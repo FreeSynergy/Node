@@ -6,6 +6,34 @@ was sich geändert hat.
 
 ---
 
+## 2026-03-04 – Claude Code – Zentinel KDL Marker-System implementiert
+
+**Geänderte Datei:**
+- `modules/proxy/zentinel/playbooks/deploy-kdl.yml` – Komplett neu geschrieben
+
+**Neue Dateien:**
+- `modules/proxy/zentinel/templates/zentinel-global.kdl.j2` – Globale Einstellungen (nur bei Erstanlage)
+- `modules/proxy/zentinel/templates/zentinel-block-l7.kdl.j2` – L7 HTTPS Route (ein Service)
+- `modules/proxy/zentinel/templates/zentinel-block-mail.kdl.j2` – Stalwart TCP + HTTPS
+- `modules/proxy/zentinel/templates/zentinel-block-sandbox.kdl.j2` – CryptPad Sandbox-Domain
+- `modules/proxy/zentinel/templates/zentinel-block-static.kdl.j2` – Root-Domain / Landing Page
+
+**Entfernte Datei:**
+- `modules/proxy/zentinel/templates/zentinel.kdl.j2` – Ersetzt durch Block-Templates
+
+**Was sich ändert:**
+- Vorher: Komplette KDL-Datei wurde bei jedem Deploy überschrieben (Control-Plane-Änderungen gingen verloren)
+- Jetzt: Jeder Service hat seinen eigenen FSN-MANAGED-START/END Block; Deployer berührt nur diese Blöcke
+- Neue Services: Block wird hinzugefügt
+- Geänderte Services: Block wird aktualisiert (in-place)
+- Entfernte Services: Block wird automatisch gelöscht (Reconcile)
+- Alles außerhalb der Marker: unberührt (Control-Plane owned)
+- Hot-Reload: Zentinel wird nur reloaded wenn die Datei sich tatsächlich geändert hat (sha256-Diff)
+
+**ansible-lint:** 0 Fehler, 0 Warnungen (73 Dateien, Production Profile)
+
+---
+
 ## 2026-03-04 – Claude Code – README.md erstellt
 
 **Neue Datei:**

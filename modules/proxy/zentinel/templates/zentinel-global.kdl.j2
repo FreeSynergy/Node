@@ -1,0 +1,13 @@
+{# Zentinel global configuration block
+   Written by FSN on initial file creation only.
+   After creation, this section is NOT managed by the deployer
+   and may be modified by the Control-Plane or operator.
+#}
+{
+    admin off
+    auto_https on
+
+{% if zentinel_acme_email is defined and zentinel_acme_email %}
+    email {{ zentinel_acme_email }}
+{% endif %}
+}
