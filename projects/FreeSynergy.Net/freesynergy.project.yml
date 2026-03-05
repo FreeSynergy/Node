@@ -24,13 +24,7 @@ project:
 
 load:
   modules:
-    # --- Infrastructure (deploy first) ---
-    "postgres":
-      module_class: "database/postgres"
-    "dragonfly":
-      module_class: "cache/dragonfly"
-
-    # --- Auth (depends on nothing, others depend on it) ---
+    # --- Auth (deploy first – other modules depend on it) ---
     "kanidm":
       module_class: "auth/kanidm"
 

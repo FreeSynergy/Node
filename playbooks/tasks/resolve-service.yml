@@ -7,8 +7,10 @@
 #   derives domain from project_domain; no YAML read needed.
 #
 # Variables (caller must pass via vars:):
-#   _svc_name  – service instance key, e.g. "postgres", "kanidm"
-#   _svc_class – module class path, e.g. "database/postgres"; empty for external
+#   _svc_name      – service instance key, e.g. "postgres", "kanidm"
+#   _svc_class     – module class path, e.g. "database/postgres"; empty for external
+#   _svc_container – actual container name; for sub-modules = "parent-svcname",
+#                    for external services = svc_name unchanged
 
 - name: "Read module YAML for service {{ _svc_name }}"
   ansible.builtin.include_vars:
@@ -21,7 +23,7 @@
   ansible.builtin.set_fact:
     services: >-
       {{ services | default({}) | combine({_svc_name: {
-        'container_name': _svc_name,
+        'container_name': _svc_container | default(_svc_name),
         'domain': _svc_name + '.' + project_domain,
         'port': (_svc_cfg.module.port | default(0)) | int,
         'db_name': instance_name,

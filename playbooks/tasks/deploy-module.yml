@@ -4,7 +4,10 @@
 
 - name: "Set module variables for {{ module_entry.key }}"
   ansible.builtin.set_fact:
-    instance_name: "{{ module_entry.key }}"
+    instance_name: >-
+      {{ (parent_instance_name ~ '-' ~ module_entry.key)
+         if (parent_instance_name | default('') | length > 0)
+         else module_entry.key }}
     module_class: "{{ module_entry.value.module_class }}"
     module_path: "{{ fsn_root }}/modules/{{ module_entry.value.module_class }}"
     service_domain: "{{ module_entry.key }}.{{ project_domain }}"
@@ -39,6 +42,7 @@
   vars:
     _svc_name: "{{ _svc_entry.key }}"
     _svc_class: "{{ _svc_entry.value.module_class }}"
+    _svc_container: "{{ instance_name }}-{{ _svc_entry.key }}"
 
 - name: "Resolve external service dependency into services dict"
   ansible.builtin.include_tasks: "{{ playbook_dir }}/tasks/resolve-service.yml"
@@ -50,6 +54,7 @@
     _svc_name: "{{ _svc_entry.key }}"
     _svc_class: >-
       {{ (project_cfg.load.modules | default({}))[_svc_entry.key].module_class | default('') }}
+    _svc_container: "{{ _svc_entry.key }}"
   when: module_cfg.load.services | default({}) | length > 0
 
 # ─────────────────────────────────────────────────────────────────────────────
