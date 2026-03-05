@@ -6,6 +6,30 @@ was sich geändert hat.
 
 ---
 
+## 2026-03-05 – Claude Code – Bugfixes: services-Dict, environment-Template, postgres
+
+**Neue Datei:**
+- `playbooks/tasks/resolve-service.yml` – Liest Sub-Modul-YAML (port, db_name) und baut `services`-Dict
+
+**Geänderte Dateien:**
+- `playbooks/tasks/deploy-module.yml` – Baut `services`-Dict vor Sub-Modul-Deployment (sub-modules + externe Abhängigkeiten)
+- `playbooks/templates/container.quadlet.j2` – Bug: `environment.items()` → `module_environment.items()` (environment ist reserviertes Ansible-Keyword)
+- `playbooks/templates/container.env.j2` – Bug: `tpl_environment.items()` → `module_environment.items()`
+- `modules/database/postgres/postgres.yml` – Bug: `{{ vars.db_name }}` → `{{ module_vars.db_name }}` (vars ist reserviert)
+
+**Was die Fixes beheben:**
+- `services.kanidm.domain`, `services.postgres.container_name` etc. sind jetzt auflösbar – OIDC-Konfigurationen aller Module funktionieren
+- Quadlet-Dateien schreiben jetzt korrekt die Modul-Env-Variablen (statt Shell-Umgebungsvariablen)
+- `.env`-Dateien für Systemd werden korrekt generiert
+- Postgres-Container startet mit korrekten DB_NAME / DB_USER
+
+**Symlink:** `playbooks/tasks/tasks/resolve-service.yml` → ansible-lint-Workaround
+
+**ansible-lint:** 0 Fehler, 0 Warnungen (74 Dateien, Production Profile)
+**ansible --syntax-check:** deploy-stack, sync-stack, update-stack – alle sauber
+
+---
+
 ## 2026-03-04 – Claude Code – Zentinel KDL Marker-System implementiert
 
 **Geänderte Datei:**

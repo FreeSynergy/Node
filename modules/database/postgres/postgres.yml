@@ -47,8 +47,8 @@ container:
   health_port: ~
 
 environment:
-  POSTGRES_DB: "{{ vars.db_name }}"
-  POSTGRES_USER: "{{ vars.db_user }}"
+  POSTGRES_DB: "{{ module_vars.db_name }}"
+  POSTGRES_USER: "{{ module_vars.db_user }}"
   POSTGRES_PASSWORD: "{{ vault_db_password }}"
   POSTGRES_INITDB_ARGS: "{{ postgres_initdb_args | default('--auth-host=scram-sha-256') }}"
   POSTGRES_HOST_AUTH_METHOD: "scram-sha-256"

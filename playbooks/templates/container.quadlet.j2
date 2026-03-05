@@ -20,7 +20,7 @@ Volume={{ volume }}
 {% for port in container.published_ports %}
 PublishPort={{ port }}
 {% endfor %}
-{% for key, value in environment.items() %}
+{% for key, value in module_environment.items() %}
 Environment={{ key }}={{ value }}
 {% endfor %}
 {% if container.read_only | default(false) %}
