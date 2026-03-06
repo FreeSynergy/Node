@@ -18,7 +18,19 @@
     - name: "Set project variables"
       ansible.builtin.set_fact:
         project_name: "{{ project_cfg.project.name }}"
+        project_domain: "{{ project_cfg.project.domain }}"
         project_root: "{{ fsn_root }}/projects/{{ project_cfg.project.name }}"
+
+    - name: "Check if vault file exists"
+      ansible.builtin.stat:
+        path: "{{ project_root }}/vault.yml"
+      register: vault_file
+
+    - name: "Load vault variables"
+      ansible.builtin.include_vars:
+        file: "{{ project_root }}/vault.yml"
+      no_log: true
+      when: vault_file.stat.exists
 
     - name: "Restart each module"
       ansible.builtin.include_tasks: "{{ playbook_dir }}/tasks/restart-module.yml"

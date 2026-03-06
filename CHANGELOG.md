@@ -6,6 +6,35 @@ was sich geändert hat.
 
 ---
 
+## 2026-03-06 – Claude Code – Playbook Architektur-Review: 11 Dateien
+
+**Kritischer Bug behoben – set_fact scope in deploy-module.yml:**
+Ansible `set_fact` ist global. Sub-Module (z.B. `forgejo-postgres`) überschreiben beim rekursiven deploy-module.yml-Aufruf die Variablen des Parents (`instance_name`, `module_cfg`, `container`, `module_environment`). Folge: das Quadlet der App (z.B. forgejo) wurde mit dem Container-Namen des letzten Sub-Moduls generiert.
+Fix: nach dem Sub-Module-Loop werden `module_cfg` neu eingelesen und alle betroffenen Vars via `module_entry` (Loop-Variable – wird von set_fact NICHT überschrieben) neu gesetzt.
+
+**Gleicher Fix in update-module.yml und restart-module.yml** (Sub-Modul-Rekursion kommt dort ebenfalls vor Parent-Operationen).
+
+**Sub-Module-Rekursion in allen Lifecycle-Tasks:**
+- `update-module.yml` – Sub-Module werden jetzt zuerst aktualisiert
+- `undeploy-module.yml` – Sub-Module stoppen NACH dem Parent (Parent gibt Connections frei)
+- `remove-module.yml` – Sub-Module werden NACH dem Parent gelöscht
+- `restart-module.yml` – Sub-Module starten VOR dem Parent (Connections müssen bereit sein)
+
+**vault.yml konsistent in allen Stack-Playbooks geladen:**
+- `update-stack.yml` – vault.yml + project_domain hinzugefügt
+- `restart-stack.yml` – vault.yml + project_domain hinzugefügt
+- `undeploy-stack.yml` – vault.yml hinzugefügt
+- `remove-stack.yml` – vault.yml + project_domain hinzugefügt
+
+**clean-module.yml:** Löscht jetzt auch `data/` und `configs/` für verwaiste Module (vorher nur Quadlet-Dateien).
+
+**Geänderte Dateien (11):**
+`tasks/deploy-module.yml`, `tasks/update-module.yml`, `tasks/undeploy-module.yml`,
+`tasks/remove-module.yml`, `tasks/restart-module.yml`, `tasks/clean-module.yml`,
+`update-stack.yml`, `restart-stack.yml`, `undeploy-stack.yml`, `remove-stack.yml`
+
+---
+
 ## 2026-03-06 – Claude Code – Code-Review Fixes: 6 Fehler behoben
 
 **Geänderte Dateien:**

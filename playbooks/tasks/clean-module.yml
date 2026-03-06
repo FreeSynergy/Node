@@ -26,6 +26,16 @@
     path: "{{ ansible_user_dir }}/.config/containers/systemd/{{ orphan_name }}.env"
     state: absent
 
+- name: "Remove data directory for {{ orphan_name }}"
+  ansible.builtin.file:
+    path: "{{ project_root }}/data/{{ orphan_name }}"
+    state: absent
+
+- name: "Remove config directory for {{ orphan_name }}"
+  ansible.builtin.file:
+    path: "{{ project_root }}/configs/{{ orphan_name }}"
+    state: absent
+
 - name: "Reload systemd"
   ansible.builtin.systemd:
     daemon_reload: true

@@ -21,6 +21,17 @@
         project_domain: "{{ project_cfg.project.domain }}"
         project_root: "{{ fsn_root }}/projects/{{ project_cfg.project.name }}"
 
+    - name: "Check if vault file exists"
+      ansible.builtin.stat:
+        path: "{{ project_root }}/vault.yml"
+      register: vault_file
+
+    - name: "Load vault variables"
+      ansible.builtin.include_vars:
+        file: "{{ project_root }}/vault.yml"
+      no_log: true
+      when: vault_file.stat.exists
+
     - name: "Run undeploy hooks then stop each module"
       ansible.builtin.include_tasks: "{{ playbook_dir }}/tasks/undeploy-module.yml"
       loop: "{{ project_cfg.load.modules | dict2items | reverse | list }}"

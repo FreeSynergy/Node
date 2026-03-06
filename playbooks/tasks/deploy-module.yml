@@ -22,7 +22,6 @@
     module: "{{ module_cfg.module }}"
     container: "{{ module_cfg.container }}"
     module_environment: "{{ module_cfg.environment | default({}) }}"
-    healthcheck: "{{ module_cfg.container.healthcheck | default(omit) }}"
     module_vars: "{{ module_cfg.vars | default({}) }}"
 
 # ── Build 'services' lookup dict ─────────────────────────────────────────────
@@ -91,6 +90,25 @@
       vars:
         parent_instance_name: "{{ instance_name }}"
         module_entry: "{{ sub_module_entry }}"
+
+    # Re-apply parent state: sub-module set_facts overwrite global vars like
+    # instance_name, module_cfg, container, module_environment. We restore them
+    # here using module_entry (loop variable – never overwritten by set_fact).
+    - name: "Re-read parent module class file"
+      ansible.builtin.include_vars:
+        file: "{{ fsn_root }}/modules/{{ module_entry.value.module_class }}/{{ module_entry.value.module_class | basename }}.yml"
+        name: module_cfg
+
+    - name: "Re-apply parent module variables"
+      ansible.builtin.set_fact:
+        instance_name: >-
+          {{ (parent_instance_name ~ '-' ~ module_entry.key)
+             if (parent_instance_name | default('') | length > 0)
+             else module_entry.key }}
+        service_domain: "{{ module_entry.key }}.{{ project_domain }}"
+        container: "{{ module_cfg.container }}"
+        module_environment: "{{ module_cfg.environment | default({}) }}"
+        module_vars: "{{ module_cfg.vars | default({}) }}"
 
     - name: "Generate Quadlet"
       ansible.builtin.include_tasks: "{{ playbook_dir }}/tasks/generate-quadlet.yml"
