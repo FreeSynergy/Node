@@ -6,6 +6,30 @@ was sich geändert hat.
 
 ---
 
+## 2026-03-07 – Claude Code – fsn-tui: Dashboard-Umbau (Sidebar, Projekt-Liste, Edit/Delete)
+
+### Geänderte Dateien
+- `cli/crates/fsn-tui/Cargo.toml` – `toml = { workspace = true }` hinzugefügt (TOML-Parsing)
+- `cli/crates/fsn-tui/src/app.rs` – `DashFocus`-Enum, `ProjectInfo`-Struct, `dirty()`-Builder, `edit_slug` in `NewProjectForm`, `NewProjectForm::from_project()`, `AppState` um `projects`/`selected_project`/`dash_focus`/`dash_confirm` erweitert
+- `cli/crates/fsn-tui/src/lib.rs` – `load_projects()` + `parse_project_toml()` lesen `*.project.toml` beim Start
+- `cli/crates/fsn-tui/src/i18n.rs` – Neue Schlüssel: `dash.hint.services`, `dash.hint.confirm`, `dash.no_projects`, `dash.new_project`, `welcome.edit_project`, `form.submit.edit`, `sidebar.projects` (DE+EN)
+- `cli/crates/fsn-tui/src/ui/dashboard.rs` – Komplettumbau: Sidebar (22 Spalten) + Fokus-System (Sidebar/Services), Header zeigt aktives Projekt, Bestätigungsdialog fürs Löschen
+- `cli/crates/fsn-tui/src/ui/new_project.rs` – Edit-Modus: Titel + Submit-Button abhängig von `edit_slug`
+- `cli/crates/fsn-tui/src/events.rs` – `handle_dashboard()` neu mit 2-Fokus-System, `delete_selected_project()`, `submit_project()` lädt Projektliste neu
+
+### Was sich geändert hat
+- **Projekt-Sidebar**: Dashboard zeigt alle Projekte aus `projects/*/`. `↑↓` wechselt Projekte, `Tab` springt zur Services-Tabelle
+- **Neues Projekt aus Dashboard**: `n` öffnet das Formular, nach Speichern kehrt man zurück
+- **Projekt bearbeiten**: `e` öffnet das Formular mit vorausgefüllten Feldern (`edit_slug` merkt sich den Slug)
+- **Projekt löschen**: `x` zeigt Bestätigungsdialog (gelb), `J/Y` löscht, `N` bricht ab; Verzeichnis wird entfernt
+- **Focus-Highlight**: Aktiver Bereich (Sidebar/Services) wird Cyan hervorgehoben
+- **Header**: Zeigt `FSN · Name @ domain` des ausgewählten Projekts
+
+### Nächster Schritt
+- Services-Aktionen implementieren (Deploy, Restart, Stop, Logs-Overlay)
+
+---
+
 ## 2026-03-07 – Claude Code – fsn-tui: Dropdown, Button-Fix, Maus-Klick, TOML-Speichern
 
 ### Geänderte Dateien

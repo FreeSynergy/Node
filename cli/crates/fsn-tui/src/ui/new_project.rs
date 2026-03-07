@@ -58,10 +58,12 @@ pub fn render(f: &mut Frame, state: &AppState) {
 // ── Header ────────────────────────────────────────────────────────────────────
 
 fn render_header(f: &mut Frame, state: &AppState, area: Rect) {
+    let is_edit = state.new_project.as_ref().map(|f| f.edit_slug.is_some()).unwrap_or(false);
+    let title_key = if is_edit { "welcome.edit_project" } else { "welcome.new_project" };
     let title = Line::from(vec![
         Span::styled(" FreeSynergy.Node ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
         Span::styled("– ",                  Style::default().fg(Color::DarkGray)),
-        Span::styled(state.t("welcome.new_project"), Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
+        Span::styled(state.t(title_key), Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
     ]);
     let header = Paragraph::new(title)
         .block(Block::default().borders(Borders::BOTTOM).border_style(Style::default().fg(Color::DarkGray)));
@@ -234,7 +236,8 @@ fn render_fields(f: &mut Frame, state: &AppState, form: &NewProjectForm, area: R
                 let btn_area = Rect { x: inner.x, y: btn_y, width: inner.width / 3, height: 3 };
                 let missing = form.missing_required();
                 let disabled = !missing.is_empty();
-                let btn = Paragraph::new(widgets::button_line(state.t("form.submit"), true, disabled))
+                let submit_key = if form.edit_slug.is_some() { "form.submit.edit" } else { "form.submit" };
+                let btn = Paragraph::new(widgets::button_line(state.t(submit_key), true, disabled))
                     .block(Block::default().borders(Borders::ALL).border_style(
                         if disabled { Style::default().fg(Color::DarkGray) } else { Style::default().fg(Color::Green) }
                     ))

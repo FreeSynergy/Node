@@ -759,6 +759,7 @@ dependencies = [
  "ratatui",
  "sysinfo",
  "tokio",
+ "toml 0.8.23",
  "tracing",
 ]
 

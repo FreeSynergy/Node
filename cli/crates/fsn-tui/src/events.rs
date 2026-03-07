@@ -5,7 +5,7 @@ use std::path::Path;
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
 
-use crate::app::{AppState, FormFieldType, FormTab, LogsState, NewProjectForm, Screen, ServiceStatus};
+use crate::app::{AppState, DashFocus, FormFieldType, FormTab, LogsState, NewProjectForm, Screen, ServiceStatus};
 
 pub fn handle(key: KeyEvent, state: &mut AppState, root: &Path) -> Result<()> {
     // Update ctrl-hint display (switches hint bar to show Ctrl shortcuts)
@@ -211,18 +211,78 @@ fn handle_new_project(key: KeyEvent, state: &mut AppState, root: &Path) -> Resul
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 
-fn handle_dashboard(key: KeyEvent, state: &mut AppState, _root: &Path) -> Result<()> {
-    match key.code {
-        KeyCode::Char('q') | KeyCode::Esc => {
-            state.should_quit = true;
+fn handle_dashboard(key: KeyEvent, state: &mut AppState, root: &Path) -> Result<()> {
+    // Delete confirmation mode — J=confirm, anything else = cancel
+    if state.dash_confirm {
+        match key.code {
+            KeyCode::Char('j') | KeyCode::Char('J') | KeyCode::Char('y') | KeyCode::Char('Y') => {
+                delete_selected_project(state, root)?;
+            }
+            _ => {}
         }
-        KeyCode::Char('l') | KeyCode::Char('L') => {
-            // L without selection = language toggle; with selection ambiguous
-            // Check if services list is focused first
-            if state.services.is_empty() {
-                state.lang = state.lang.toggle();
-            } else {
-                // Open logs overlay for selected service
+        state.dash_confirm = false;
+        return Ok(());
+    }
+
+    match state.dash_focus {
+        // ── Sidebar focus ──────────────────────────────────────────────────────
+        DashFocus::Sidebar => match key.code {
+            KeyCode::Char('q') | KeyCode::Esc => state.should_quit = true,
+
+            KeyCode::Char('L') => state.lang = state.lang.toggle(),
+
+            KeyCode::Tab => state.dash_focus = DashFocus::Services,
+
+            KeyCode::Up => {
+                if state.selected_project > 0 { state.selected_project -= 1; }
+            }
+            KeyCode::Down => {
+                if state.selected_project + 1 < state.projects.len() {
+                    state.selected_project += 1;
+                }
+            }
+
+            // n = new project
+            KeyCode::Char('n') => {
+                state.new_project = Some(NewProjectForm::new());
+                state.screen = Screen::NewProject;
+            }
+
+            // e = edit selected project (pre-filled form)
+            KeyCode::Char('e') => {
+                if let Some(proj) = state.projects.get(state.selected_project) {
+                    let form = NewProjectForm::from_project(proj);
+                    state.new_project = Some(form);
+                    state.screen = Screen::NewProject;
+                }
+            }
+
+            // x / Delete = delete with confirmation
+            KeyCode::Char('x') | KeyCode::Delete => {
+                if !state.projects.is_empty() {
+                    state.dash_confirm = true;
+                }
+            }
+
+            _ => {}
+        },
+
+        // ── Services focus ─────────────────────────────────────────────────────
+        DashFocus::Services => match key.code {
+            KeyCode::Char('q') | KeyCode::Esc => state.should_quit = true,
+
+            KeyCode::Char('L') => state.lang = state.lang.toggle(),
+
+            KeyCode::Tab => state.dash_focus = DashFocus::Sidebar,
+
+            KeyCode::Up => {
+                if state.selected > 0 { state.selected -= 1; }
+            }
+            KeyCode::Down => {
+                if state.selected + 1 < state.services.len() { state.selected += 1; }
+            }
+
+            KeyCode::Char('l') => {
                 if let Some(svc) = state.services.get(state.selected) {
                     let lines = fetch_logs(&svc.name);
                     state.logs_overlay = Some(LogsState {
@@ -232,51 +292,52 @@ fn handle_dashboard(key: KeyEvent, state: &mut AppState, _root: &Path) -> Result
                     });
                 }
             }
-        }
-        KeyCode::Up => {
-            if state.selected > 0 {
-                state.selected -= 1;
-            }
-        }
-        KeyCode::Down => {
-            if state.selected + 1 < state.services.len() {
-                state.selected += 1;
-            }
-        }
-        KeyCode::Char('d') => {
-            // Deploy: mark as unknown while running (async in future)
-            if let Some(svc) = state.services.get_mut(state.selected) {
-                svc.status = ServiceStatus::Unknown;
-            }
-            // TODO: spawn deploy task
-        }
-        KeyCode::Char('r') => {
-            // Restart selected service via podman
-            if let Some(svc) = state.services.get(state.selected) {
-                let _ = std::process::Command::new("podman")
-                    .args(["restart", &svc.name])
-                    .output();
-                if let Some(row) = state.services.get_mut(state.selected) {
-                    row.status = podman_status(&row.name);
+
+            KeyCode::Char('d') => {
+                if let Some(svc) = state.services.get_mut(state.selected) {
+                    svc.status = ServiceStatus::Unknown;
                 }
             }
-        }
-        KeyCode::Char('x') => {
-            // Remove selected service (stop + remove)
-            if let Some(svc) = state.services.get(state.selected) {
-                let _ = std::process::Command::new("podman")
-                    .args(["stop", &svc.name])
-                    .output();
-                let _ = std::process::Command::new("podman")
-                    .args(["rm", &svc.name])
-                    .output();
-                state.services.remove(state.selected);
-                if state.selected > 0 && state.selected >= state.services.len() {
-                    state.selected -= 1;
+
+            KeyCode::Char('r') => {
+                if let Some(svc) = state.services.get(state.selected) {
+                    let _ = std::process::Command::new("podman")
+                        .args(["restart", &svc.name])
+                        .output();
+                    if let Some(row) = state.services.get_mut(state.selected) {
+                        row.status = podman_status(&row.name);
+                    }
                 }
             }
-        }
-        _ => {}
+
+            KeyCode::Char('x') => {
+                if let Some(svc) = state.services.get(state.selected) {
+                    let _ = std::process::Command::new("podman").args(["stop", &svc.name]).output();
+                    let _ = std::process::Command::new("podman").args(["rm",   &svc.name]).output();
+                    state.services.remove(state.selected);
+                    if state.selected > 0 && state.selected >= state.services.len() {
+                        state.selected -= 1;
+                    }
+                }
+            }
+
+            _ => {}
+        },
+    }
+    Ok(())
+}
+
+fn delete_selected_project(state: &mut AppState, root: &Path) -> Result<()> {
+    let Some(proj) = state.projects.get(state.selected_project) else { return Ok(()); };
+    let project_dir = root.join("projects").join(&proj.slug);
+    // Best-effort removal — ignore errors (might not own the directory)
+    let _ = std::fs::remove_dir_all(&project_dir);
+    state.projects.remove(state.selected_project);
+    if state.selected_project > 0 && state.selected_project >= state.projects.len() {
+        state.selected_project -= 1;
+    }
+    if state.projects.is_empty() {
+        state.screen = Screen::Welcome;
     }
     Ok(())
 }
@@ -453,7 +514,18 @@ fn submit_project(state: &mut AppState, root: &Path) -> Result<()> {
 
     match result {
         Ok(()) => {
+            // Reload projects from disk so dashboard is up to date
+            state.projects = crate::load_projects(root);
+            // Select the newly created/edited project in the sidebar
+            if let Some(ref form) = state.new_project {
+                let slug = form.edit_slug.clone()
+                    .unwrap_or_else(|| crate::app::slugify(&form.field_value("name")));
+                state.selected_project = state.projects.iter()
+                    .position(|p| p.slug == slug)
+                    .unwrap_or(0);
+            }
             state.screen = Screen::Dashboard;
+            state.dash_focus = DashFocus::Sidebar;
             state.new_project = None;
         }
         Err(e) => {
@@ -466,8 +538,10 @@ fn submit_project(state: &mut AppState, root: &Path) -> Result<()> {
 }
 
 fn write_project_to_disk(form: &crate::app::NewProjectForm, root: &Path) -> anyhow::Result<()> {
-    let name = form.field_value("name");
-    let slug = crate::app::slugify(&name);
+    let is_edit = form.edit_slug.is_some();
+    let name    = form.field_value("name");
+    let slug    = form.edit_slug.clone()
+        .unwrap_or_else(|| crate::app::slugify(&name));
 
     if slug.is_empty() {
         return Err(anyhow::anyhow!("Projektname ist ungültig (leer nach Bereinigung)"));
@@ -477,8 +551,8 @@ fn write_project_to_disk(form: &crate::app::NewProjectForm, root: &Path) -> anyh
     std::fs::create_dir_all(&project_dir)?;
 
     let toml_path = project_dir.join(format!("{}.project.toml", slug));
-    if toml_path.exists() {
-        // Project already exists — don't overwrite, just go to dashboard
+    if !is_edit && toml_path.exists() {
+        // New project but file already exists — just switch to dashboard
         return Ok(());
     }
 

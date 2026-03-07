@@ -20,7 +20,7 @@ use crossterm::{
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
 
-use app::{AppState, ServiceRow, ServiceStatus};
+use app::{AppState, ProjectInfo, ServiceRow, ServiceStatus};
 use sysinfo::SysInfo;
 
 /// Start the TUI. Blocks until the user quits.
@@ -31,7 +31,8 @@ pub fn run(root: &Path) -> Result<()> {
     // Load running services from Podman (best-effort)
     let services = load_services(root);
 
-    let mut state = AppState::new(sysinfo, services);
+    let projects = load_projects(root);
+    let mut state = AppState::new(sysinfo, services, projects);
 
     // If a project.toml already exists, go straight to Dashboard
     // even when no containers are running yet
@@ -58,6 +59,55 @@ pub fn run(root: &Path) -> Result<()> {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+/// Load all projects from `root/projects/` into ProjectInfo structs.
+pub fn load_projects(root: &Path) -> Vec<ProjectInfo> {
+    let projects_dir = root.join("projects");
+    if !projects_dir.exists() { return vec![]; }
+
+    let mut projects = Vec::new();
+    let Ok(entries) = std::fs::read_dir(&projects_dir) else { return projects; };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() { continue; }
+        let Ok(inner) = std::fs::read_dir(&path) else { continue; };
+        for f in inner.flatten() {
+            let fp = f.path();
+            if fp.extension().and_then(|e| e.to_str()) != Some("toml") { continue; }
+            if !fp.file_stem().and_then(|s| s.to_str())
+                .map(|s| s.ends_with(".project"))
+                .unwrap_or(false) { continue; }
+            if let Some(info) = parse_project_toml(&fp) {
+                projects.push(info);
+            }
+        }
+    }
+    projects
+}
+
+fn parse_project_toml(path: &Path) -> Option<ProjectInfo> {
+    let content = std::fs::read_to_string(path).ok()?;
+    let val: toml::Value = content.parse().ok()?;
+    let proj = val.get("project")?;
+
+    let get = |key: &str| proj.get(key).and_then(|v| v.as_str()).unwrap_or("").to_string();
+
+    let stem = path.file_stem()?.to_str()?;
+    let slug = stem.strip_suffix(".project").unwrap_or(stem).to_string();
+
+    Some(ProjectInfo {
+        slug,
+        name:        get("name"),
+        domain:      get("domain"),
+        description: get("description"),
+        email:       get("email"),
+        language:    get("language"),
+        version:     get("version"),
+        path:        get("path"),
+        toml_path:   path.to_path_buf(),
+    })
+}
 
 /// Returns true if any *.project.toml exists under `root/projects/`.
 fn project_toml_exists(root: &Path) -> bool {

@@ -20,6 +20,14 @@ pub enum Screen {
     NewProject,
 }
 
+// ── Dashboard focus ───────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DashFocus {
+    Sidebar,
+    Services,
+}
+
 // ── Language ──────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -35,6 +43,21 @@ impl Lang {
     pub fn label(self) -> &'static str {
         match self { Lang::De => "DE", Lang::En => "EN" }
     }
+}
+
+// ── Project info (loaded from disk) ──────────────────────────────────────────
+
+#[derive(Debug, Clone)]
+pub struct ProjectInfo {
+    pub slug:        String,
+    pub name:        String,
+    pub domain:      String,
+    pub description: String,
+    pub email:       String,
+    pub language:    String,
+    pub version:     String,
+    pub path:        String,
+    pub toml_path:   std::path::PathBuf,
 }
 
 // ── Service table ─────────────────────────────────────────────────────────────
@@ -127,6 +150,7 @@ impl FormField {
     fn hint(mut self, k: &'static str) -> Self { self.hint_key = Some(k); self }
     fn default_val(mut self, v: &str) -> Self { self.value = v.to_string(); self.cursor = v.len(); self }
     fn opts(mut self, o: Vec<&'static str>) -> Self { self.options = o; self }
+    fn dirty(mut self) -> Self { self.dirty = true; self }
 }
 
 #[derive(Debug)]
@@ -135,6 +159,8 @@ pub struct NewProjectForm {
     pub active_field: usize,        // index into `fields` filtered by active_tab
     pub fields:       Vec<FormField>,
     pub error:        Option<String>,
+    /// When Some(slug), editing an existing project (overwrite on submit).
+    pub edit_slug:    Option<String>,
 }
 
 impl NewProjectForm {
@@ -162,7 +188,28 @@ impl NewProjectForm {
                 .default_val("0.1.0"),
         ];
 
-        Self { active_tab: 0, active_field: 0, fields, error: None }
+        Self { active_tab: 0, active_field: 0, fields, error: None, edit_slug: None }
+    }
+
+    /// Create a pre-filled edit form from an existing project.
+    pub fn from_project(info: &ProjectInfo) -> Self {
+        let fields = vec![
+            FormField::new("name",          "form.project.name",        FormTab::Project, true,  FormFieldType::Text)
+                .hint("form.project.name.hint").default_val(&info.name).dirty(),
+            FormField::new("domain",        "form.project.domain",      FormTab::Project, true,  FormFieldType::Text)
+                .hint("form.project.domain.hint").default_val(&info.domain).dirty(),
+            FormField::new("description",   "form.project.description", FormTab::Project, false, FormFieldType::Text)
+                .hint("form.project.description.hint").default_val(&info.description).dirty(),
+            FormField::new("contact_email", "form.project.email",       FormTab::Project, true,  FormFieldType::Email)
+                .hint("form.project.email.hint").default_val(&info.email).dirty(),
+            FormField::new("language", "form.options.language",  FormTab::Options, false, FormFieldType::Select)
+                .opts(vec!["de", "en", "fr", "es", "it", "pt"]).default_val(&info.language).dirty(),
+            FormField::new("path",     "form.project.path",      FormTab::Options, true,  FormFieldType::Path)
+                .hint("form.project.path.hint").default_val(&info.path).dirty(),
+            FormField::new("version",  "form.options.version",   FormTab::Options, false, FormFieldType::Text)
+                .default_val(&info.version).dirty(),
+        ];
+        Self { active_tab: 0, active_field: 0, fields, error: None, edit_slug: Some(info.slug.clone()) }
     }
 
     /// Indices of fields belonging to the active tab.
@@ -408,6 +455,12 @@ pub struct AppState {
     pub new_project:        Option<NewProjectForm>,
     /// True when last keypress included CONTROL — switches hint bar to Ctrl shortcuts.
     pub ctrl_hint:          bool,
+    /// Loaded projects from disk.
+    pub projects:           Vec<ProjectInfo>,
+    pub selected_project:   usize,
+    pub dash_focus:         DashFocus,
+    /// True = waiting for delete-confirm (J/N).
+    pub dash_confirm:       bool,
     last_refresh:           Instant,
 }
 
@@ -419,13 +472,15 @@ pub struct LogsState {
 }
 
 impl AppState {
-    pub fn new(sysinfo: SysInfo, services: Vec<ServiceRow>) -> Self {
+    pub fn new(sysinfo: SysInfo, services: Vec<ServiceRow>, projects: Vec<ProjectInfo>) -> Self {
         let screen = if services.is_empty() { Screen::Welcome } else { Screen::Dashboard };
         Self {
             screen, lang: Lang::De, sysinfo, services,
             selected: 0, logs_overlay: None, lang_dropdown_open: false,
             should_quit: false, welcome_focus: 0, new_project: None,
-            ctrl_hint: false, last_refresh: Instant::now(),
+            ctrl_hint: false, projects, selected_project: 0,
+            dash_focus: DashFocus::Sidebar, dash_confirm: false,
+            last_refresh: Instant::now(),
         }
     }
 
