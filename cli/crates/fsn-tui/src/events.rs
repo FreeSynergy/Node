@@ -3,7 +3,7 @@
 use std::path::Path;
 
 use anyhow::Result;
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
 
 use crate::app::{AppState, FormFieldType, FormTab, LogsState, NewProjectForm, Screen, ServiceStatus};
 
@@ -67,9 +67,18 @@ fn handle_new_project(key: KeyEvent, state: &mut AppState) -> Result<()> {
 
     match key.code {
         KeyCode::Esc => {
-            // Back to Welcome
-            state.screen = Screen::Welcome;
-            state.new_project = None;
+            if let Some(ref mut form) = state.new_project {
+                if form.active_tab > 0 {
+                    // Go back one tab — data is preserved
+                    form.prev_tab();
+                    form.error = None;
+                } else {
+                    // On first tab: go back to Welcome, keep form data in case user returns
+                    state.screen = Screen::Welcome;
+                }
+            } else {
+                state.screen = Screen::Welcome;
+            }
         }
 
         // Tab switches to next field
@@ -129,19 +138,24 @@ fn handle_new_project(key: KeyEvent, state: &mut AppState) -> Result<()> {
         KeyCode::Enter => {
             if let Some(ref mut form) = state.new_project {
                 let is_last_tab = form.active_tab == FormTab::count() - 1;
-                if is_last_tab {
-                    // Submit if all required fields are filled
-                    let missing = form.missing_required();
-                    if missing.is_empty() {
+                let missing_on_tab = form.tab_missing_count(form.active_tab);
+                if missing_on_tab > 0 {
+                    form.error = Some(format!(
+                        "{} {}",
+                        missing_on_tab,
+                        if missing_on_tab == 1 { "Pflichtfeld fehlt" } else { "Pflichtfelder fehlen" },
+                    ));
+                } else if is_last_tab {
+                    let missing_total = form.missing_required();
+                    if missing_total.is_empty() {
                         // TODO: trigger project creation
-                        // For now show success feedback via error field
                         form.error = None;
                         state.screen = Screen::Welcome;
-                        // Keep form data for now; caller will pick it up
                     } else {
-                        form.error = Some(format!("{} Pflichtfeld(er) fehlen", missing.len()));
+                        form.error = Some(format!("{} Pflichtfeld(er) auf anderen Tabs fehlen", missing_total.len()));
                     }
                 } else {
+                    form.error = None;
                     form.next_tab();
                 }
             }
@@ -309,6 +323,41 @@ fn is_typing(state: &AppState) -> bool {
     } else {
         false
     }
+}
+
+// ── Mouse events ──────────────────────────────────────────────────────────────
+
+pub fn handle_mouse(event: MouseEvent, state: &mut AppState) -> Result<()> {
+    match event.kind {
+        // Scroll wheel in logs overlay
+        MouseEventKind::ScrollDown => {
+            if let Some(ref mut logs) = state.logs_overlay {
+                let max = logs.lines.len().saturating_sub(1);
+                if logs.scroll < max { logs.scroll += 1; }
+            } else if let Some(ref mut form) = state.new_project {
+                // Scroll in form: cycle Select fields or move to next field
+                if is_select_field(form) { form.select_next(); }
+            }
+        }
+        MouseEventKind::ScrollUp => {
+            if let Some(ref mut logs) = state.logs_overlay {
+                if logs.scroll > 0 { logs.scroll -= 1; }
+            } else if let Some(ref mut form) = state.new_project {
+                if is_select_field(form) { form.select_prev(); }
+            }
+        }
+        // Left-click: toggle language button (top-right corner)
+        MouseEventKind::Down(_) => {
+            // A click on [DE]/[EN] button — approximate position check
+            // We look for a click in the top-right 6 columns
+            let terminal_width = crossterm::terminal::size().map(|(w, _)| w).unwrap_or(80);
+            if event.column >= terminal_width.saturating_sub(6) && event.row <= 2 {
+                state.lang = state.lang.toggle();
+            }
+        }
+        _ => {}
+    }
+    Ok(())
 }
 
 // ── Podman helpers ────────────────────────────────────────────────────────────

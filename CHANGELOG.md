@@ -6,6 +6,26 @@ was sich geändert hat.
 
 ---
 
+## 2026-03-07 – Claude Code – fsn-tui: UX-Verbesserungen (Zentrierung, Maus, Validierung)
+
+### Geänderte Dateien
+- `cli/crates/fsn-tui/src/ui/welcome.rs` – Sysinfo-Box: `Max(74)` + `Fill(1)` statt Percentage → zentriert. Branding: „FreeSynergy.Node · by KalEl"
+- `cli/crates/fsn-tui/src/app.rs` – `tab_missing_count()`, Event-Loop: `Event::Mouse` → `handle_mouse()`
+- `cli/crates/fsn-tui/src/events.rs` – Maus: ScrollUp/Down für Logs + Select. ESC geht Tab-weise zurück. Tab-Wechsel blockiert wenn Pflichtfelder fehlen
+- `cli/crates/fsn-tui/src/lib.rs` – `EnableMouseCapture` / `DisableMouseCapture`
+
+### Was sich geändert hat
+- Sysinfo-Box ist zentriert
+- Maus: Scrollrad für Logs/Select, Klick auf Sprach-Button
+- Pflichtfelder müssen vor Tab-Wechsel ausgefüllt sein
+- ESC geht schrittweise zurück (Daten bleiben erhalten)
+- Branding im Header
+
+### Nächster Schritt
+- Submit-Handler: Verzeichnis + project.toml + host.toml schreiben
+
+---
+
 ## 2026-03-07 – Claude Code – fsn-tui: New-Project-Formular vollständig
 
 ### Geänderte Dateien

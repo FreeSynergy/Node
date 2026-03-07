@@ -302,7 +302,15 @@ impl NewProjectForm {
         }
     }
 
-    /// Validate — returns list of missing required fields.
+    /// How many required fields on the given tab are still empty.
+    pub fn tab_missing_count(&self, tab_idx: usize) -> usize {
+        let tab = FormTab::from_index(tab_idx);
+        self.fields.iter()
+            .filter(|f| f.tab == tab && f.required && f.value.trim().is_empty())
+            .count()
+    }
+
+    /// Validate — returns list of missing required fields (all tabs).
     pub fn missing_required(&self) -> Vec<&'static str> {
         self.fields.iter()
             .filter(|f| f.required && f.value.trim().is_empty())
@@ -365,8 +373,10 @@ pub fn run_loop(
         terminal.draw(|f| ui::render(f, state))?;
 
         if event::poll(Duration::from_millis(POLL_MS))? {
-            if let Event::Key(key) = event::read()? {
-                crate::events::handle(key, state, root)?;
+            match event::read()? {
+                Event::Key(key) => crate::events::handle(key, state, root)?,
+                Event::Mouse(mouse) => crate::events::handle_mouse(mouse, state)?,
+                _ => {}
             }
         }
 

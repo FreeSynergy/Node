@@ -54,8 +54,10 @@ pub fn render(f: &mut Frame, state: &AppState) {
 
 fn render_header(f: &mut Frame, state: &AppState, area: Rect) {
     let title = Line::from(vec![
-        Span::styled(" FreeSynergy.Node ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-        Span::styled("v0.1.0",             Style::default().fg(Color::DarkGray)),
+        Span::styled(" FreeSynergy", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+        Span::styled(".Node",        Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
+        Span::styled(" v0.1.0 ",     Style::default().fg(Color::DarkGray)),
+        Span::styled("· by KalEl",   Style::default().fg(Color::DarkGray)),
     ]);
 
     let header = Paragraph::new(title)
@@ -71,12 +73,13 @@ fn render_header(f: &mut Frame, state: &AppState, area: Rect) {
 // ── Body ──────────────────────────────────────────────────────────────────────
 
 fn render_body(f: &mut Frame, state: &AppState, area: Rect) {
+    // Center the content at a fixed max width so it doesn't stretch across the full screen
     let cols = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Percentage(10),
-            Constraint::Percentage(80),
-            Constraint::Percentage(10),
+            Constraint::Fill(1),
+            Constraint::Max(74),
+            Constraint::Fill(1),
         ])
         .split(area);
 
