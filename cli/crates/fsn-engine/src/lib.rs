@@ -10,4 +10,5 @@ pub mod diff;
 pub mod generate;
 pub mod observe;
 pub mod resolve;
+pub mod setup;
 pub mod template;

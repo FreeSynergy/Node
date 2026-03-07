@@ -1,0 +1,56 @@
+# Module class definition – maps to modules/proxy/zentinel/zentinel.toml
+#
+# Field order (MANDATORY per RULES.md):
+#   module → vars → load → container → environment → setup
+#
+# NOTE: Zentinel is the ONLY module allowed to use published_ports (80 + 443).
+#       per_host = 1 and per_ip = 1 are mandatory.
+
+[module]
+name        = "zentinel"
+alias       = []
+type        = "proxy"
+author      = "FreeSynergy.Node"
+version     = "0.0.1"
+tags        = ["proxy", "reverse-proxy", "tls"]
+description = "Zentinel reverse proxy with automatic TLS"
+website     = "https://github.com/zentinelproxy/zentinel"
+repository  = "https://github.com/zentinelproxy/zentinel"
+port        = 443
+
+[module.constraints]
+per_host = 1
+per_ip   = 1
+
+[vars]
+config_dir = "{{ project_root }}/data/{{ instance_name }}"
+kdl_path   = "{{ module_vars.config_dir }}/config/zentinel.kdl"
+
+[load.modules.zentinel-control-plane]
+module_class = "proxy/zentinel/zentinel-control-plane"
+
+[container]
+name            = "{{ instance_name }}"
+image           = "ghcr.io/zentinelproxy/zentinel"
+image_tag       = "latest"
+# Zentinel is the ONLY module with published_ports
+published_ports = ["80:80", "443:443"]
+volumes         = [
+    "{{ module_vars.config_dir }}/config:/config:Z",
+    "{{ module_vars.config_dir }}/data:/data:Z",
+    "{{ project_root }}/branding:/srv/{{ project_name }}/branding:ro,Z",
+    "{{ project_root }}/sites:/srv/{{ project_name }}/sites:ro,Z",
+]
+
+[container.healthcheck]
+cmd          = "curl -fsS http://localhost:80/ || exit 1"
+interval     = "15s"
+timeout      = "3s"
+retries      = 3
+start_period = "10s"
+
+[environment]
+ZENTINEL_CONFIG = "/config/zentinel.kdl"
+
+# No setup.fields – TLS certificates are obtained automatically via ACME.
+# ACME email is configured in the host file (host.toml [proxy.acme_email]).

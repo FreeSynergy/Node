@@ -1,0 +1,100 @@
+[module]
+name        = "outline"
+alias       = ["wiki"]
+type        = "wiki"
+author      = "FreeSynergy.Node"
+version     = "0.0.1"
+tags        = ["wiki", "knowledge", "docs"]
+description = "Outline collaborative wiki and knowledge base"
+website     = "https://www.getoutline.com"
+repository  = "https://github.com/outline/outline"
+port        = 3000
+health_path = "/_health"
+health_port = 3000
+
+[module.constraints]
+
+[module.federation]
+enabled   = true
+min_trust = 2
+
+[vars]
+config_dir = "{{ project_root }}/data/{{ instance_name }}"
+
+[load.modules.postgres]
+module_class = "database/postgres"
+
+[load.services.kanidm]
+[load.services.cache]
+
+[container]
+name      = "{{ instance_name }}"
+image     = "docker.getoutline.com/outlinewiki/outline"
+image_tag = "latest"
+volumes   = ["{{ module_vars.config_dir }}/data:/var/lib/outline/data:Z"]
+
+[container.healthcheck]
+cmd          = "curl -fsS http://localhost:3000/_health || exit 1"
+interval     = "30s"
+timeout      = "5s"
+retries      = 3
+start_period = "30s"
+
+[environment]
+NODE_ENV                      = "production"
+URL                           = "https://{{ service_domain }}"
+PORT                          = "{{ module.port }}"
+SECRET_KEY                    = "{{ vault_outline_secret_key }}"
+UTILS_SECRET                  = "{{ vault_outline_utils_secret }}"
+DATABASE_URL                  = "postgres://{{ services.postgres.db_user }}:{{ services.postgres.vault_db_password }}@{{ services.postgres.container_name }}:{{ services.postgres.port }}/{{ services.postgres.db_name }}"
+DATABASE_CONNECTION_POOL_MIN  = "{{ outline_db_pool_min | default('') }}"
+DATABASE_CONNECTION_POOL_MAX  = "{{ outline_db_pool_max | default('') }}"
+PGSSLMODE                     = "disable"
+REDIS_URL                     = "redis://:{{ services.cache.vault_cache_password }}@{{ services.cache.container_name }}:{{ services.cache.port }}"
+OIDC_CLIENT_ID                = "{{ vault_outline_oidc_client_id | default('outline') }}"
+OIDC_CLIENT_SECRET            = "{{ vault_outline_oidc_client_secret }}"
+OIDC_AUTH_URI                 = "https://{{ services.kanidm.domain }}/ui/oauth2"
+OIDC_TOKEN_URI                = "https://{{ services.kanidm.domain }}/oauth2/token"
+OIDC_USERINFO_URI             = "https://{{ services.kanidm.domain }}/oauth2/openid/outline/userinfo"
+OIDC_LOGOUT_URI               = "https://{{ services.kanidm.domain }}/ui/logout"
+OIDC_USERNAME_CLAIM           = "preferred_username"
+OIDC_DISPLAY_NAME             = "{{ outline_oidc_display_name | default('Login') }}"
+OIDC_SCOPES                   = "openid profile email"
+FILE_STORAGE                  = "local"
+FILE_STORAGE_LOCAL_ROOT_DIR   = "/var/lib/outline/data"
+FILE_STORAGE_UPLOAD_MAX_SIZE  = "{{ outline_upload_max_size | default('262144000') }}"
+SMTP_HOST                     = "{{ outline_smtp_host | default('') }}"
+SMTP_PORT                     = "{{ outline_smtp_port | default('') }}"
+SMTP_USERNAME                 = "{{ outline_smtp_user | default('') }}"
+SMTP_PASSWORD                 = "{{ vault_outline_smtp_password | default('') }}"
+SMTP_FROM_EMAIL               = "{{ outline_smtp_from | default('') }}"
+SMTP_REPLY_EMAIL              = "{{ outline_smtp_reply | default('') }}"
+SMTP_SECURE                   = "{{ outline_smtp_secure | default('true') }}"
+FORCE_HTTPS                   = "true"
+ENABLE_UPDATES                = "false"
+DEFAULT_LANGUAGE              = "{{ outline_language | default('en_US') }}"
+LOG_LEVEL                     = "{{ log_level | default('info') }}"
+
+[[setup.fields]]
+key           = "vault_outline_secret_key"
+label         = "Outline secret key (32+ chars)"
+field_type    = "secret"
+auto_generate = true
+
+[[setup.fields]]
+key           = "vault_outline_utils_secret"
+label         = "Outline utils secret (32+ chars)"
+field_type    = "secret"
+auto_generate = true
+
+[[setup.fields]]
+key         = "vault_outline_oidc_client_secret"
+label       = "Outline OIDC client secret (from Kanidm)"
+field_type  = "secret"
+description = "Create an OAuth2 client 'outline' in Kanidm and paste the client secret here"
+
+[[setup.fields]]
+key         = "vault_outline_smtp_password"
+label       = "Outline SMTP password (optional)"
+field_type  = "secret"
+skip_if_set = true

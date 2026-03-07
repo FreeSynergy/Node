@@ -1,23 +1,33 @@
 # FSN Platform – Git Ignore
 
-# Project instance data (secrets + volumes)
+# ── Secrets (NEVER commit) ─────────────────────────────────────────────────
+projects/*/vault.toml
+projects/*/vault.yml
+
+# ── Project instance data ──────────────────────────────────────────────────
 projects/*/configs/
 projects/*/data/
 
-# Host files (each deployment has its own)
-# Only example.host.yml is tracked
-# See hosts/.gitignore
+# ── Host files (deployment-specific, may contain IPs / tokens) ────────────
+# Only example.host.toml / example.host.yml are tracked
+hosts/*.host.toml
+hosts/*.host.yml
+!hosts/example.host.toml
+!hosts/example.host.yml
 
-# Internal development log (Claude Code sessions)
-CHANGELOG.md
+# ── Rust build artefacts ───────────────────────────────────────────────────
+cli/target/
 
-# Editor files
+# ── Editor / IDE ───────────────────────────────────────────────────────────
 *.swp
 *.swo
 *~
 .vscode/
 .idea/
 
-# OS files
+# ── OS files ──────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
+
+# ── Internal development log ──────────────────────────────────────────────
+CHANGELOG.md

@@ -6,13 +6,28 @@ use axum::{
     response::IntoResponse,
     routing::{get, post},
 };
+use fsn_core::config::module::{FieldType, SetupField};
 use fsn_podman::systemd::{self, UnitStatus};
-use serde::{Deserialize, Serialize};
+use serde::{Serialize};
 
 #[derive(Debug, Serialize)]
 pub struct ServiceInfo {
     pub name: String,
     pub state: String,
+}
+
+/// A setup requirement in JSON form – mirrors fsn_engine::setup::SetupRequirement.
+#[derive(Debug, Serialize)]
+pub struct SetupRequirementJson {
+    pub instance_name: String,
+    pub class_key: String,
+    pub key: String,
+    pub label: String,
+    pub description: Option<String>,
+    pub field_type: String,
+    pub auto_generate: bool,
+    pub default: Option<String>,
+    pub options: Vec<String>,
 }
 
 pub fn api_routes() -> Router {
@@ -21,6 +36,28 @@ pub fn api_routes() -> Router {
         .route("/api/restart/:name", post(restart))
         .route("/api/stop/:name", post(stop))
         .route("/api/start/:name", post(start))
+        .route("/api/setup/requirements", get(setup_requirements))
+}
+
+fn field_type_str(ft: &FieldType) -> &'static str {
+    match ft {
+        FieldType::String => "string",
+        FieldType::Secret => "secret",
+        FieldType::Email  => "email",
+        FieldType::Ip     => "ip",
+        FieldType::Select => "select",
+        FieldType::Bool   => "bool",
+    }
+}
+
+/// GET /api/setup/requirements
+/// Returns the list of setup fields for all modules in the active project.
+/// The WebUI uses this to render the setup form dynamically.
+async fn setup_requirements() -> impl IntoResponse {
+    // For Phase 1 this returns an empty list.
+    // Phase 2: inject FSN_ROOT via state and load from actual project.
+    let empty: Vec<SetupRequirementJson> = Vec::new();
+    Json(empty)
 }
 
 async fn status() -> impl IntoResponse {

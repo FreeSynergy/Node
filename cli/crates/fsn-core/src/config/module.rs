@@ -1,14 +1,14 @@
 // Module class definition – maps to modules/{type}/{name}/{name}.toml
 //
-// Field order in YAML (MANDATORY per RULES.md):
-//   module → vars → load → container → environment
+// Field order (MANDATORY per RULES.md):
+//   module → vars → load → container → environment → setup
 
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use toml::Value;
 
 /// A module class definition (the template/blueprint for a service).
-/// Loaded from modules/{type}/{name}/{name}.yml.
+/// Loaded from modules/{type}/{name}/{name}.toml.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModuleClass {
     pub module: ModuleMeta,
@@ -23,6 +23,64 @@ pub struct ModuleClass {
 
     #[serde(default)]
     pub environment: IndexMap<String, String>,
+
+    /// Setup wizard configuration – what this module needs before it can run.
+    #[serde(default)]
+    pub setup: ModuleSetup,
+}
+
+// ── Setup wizard types ────────────────────────────────────────────────────
+
+/// All configuration fields this module requires during `fsn init`.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ModuleSetup {
+    #[serde(default)]
+    pub fields: Vec<SetupField>,
+}
+
+/// A single field the wizard will prompt for.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SetupField {
+    /// Key to set: "vault_*" → goes to vault.toml, anything else → vars reminder.
+    pub key: String,
+
+    /// English label shown in prompt AND used as .po lookup key (sentence-key style).
+    pub label: String,
+
+    /// Optional longer explanation shown below the prompt.
+    pub description: Option<String>,
+
+    #[serde(default)]
+    pub field_type: FieldType,
+
+    /// Auto-generate a random value; user can press Enter to accept or type override.
+    #[serde(default)]
+    pub auto_generate: bool,
+
+    /// Pre-filled default value shown in the prompt.
+    pub default: Option<String>,
+
+    /// For FieldType::Select – the available choices.
+    #[serde(default)]
+    pub options: Vec<String>,
+
+    /// Skip this field if the key already exists in vault.toml (idempotent).
+    #[serde(default = "default_true")]
+    pub skip_if_set: bool,
+}
+
+fn default_true() -> bool { true }
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum FieldType {
+    #[default]
+    String,
+    Secret,  // masked input, stored in vault.toml
+    Email,
+    Ip,
+    Select,  // requires `options`
+    Bool,
 }
 
 /// Core metadata declared under the `module:` key.
@@ -124,6 +182,9 @@ pub struct ContainerDef {
     pub published_ports: Vec<String>,
 
     pub healthcheck: Option<HealthCheck>,
+
+    /// Run as a specific UID[:GID] (e.g. "1000" or "15371:15371").
+    pub user: Option<String>,
 
     #[serde(default)]
     pub read_only: bool,

@@ -1,0 +1,59 @@
+# Module class definition – zentinel-control-plane
+#
+# Field order (MANDATORY per RULES.md):
+#   module → vars → load → container → environment → setup
+
+[module]
+name        = "zentinel-control-plane"
+alias       = []
+type        = "proxy"
+author      = "FreeSynergy.Node"
+version     = "0.0.1"
+tags        = ["proxy", "control-plane", "management"]
+description = "Zentinel Control Plane for proxy management"
+website     = "https://github.com/zentinelproxy/zentinel"
+repository  = "https://github.com/zentinelproxy/zentinel"
+port        = 8080
+
+health_path = "/health"
+health_port = 8080
+
+[module.constraints]
+per_host = 1
+
+[vars]
+config_dir = "{{ project_root }}/data/{{ instance_name }}"
+
+[load.services.zentinel]
+[load.services.kanidm]
+
+[container]
+name      = "{{ instance_name }}"
+image     = "ghcr.io/zentinelproxy/zentinel-control-plane"
+image_tag = "latest"
+volumes   = [
+    "{{ module_vars.config_dir }}/data:/data:Z",
+]
+
+[container.healthcheck]
+cmd          = "wget -qO- http://localhost:8080/health || exit 1"
+interval     = "30s"
+timeout      = "5s"
+retries      = 3
+start_period = "15s"
+
+[environment]
+ZENTINEL_API_URL    = "http://{{ services.zentinel.container_name }}:{{ services.zentinel.port }}"
+ZENTINEL_CP_PORT    = "8080"
+OIDC_ENABLED        = "{{ zentinel_cp_oidc_enabled | default('true') }}"
+OIDC_ISSUER_URL     = "https://{{ services.kanidm.domain }}/oauth2/openid/zentinel-cp"
+OIDC_CLIENT_ID      = "{{ vault_zentinel_cp_oidc_client_id | default('zentinel-cp') }}"
+OIDC_CLIENT_SECRET  = "{{ vault_zentinel_cp_oidc_client_secret }}"
+OIDC_REDIRECT_URI   = "https://{{ service_domain }}/auth/callback"
+OIDC_SCOPES         = "openid profile email"
+
+[[setup.fields]]
+key         = "vault_zentinel_cp_oidc_client_secret"
+label       = "Zentinel Control Plane OIDC client secret (from Kanidm)"
+field_type  = "secret"
+description = "Create an OAuth2 client 'zentinel-cp' in Kanidm and paste the client secret here."

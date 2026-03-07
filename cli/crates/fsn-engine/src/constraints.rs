@@ -22,15 +22,11 @@ fn check_per_host(desired: &DesiredState) -> Result<()> {
     let all = collect_all_instances(desired);
 
     // Group by class key
-    let mut counts: std::collections::HashMap<&str, Vec<&str>> = Default::default();
+    let mut counts: std::collections::HashMap<String, Vec<String>> = Default::default();
     for (class_key, name, limit) in &all {
         if let Some(limit) = limit {
-            counts
-                .entry(class_key)
-                .or_default()
-                .push(name);
-
-            let group = &counts[class_key];
+            let group = counts.entry(class_key.clone()).or_default();
+            group.push(name.clone());
             if group.len() > *limit as usize {
                 bail!(
                     "Constraint violation: module class '{}' has per_host={}, \

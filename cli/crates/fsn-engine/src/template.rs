@@ -5,7 +5,8 @@
 // project_root, service_domain, vault_*, ...).
 
 use anyhow::Result;
-use minijinja::{context, Environment};
+use minijinja::Environment;
+use std::collections::HashMap;
 
 use fsn_core::config::VaultConfig;
 
@@ -23,25 +24,23 @@ pub struct TemplateContext<'a> {
 pub fn render(template: &str, ctx: &TemplateContext) -> Result<String> {
     let mut env = Environment::new();
 
-    // Build variable map from context
-    let mut vars = minijinja::Value::from_iter([
-        ("project_name", minijinja::Value::from(ctx.project_name)),
-        ("project_domain", minijinja::Value::from(ctx.project_domain)),
-        ("instance_name", minijinja::Value::from(ctx.instance_name)),
-        ("service_domain", minijinja::Value::from(ctx.service_domain)),
-        ("parent_instance_name", minijinja::Value::from(ctx.parent_instance_name)),
-    ]);
+    // Build variable map – includes core vars plus vault secrets
+    let mut vars: HashMap<String, minijinja::Value> = [
+        ("project_name",          ctx.project_name),
+        ("project_domain",        ctx.project_domain),
+        ("instance_name",         ctx.instance_name),
+        ("service_domain",        ctx.service_domain),
+        ("parent_instance_name",  ctx.parent_instance_name),
+    ]
+    .into_iter()
+    .map(|(k, v)| (k.to_string(), minijinja::Value::from(v)))
+    .collect();
 
-    // Inject vault secrets into the template context
-    // (only keys – values exposed by minijinja during render, not stored as strings)
-    if let minijinja::Value::Map(ref mut map) = vars {
-        for key in ctx.vault.keys() {
-            if let Some(exposed) = ctx.vault.expose(key) {
-                map.insert(
-                    minijinja::Value::from(key),
-                    minijinja::Value::from(exposed.to_string()),
-                );
-            }
+    // Inject vault secrets (vault_* keys) into the template context.
+    // Vault values are exposed only at render time, never stored as plain strings.
+    for key in ctx.vault.keys() {
+        if let Some(exposed) = ctx.vault.expose(key) {
+            vars.insert(key.to_string(), minijinja::Value::from(exposed));
         }
     }
 

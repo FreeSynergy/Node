@@ -1,98 +1,325 @@
-use std::io::{self, Write};
-use std::path::Path;
-use anyhow::Result;
+// fsn init – Module-driven setup wizard.
+//
+// Flow:
+//   Phase 1 – Project skeleton (if none exists)
+//   Phase 2 – Module selection (interactive checklist)
+//   Phase 3 – Module requirements (per [[setup.fields]] in each module)
+//   Phase 4 – Confirm & (optionally) deploy
 
-/// Interactive setup wizard – generates project.toml, host.toml, vault.toml skeletons.
+use std::collections::HashMap;
+use std::io::{self, Write};
+use std::path::{Path, PathBuf};
+
+use anyhow::{Context, Result};
+use fsn_core::config::{
+    module::FieldType,
+    registry::ModuleRegistry,
+    vault::VaultConfig,
+};
+use fsn_engine::setup::collect_requirements;
+
 pub async fn run(root: &Path) -> Result<()> {
     println!("=== FreeSynergy.Node Setup Wizard ===\n");
 
-    let project_name = prompt("Project name")?;
-    let domain       = prompt("Primary domain (e.g. example.com)")?;
-    let contact      = prompt("Contact email")?;
-    let host_ip      = prompt("Server IP address")?;
-    let dns_provider = prompt_with_default("DNS provider [hetzner/cloudflare/none]", "hetzner")?;
-    let acme         = prompt_with_default("ACME provider [letsencrypt/smallstep-ca/none]", "letsencrypt")?;
+    let (slug, proj_dir) = ensure_project_skeleton(root)?;
 
-    // Create project directory
-    let slug = project_name.to_lowercase().replace(' ', "-");
-    let proj_dir = root.join("projects").join(&slug);
-    std::fs::create_dir_all(&proj_dir)?;
+    let modules_dir = root.join("modules");
+    if modules_dir.exists() {
+        select_modules(root, &proj_dir, &slug, &modules_dir)?;
+    }
 
-    // Write project.toml
-    let project_toml = format!(
-        r#"[project]
-name        = "{name}"
-domain      = "{domain}"
-description = ""
+    collect_module_secrets(root, &proj_dir, &modules_dir)?;
 
-[project.contact]
-email       = "{contact}"
-acme_email  = "{contact}"
-
-[load.modules]
-# Example:
-# [load.modules.forgejo]
-# module_class = "git/forgejo"
-"#,
-        name    = project_name,
-        domain  = domain,
-        contact = contact,
-    );
-    std::fs::write(proj_dir.join(format!("{}.project.toml", slug)), &project_toml)?;
-
-    // Write host.toml
-    let host_toml = format!(
-        r#"[host]
-name = "{slug}"
-ip   = "{ip}"
-
-[proxy.zentinel]
-module_class = "proxy/zentinel"
-
-[proxy.zentinel.load.plugins]
-dns        = "{dns}"
-acme       = "{acme}"
-acme_email = "{contact}"
-"#,
-        slug    = slug,
-        ip      = host_ip,
-        dns     = dns_provider,
-        acme    = acme,
-        contact = contact,
-    );
-    let hosts_dir = root.join("hosts");
-    std::fs::create_dir_all(&hosts_dir)?;
-    std::fs::write(hosts_dir.join(format!("{}.host.toml", slug)), &host_toml)?;
-
-    // Write empty vault.toml
-    std::fs::write(proj_dir.join("vault.toml"), "# Secrets (vault_ prefix required)\n")?;
-
-    println!("\nCreated:");
-    println!("  projects/{slug}/{slug}.project.toml");
-    println!("  hosts/{slug}.host.toml");
-    println!("  projects/{slug}/vault.toml");
-    println!("\nNext: edit the config files, then run `fsn deploy`.");
+    if confirm("Deploy now?")? {
+        println!("\nRunning fsn deploy ...");
+        super::deploy::run(root, None, None).await?;
+    } else {
+        println!("\nSetup complete. Run `fsn deploy` when ready.");
+    }
 
     Ok(())
 }
 
-fn prompt(label: &str) -> Result<String> {
-    print!("{}: ", label);
+// ── Phase 1: Project skeleton ─────────────────────────────────────────────
+
+fn ensure_project_skeleton(root: &Path) -> Result<(String, PathBuf)> {
+    if let Some(existing) = find_existing_project(root) {
+        let stem = existing.file_stem().and_then(|s| s.to_str()).unwrap_or("project");
+        let slug = stem.trim_end_matches(".project").to_string();
+        let proj_dir = existing.parent().unwrap_or(root).to_path_buf();
+        println!("Existing project found: {}\n", existing.display());
+        return Ok((slug, proj_dir));
+    }
+
+    println!("--- Project ---");
+    let project_name = prompt("Project name", None)?;
+    let domain       = prompt("Primary domain (e.g. example.com)", None)?;
+    let contact      = prompt("Contact / ACME email", None)?;
+    let host_ip      = prompt("Server IPv4 address", None)?;
+    let host_ipv6    = prompt_optional("Server IPv6 address (optional)")?;
+    let dns_provider = prompt("DNS provider [hetzner/cloudflare/none]", Some("hetzner"))?;
+    let acme         = prompt("ACME provider [letsencrypt/smallstep-ca/none]", Some("letsencrypt"))?;
+
+    let slug = project_name.to_lowercase().replace(' ', "-");
+    let proj_dir = root.join("projects").join(&slug);
+    std::fs::create_dir_all(&proj_dir)?;
+
+    std::fs::write(
+        proj_dir.join(format!("{}.project.toml", slug)),
+        format!(
+            "[project]\nname        = \"{name}\"\ndomain      = \"{domain}\"\ndescription = \"\"\n\n[project.contact]\nemail       = \"{contact}\"\nacme_email  = \"{contact}\"\n\n[load.modules]\n# Added by wizard\n",
+            name = project_name, domain = domain, contact = contact,
+        ),
+    )?;
+
+    let hosts_dir = root.join("hosts");
+    std::fs::create_dir_all(&hosts_dir)?;
+    let ipv6_line = host_ipv6.map(|v| format!("\nipv6   = \"{}\"", v)).unwrap_or_default();
+    std::fs::write(
+        hosts_dir.join(format!("{}.host.toml", slug)),
+        format!(
+            "[host]\nname = \"{slug}\"\nip   = \"{ip}\"{ipv6}\n\n[proxy.zentinel]\nmodule_class = \"proxy/zentinel\"\n\n[proxy.zentinel.load.plugins]\ndns        = \"{dns}\"\nacme       = \"{acme}\"\nacme_email = \"{contact}\"\n",
+            slug = slug, ip = host_ip, ipv6 = ipv6_line,
+            dns = dns_provider, acme = acme, contact = contact,
+        ),
+    )?;
+
+    let vault_path = proj_dir.join("vault.toml");
+    if !vault_path.exists() {
+        std::fs::write(&vault_path, "# Secrets (vault_ prefix required)\n")?;
+    }
+
+    println!("\nProject skeleton created in projects/{}/\n", slug);
+    Ok((slug, proj_dir))
+}
+
+// ── Phase 2: Module selection ─────────────────────────────────────────────
+
+fn select_modules(root: &Path, proj_dir: &Path, slug: &str, modules_dir: &Path) -> Result<()> {
+    let registry = ModuleRegistry::load(modules_dir)?;
+    let mut all_classes: Vec<(&str, &fsn_core::config::module::ModuleClass)> =
+        registry.all().collect();
+    all_classes.sort_by_key(|(k, _)| *k);
+
+    if all_classes.is_empty() {
+        return Ok(());
+    }
+
+    println!("--- Module selection ---");
+    println!("Press 'y' to add a module, Enter to skip:\n");
+
+    let mut selected: Vec<(String, String)> = Vec::new();
+
+    for (class_key, class) in &all_classes {
+        let desc = class.module.description.as_deref().unwrap_or("");
+        let label = format!("  [{:<22}]  {}", class_key, desc);
+        if confirm_default_no(&label)? {
+            let instance_name = prompt(
+                &format!("    Instance name for {}", class_key),
+                Some(&class.module.name),
+            )?;
+            selected.push((instance_name, class_key.to_string()));
+        }
+    }
+
+    if selected.is_empty() {
+        println!("(No modules selected)\n");
+        return Ok(());
+    }
+
+    let proj_toml = proj_dir.join(format!("{}.project.toml", slug));
+    let mut existing = std::fs::read_to_string(&proj_toml)?;
+
+    let mut additions = String::new();
+    for (instance_name, class_key) in &selected {
+        additions.push_str(&format!(
+            "\n[load.modules.{}]\nmodule_class = \"{}\"\n",
+            instance_name, class_key
+        ));
+    }
+
+    // Replace placeholder comment if present
+    existing = existing.replace("# Added by wizard\n", &additions);
+    std::fs::write(&proj_toml, existing)?;
+    println!("\nAdded {} module(s) to project.toml\n", selected.len());
+    Ok(())
+}
+
+// ── Phase 3: Module requirements ─────────────────────────────────────────
+
+fn collect_module_secrets(root: &Path, proj_dir: &Path, modules_dir: &Path) -> Result<()> {
+    let slug = proj_dir.file_name().and_then(|n| n.to_str()).unwrap_or("project");
+    let proj_toml = proj_dir.join(format!("{}.project.toml", slug));
+    if !proj_toml.exists() {
+        return Ok(());
+    }
+
+    let project = fsn_core::config::ProjectConfig::load(&proj_toml)
+        .with_context(|| format!("Loading {}", proj_toml.display()))?;
+
+    if project.load.modules.is_empty() || !modules_dir.exists() {
+        return Ok(());
+    }
+
+    let registry = ModuleRegistry::load(modules_dir)?;
+    let vault_path = proj_dir.join("vault.toml");
+    let vault = VaultConfig::load(&vault_path)?;
+
+    let host_path = root.join("hosts").join(format!("{}.host.toml", slug));
+    let host = fsn_core::config::HostConfig::load(&host_path)
+        .with_context(|| format!("Loading {}", host_path.display()))?;
+
+    let desired = fsn_engine::resolve::resolve_desired(&project, &host, &registry, &vault)
+        .context("Resolving desired state")?;
+
+    let requirements = collect_requirements(&desired);
+    if requirements.is_empty() {
+        return Ok(());
+    }
+
+    println!("--- Module configuration ---");
+
+    // Load existing vault values to enable skip_if_set
+    let mut vault_values: HashMap<String, String> = if vault_path.exists() {
+        toml::from_str(&std::fs::read_to_string(&vault_path)?).unwrap_or_default()
+    } else {
+        HashMap::new()
+    };
+
+    let mut added = 0usize;
+
+    for req in &requirements {
+        let field = &req.field;
+        if field.skip_if_set && vault_values.contains_key(&field.key) {
+            continue;
+        }
+
+        println!("  [{}] {}", req.class_key, field.label);
+        if let Some(desc) = &field.description {
+            println!("      {}", desc);
+        }
+
+        let value = match &field.field_type {
+            FieldType::Secret => {
+                if field.auto_generate {
+                    let gen = generate_secret(32);
+                    let show = format!("{}...{}", &gen[..4], &gen[gen.len()-4..]);
+                    let input = prompt_secret(&format!("    auto [{}] (Enter=accept)", show))?;
+                    if input.is_empty() { gen } else { input }
+                } else {
+                    prompt_secret("    value (hidden)")?
+                }
+            }
+            FieldType::Select => {
+                for (i, opt) in field.options.iter().enumerate() {
+                    println!("      [{}] {}", i + 1, opt);
+                }
+                let def_idx = field.default.as_deref()
+                    .and_then(|d| field.options.iter().position(|o| o == d))
+                    .unwrap_or(0);
+                let sel = prompt(&format!("    choose"), Some(&format!("{}", def_idx + 1)))?;
+                sel.parse::<usize>().ok()
+                    .filter(|&n| n >= 1 && n <= field.options.len())
+                    .map(|n| field.options[n-1].clone())
+                    .unwrap_or_else(|| field.options[def_idx].clone())
+            }
+            FieldType::Bool => {
+                if confirm_default_no("    yes/no")? { "true".into() } else { "false".into() }
+            }
+            _ => prompt("    value", field.default.as_deref())?,
+        };
+
+        if field.key.starts_with("vault_") {
+            vault_values.insert(field.key.clone(), value);
+            added += 1;
+        } else {
+            println!("      Note: add {} = {:?} to project.toml [vars]\n", field.key, value);
+        }
+
+        println!();
+    }
+
+    if added > 0 {
+        let mut content = "# Secrets – generated by fsn init. NEVER commit!\n".to_string();
+        for (k, v) in &vault_values {
+            content.push_str(&format!("{} = {:?}\n", k, v));
+        }
+        std::fs::write(&vault_path, content)?;
+        println!("vault.toml updated ({} secret(s)).", vault_values.len());
+    }
+
+    Ok(())
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+
+fn find_existing_project(root: &Path) -> Option<PathBuf> {
+    std::fs::read_dir(root.join("projects"))
+        .ok()?
+        .flatten()
+        .filter(|e| e.path().is_dir())
+        .flat_map(|d| std::fs::read_dir(d.path()).into_iter().flatten().flatten())
+        .map(|e| e.path())
+        .find(|p| p.to_string_lossy().ends_with(".project.toml"))
+}
+
+fn prompt(label: &str, default: Option<&str>) -> Result<String> {
+    match default {
+        Some(d) => print!("  {} [{}]: ", label, d),
+        None    => print!("  {}: ", label),
+    }
+    io::stdout().flush()?;
+    let mut buf = String::new();
+    io::stdin().read_line(&mut buf)?;
+    let t = buf.trim().to_string();
+    Ok(if t.is_empty() { default.unwrap_or("").to_string() } else { t })
+}
+
+fn prompt_optional(label: &str) -> Result<Option<String>> {
+    print!("  {} (Enter to skip): ", label);
+    io::stdout().flush()?;
+    let mut buf = String::new();
+    io::stdin().read_line(&mut buf)?;
+    let t = buf.trim().to_string();
+    Ok(if t.is_empty() { None } else { Some(t) })
+}
+
+fn prompt_secret(label: &str) -> Result<String> {
+    print!("  {}: ", label);
     io::stdout().flush()?;
     let mut buf = String::new();
     io::stdin().read_line(&mut buf)?;
     Ok(buf.trim().to_string())
 }
 
-fn prompt_with_default(label: &str, default: &str) -> Result<String> {
-    print!("{}: ", label);
+fn confirm(label: &str) -> Result<bool> {
+    print!("  {} [Y/n]: ", label);
     io::stdout().flush()?;
     let mut buf = String::new();
     io::stdin().read_line(&mut buf)?;
-    let trimmed = buf.trim();
-    if trimmed.is_empty() {
-        Ok(default.to_string())
-    } else {
-        Ok(trimmed.to_string())
-    }
+    Ok(!buf.trim().eq_ignore_ascii_case("n"))
+}
+
+fn confirm_default_no(label: &str) -> Result<bool> {
+    print!("{} [y/N]: ", label);
+    io::stdout().flush()?;
+    let mut buf = String::new();
+    io::stdin().read_line(&mut buf)?;
+    Ok(buf.trim().eq_ignore_ascii_case("y"))
+}
+
+fn generate_secret(len: usize) -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let seed = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .subsec_nanos() as u64;
+    let chars: &[u8] = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let mut state = seed ^ 0x9e3779b97f4a7c15;
+    (0..len)
+        .map(|_| {
+            state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            chars[((state >> 33) as usize) % chars.len()] as char
+        })
+        .collect()
 }

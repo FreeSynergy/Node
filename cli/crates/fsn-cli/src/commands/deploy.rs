@@ -20,8 +20,7 @@ fn find_project(root: &Path) -> Option<PathBuf> {
     let projects = root.join("projects");
     std::fs::read_dir(&projects).ok()?.flatten()
         .filter(|e| e.path().is_dir())
-        .flat_map(|d| std::fs::read_dir(d.path()).ok()?.collect::<Vec<_>>())
-        .flatten()
+        .flat_map(|d| std::fs::read_dir(d.path()).into_iter().flatten().flatten())
         .map(|e| e.path())
         .find(|p| p.to_string_lossy().ends_with(".project.toml"))
 }
