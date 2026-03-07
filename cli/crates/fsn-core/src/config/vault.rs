@@ -176,7 +176,7 @@ fn encrypt_age(plaintext: &[u8], passphrase: &str) -> Result<Vec<u8>> {
 }
 
 fn decrypt_age(ciphertext: &[u8], passphrase: &str) -> Result<Vec<u8>> {
-    use age::armor::{ArmoredReader, Format};
+    use age::armor::ArmoredReader;
 
     let pass    = age::secrecy::SecretString::new(passphrase.to_owned());
     let armored = ArmoredReader::new(ciphertext);
