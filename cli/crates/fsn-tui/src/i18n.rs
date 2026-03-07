@@ -68,6 +68,14 @@ fn de(key: &str) -> Option<&'static str> {
         "form.project.email.hint"        => "Für Let's Encrypt Benachrichtigungen (wird aus Domain abgeleitet)",
         "form.options.language"    => "Primärsprache (↑↓ zum Wählen)",
         "form.options.version"     => "Version",
+        "form.tab.service"         => "Service",
+        "form.new_service"         => "Neuer Service",
+        "form.edit_service"        => "Service bearbeiten",
+        "form.service.name"        => "Service-Name",
+        "form.service.name.hint"   => "Instanzname, z.B. forgejo (eindeutig im Projekt)",
+        "form.service.class"       => "Service-Typ (↑↓ zum Wählen)",
+        "form.service.alias"       => "Subdomain-Alias",
+        "form.service.alias.hint"  => "Optionaler Alias, z.B. git → git.<domain>",
         _ => return None,
     })
 }
@@ -129,6 +137,14 @@ fn en(key: &str) -> Option<&'static str> {
         "form.project.email.hint"        => "For Let's Encrypt notifications (derived from domain)",
         "form.options.language"    => "Primary Language (↑↓ to select)",
         "form.options.version"     => "Version",
+        "form.tab.service"         => "Service",
+        "form.new_service"         => "New Service",
+        "form.edit_service"        => "Edit Service",
+        "form.service.name"        => "Service Name",
+        "form.service.name.hint"   => "Instance name, e.g. forgejo (unique within project)",
+        "form.service.class"       => "Service Type (↑↓ to select)",
+        "form.service.alias"       => "Subdomain Alias",
+        "form.service.alias.hint"  => "Optional alias, e.g. git → git.<domain>",
         _ => return None,
     })
 }
