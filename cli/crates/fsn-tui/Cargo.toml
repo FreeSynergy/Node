@@ -1,0 +1,17 @@
+[package]
+name        = "fsn-tui"
+description = "FreeSynergy.Node – terminal UI dashboard"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+fsn-core   = { workspace = true }
+fsn-engine = { workspace = true }
+fsn-podman = { workspace = true }
+ratatui    = { workspace = true }
+crossterm  = { workspace = true }
+sysinfo    = { workspace = true }
+anyhow     = { workspace = true }
+tokio      = { workspace = true }
+tracing    = { workspace = true }

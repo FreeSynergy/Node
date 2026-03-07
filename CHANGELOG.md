@@ -6,6 +6,48 @@ was sich geändert hat.
 
 ---
 
+## 2026-03-07 – Claude Code – fsn-tui: Terminal-UI-Dashboard (ratatui)
+
+### Neue Dateien
+- `cli/crates/fsn-tui/Cargo.toml` – neues Crate, Dependencies: ratatui/crossterm/sysinfo/fsn-core/fsn-engine
+- `cli/crates/fsn-tui/src/lib.rs` – Einstieg `run(root)`: Terminal-Init, Service-Erkennung, Event-Loop-Start
+- `cli/crates/fsn-tui/src/app.rs` – `AppState`, `Screen`/`Lang`/`ServiceStatus`-Enums, Event-Loop (`run_loop`)
+- `cli/crates/fsn-tui/src/i18n.rs` – Compile-time DE/EN Strings (`t(lang, key)`), ca. 30 Schlüssel pro Sprache
+- `cli/crates/fsn-tui/src/sysinfo.rs` – `SysInfo::collect()`: Hostname, User, IP, RAM, CPU, Uptime, Podman-Version, Arch
+- `cli/crates/fsn-tui/src/events.rs` – Tastaturhandling: Welcome (Tab=Sprache, Enter, q), Dashboard (↑↓, d/r/x/l, q), Logs-Overlay
+- `cli/crates/fsn-tui/src/ui/mod.rs` – Screen-Dispatch + Overlay-Rendering
+- `cli/crates/fsn-tui/src/ui/welcome.rs` – Welcome-Screen (Header, Systeminfo-Grid 2-spaltig, Buttons)
+- `cli/crates/fsn-tui/src/ui/dashboard.rs` – Dashboard (Header + [DE] Button, Sidebar, Services-Tabelle mit Status-Badges)
+- `cli/crates/fsn-tui/src/ui/logs.rs` – Logs-Overlay (Modal-Popup, Podman-Logs, Scroll)
+- `cli/crates/fsn-tui/src/ui/widgets.rs` – Hilfsfunktionen: `lang_button`, `status_span`, `popup_area`, `button_line`
+- `cli/crates/fsn-cli/src/commands/tui.rs` – `pub async fn run(root) → fsn_tui::run(root)`
+
+### Geänderte Dateien
+- `cli/Cargo.toml` – `fsn-tui` zu workspace members; ratatui/crossterm/sysinfo zu workspace.dependencies
+- `cli/crates/fsn-cli/Cargo.toml` – `fsn-tui = { workspace = true }`
+- `cli/crates/fsn-cli/src/cli.rs` – `Command::Tui` + Dispatch zu `commands::tui::run`
+- `cli/crates/fsn-cli/src/commands/mod.rs` – `pub mod tui;`
+
+### Was die TUI kann (Phase 1)
+- **Welcome-Screen** (kein Projekt): Systeminfo (Host, User, IP, RAM, CPU, Podman, Uptime, Arch), Sprachauswahl via Tab (DE/EN live), Buttons „Neues Projekt" / „Vorhandenes Projekt" (ausgegraut)
+- **Dashboard** (Projekt vorhanden): Sidebar, Services-Tabelle (Name, Typ, Domain, Status mit Farbe), Cursor-Navigation ↑↓
+- **Aktionen**: `d`=Deploy-Markierung, `r`=Restart via podman, `x`=Remove, `l`=Logs-Overlay öffnen
+- **Logs-Overlay**: Podman-Logs (100 Zeilen), scrollbar, `q`=Schließen
+- **Sprachenwechsel**: Tab jederzeit, sofortige UI-Aktualisierung (DE/EN)
+- **Auto-Refresh**: Systeminfo alle 5 Sekunden
+
+### Offene Probleme / TODO für Phase 2
+- Deploy-Aktion (`d`) spawnt noch keinen echten Deploy — markiert nur als Unknown (Async-Task folgt)
+- `fsn tui` → Enter auf „Neues Projekt" → Wizard noch nicht inline (beendet aktuell die TUI, `fsn init` danach)
+- Service-Typ und Domain aus project.toml lesen (aktuell: Podman `ps -a` Ausgabe, Domain Placeholder)
+- Projekt-Switching (mehrere Projekte) folgt in Phase 2
+
+### Nächster Schritt
+- KDL in deploy.rs einbauen
+- postgres-Modul nach TOML konvertieren
+
+---
+
 ## 2026-03-07 – Claude Code – Zentinel KDL-Generator (echtes Pingora-Format)
 
 ### Geänderte Dateien

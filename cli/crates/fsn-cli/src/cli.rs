@@ -109,6 +109,9 @@ pub enum Command {
     /// Interactive first-time setup wizard (replaces fsn-install.sh for ongoing use)
     Init,
 
+    /// Open the terminal UI dashboard
+    Tui,
+
     /// Server-level administration (run as root)
     Server {
         #[command(subcommand)]
@@ -158,6 +161,7 @@ pub async fn run() -> Result<()> {
         Command::Config { cmd }            => commands::config::run(&root, cli.project.as_deref(), cmd).await,
         Command::Serve { port, bind }      => commands::serve::run(&root, cli.project.as_deref(), &bind, port).await,
         Command::Init                      => commands::init::run(&root).await,
+        Command::Tui                       => commands::tui::run(&root).await,
         Command::Server { cmd }            => match cmd {
             ServerCommand::Setup           => commands::server_setup::run(&root).await,
         },

@@ -9,5 +9,6 @@ pub mod serve;
 pub mod server_setup;
 pub mod status;
 pub mod sync;
+pub mod tui;
 pub mod undeploy;
 pub mod update;

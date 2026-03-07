@@ -15,6 +15,7 @@ fsn-engine  = { workspace = true }
 fsn-podman  = { workspace = true }
 fsn-dns     = { workspace = true }
 fsn-web     = { workspace = true }
+fsn-tui     = { workspace = true }
 clap        = { workspace = true }
 tokio       = { workspace = true }
 anyhow      = { workspace = true }
