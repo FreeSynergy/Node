@@ -6,6 +6,28 @@ was sich geändert hat.
 
 ---
 
+## 2026-03-07 – Claude Code – Zentinel KDL-Generator (echtes Pingora-Format)
+
+### Geänderte Dateien
+- `cli/crates/fsn-engine/src/generate/kdl.rs` – komplett neu geschrieben: echtes Zentinel KDL-Format (Pingora, nicht Caddy), `upstreams {}` und `routes {}` Top-Level-Blöcke, `upsert_managed_section()` (markers-basiertes In-Place-Update), `generate_full_config()` (Erstinstallation mit listeners-Block), `collect_proxy_instances()` (überspringt Database/Cache/Proxy), Alias-Domains bekommen eigene `route`-Blöcke
+- `README.md` – Zentinel korrekt als Pingora beschrieben (war noch Caddy-Referenz drin)
+- `CHANGELOG.md` – dieses Update
+
+### Was sich geändert hat
+- **Altes Format** (Caddy-Stil): `domain { reverse_proxy name:port }` — falsch
+- **Neues Format** (echtes Zentinel KDL): `upstream "name" { targets { target { address "name:port" } } }` + `route "name" { matches { host "…" } upstream "name" }`
+- Gesamte FSN-managed Section wird bei jedem Deploy neu generiert (zwischen `# === FSN-MANAGED-START ===` / `# === FSN-MANAGED-END ===`)
+- Manuell editierte Bereiche außerhalb der Marker bleiben unberührt
+
+### Offene Probleme
+- Zentinel TCP-Syntax (Mail: SMTP/IMAP/JMAP) noch nicht implementiert — Pingora unterstützt TCP (laut Entwickler bestätigt), genaue KDL-Syntax noch unbekannt → wird als Stub ergänzt sobald bestätigt
+
+### Nächster Schritt
+- deploy.rs: `kdl::upsert_managed_section()` in den Deploy-Loop einbauen (nach Quadlet-Generation)
+- TUI mit ratatui
+
+---
+
 ## 2026-03-07 – Claude Code – Datenstruktur: Module → Service + Ansible-Entfernung + Build-Fix
 
 ### Geänderte Dateien
