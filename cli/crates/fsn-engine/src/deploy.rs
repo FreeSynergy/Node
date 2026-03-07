@@ -26,7 +26,7 @@ use fsn_core::{
 use fsn_podman::systemd;
 use tracing::{info, warn};
 
-use crate::generate::{env as gen_env, quadlet as gen_quadlet};
+use crate::generate::{env as gen_env, kdl as gen_kdl, quadlet as gen_quadlet};
 use crate::health;
 use crate::hooks::{self, HookContext};
 
@@ -123,6 +123,9 @@ pub async fn deploy_all(
 
         info!("  ✓ {} running", instance.name);
     }
+
+    // ── Phase 5: Write Zentinel KDL config ───────────────────────────────────
+    write_zentinel_kdl(desired, data_root)?;
 
     Ok(())
 }
@@ -223,5 +226,45 @@ async fn run_systemctl_disable(unit: &str) -> Result<()> {
         .status()
         .await?;
     anyhow::ensure!(st.success(), "systemctl --user disable {unit} failed");
+    Ok(())
+}
+
+/// Write (or update) the Zentinel KDL config after a deploy.
+///
+/// Path: {data_root}/{proxy_instance_name}/config/zentinel.kdl
+/// - If the file exists: only the FSN-managed block is updated (markers preserved)
+/// - If new: full config is generated (listeners + managed section)
+fn write_zentinel_kdl(desired: &DesiredState, data_root: &Path) -> Result<()> {
+    use fsn_core::config::service::ServiceType;
+
+    // Find the proxy instance (ServiceType::Proxy)
+    let proxy = desired
+        .services
+        .iter()
+        .find(|s| s.class.meta.service_type == ServiceType::Proxy);
+
+    let Some(proxy) = proxy else {
+        return Ok(()); // no proxy in this project — nothing to do
+    };
+
+    let kdl_path = data_root
+        .join(&proxy.name)
+        .join("config")
+        .join("zentinel.kdl");
+
+    if let Some(parent) = kdl_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    let new_content = if kdl_path.exists() {
+        let existing = std::fs::read_to_string(&kdl_path)?;
+        gen_kdl::upsert_managed_section(&existing, desired)
+    } else {
+        gen_kdl::generate_full_config(desired)
+    };
+
+    write_if_changed(&kdl_path, &new_content)?;
+    info!("  ✓ Zentinel config written → {}", kdl_path.display());
+
     Ok(())
 }

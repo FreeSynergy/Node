@@ -52,3 +52,10 @@ STALWART_DOMAINS  = "{{ project_domain }}"
 #   SRV  _imaps._tcp       993
 
 [setup]
+
+[[setup.fields]]
+key         = "stalwart_admin_password"
+label       = "Stalwart admin password"
+field_type  = "secret"
+auto_generate = true
+description = "Password for the Stalwart web admin UI (https://mail.yourdomain/)"

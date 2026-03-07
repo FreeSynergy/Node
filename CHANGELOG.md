@@ -6,6 +6,42 @@ was sich geändert hat.
 
 ---
 
+## 2026-03-07 – Claude Code – KDL in Deploy-Loop + setup.fields für fehlende Module
+
+### Geänderte Dateien
+- `cli/crates/fsn-engine/src/deploy.rs` – Phase 5 nach dem Service-Deploy: `write_zentinel_kdl()` schreibt `{data_root}/{proxy_name}/config/zentinel.kdl`. Neue Datei → `generate_full_config()`, vorhandene Datei → `upsert_managed_section()` (nur FSN-Block wird ersetzt)
+- `modules/chat/tuwunel/tuwunel.toml` – `[[setup.fields]]` für `tuwunel_allow_registration` (bool, default false) und `tuwunel_allow_federation` (bool, default true) hinzugefügt
+- `modules/collab/cryptpad/cryptpad.toml` – `[[setup.fields]]` für `cryptpad_admin_email` (email) hinzugefügt
+- `modules/mail/stalwart/stalwart.toml` – `[[setup.fields]]` für `stalwart_admin_password` (secret, auto_generate) hinzugefügt
+
+### Was sich geändert hat
+- `fsn deploy` schreibt nach jedem Deploy automatisch die Zentinel KDL-Konfiguration. Manuell editierte Bereiche (oberhalb/unterhalb der FSN-Marker) bleiben unberührt.
+- Alle 14 Module haben jetzt `.toml` Dateien (waren schon vorhanden). 9 Module haben `[[setup.fields]]` — der `fsn init`-Wizard fragt die richtigen Secrets automatisch ab.
+
+### Stand der Module mit setup.fields
+| Modul | Felder |
+|---|---|
+| postgres | vault_db_password (secret, auto) |
+| dragonfly | vault_dragonfly_password (secret, auto) |
+| umap | – |
+| forgejo | vault_forgejo_secret_key, vault_forgejo_db_password |
+| openobserver | vault_zo_root_user_email, vault_zo_root_user_password |
+| pretix | vault_pretix_secret_key, vault_pretix_db_password |
+| vikunja | vault_vikunja_jwt_secret, vault_vikunja_db_password, vault_vikunja_redis_password |
+| outline | 4 Felder (secret keys + S3) |
+| tuwunel | allow_registration, allow_federation |
+| cryptpad | admin_email |
+| stalwart | admin_password |
+
+### Offene Probleme
+- Keine — `cargo build` sauber
+
+### Nächster Schritt
+- `fsn init` testen mit einem echten Projekt
+- TUI: Deploy-Aktion wirklich async ausführen
+
+---
+
 ## 2026-03-07 – Claude Code – fsn-tui: Terminal-UI-Dashboard (ratatui)
 
 ### Neue Dateien
