@@ -25,8 +25,7 @@ use ratatui::{
 use crate::app::{AppState, DashFocus, SidebarItem};
 use crate::ui::widgets;
 
-pub fn render(f: &mut Frame, state: &mut AppState) {
-    let area = f.area();
+pub fn render(f: &mut Frame, state: &mut AppState, area: ratatui::layout::Rect) {
 
     let outer = Layout::default()
         .direction(Direction::Vertical)

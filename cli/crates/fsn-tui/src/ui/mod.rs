@@ -2,23 +2,57 @@
 //
 // Render takes `&mut AppState` because FormNode::render(&mut self, ...) needs
 // to store the last rendered Rect for mouse hit-testing (layout cache).
+//
+// Layout with help sidebar:
+//   ┌─────────────────────────┬──────────────────────────────┐
+//   │  main content           │  F1 Help sidebar (30 cols)   │
+//   └─────────────────────────┴──────────────────────────────┘
+// When help_visible=false the sidebar column is omitted.
 
 pub mod dashboard;
 pub mod form_node;
+pub mod help_sidebar;
 pub mod logs;
 pub mod new_project;
 pub mod nodes;
 pub mod welcome;
 pub mod widgets;
 
+use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::Frame;
 use crate::app::{AppState, OverlayLayer, Screen};
 
 pub fn render(f: &mut Frame, state: &mut AppState) {
+    let full = f.area();
+
+    // Horizontal split: main content | help sidebar (when visible)
+    let (main_area, help_area) = if state.help_visible && full.width > help_sidebar::SIDEBAR_WIDTH + 20 {
+        let chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Min(20),
+                Constraint::Length(help_sidebar::SIDEBAR_WIDTH),
+            ])
+            .split(full);
+        (chunks[0], Some(chunks[1]))
+    } else {
+        (full, None)
+    };
+
     match state.screen {
-        Screen::Welcome    => welcome::render(f, state),
-        Screen::Dashboard  => dashboard::render(f, state),
-        Screen::NewProject => new_project::render(f, state),
+        Screen::Welcome    => welcome::render(f, state, main_area),
+        Screen::Dashboard  => dashboard::render(f, state, main_area),
+        Screen::NewProject => new_project::render(f, state, main_area),
+    }
+
+    // Help sidebar rendered after main content so it appears on top at the border
+    if let Some(area) = help_area {
+        let kind     = state.current_form.as_ref().map(|f| f.kind);
+        let foc_key  = state.current_form.as_ref()
+            .and_then(|f| f.focused_node())
+            .map(|n| n.key());
+        let sections = help_sidebar::build_help(state.screen, kind, foc_key, state.lang);
+        help_sidebar::render_help_sidebar(f, area, &sections, state.lang);
     }
 
     // Overlay layers drawn on top (Ebene system)

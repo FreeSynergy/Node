@@ -25,6 +25,18 @@ pub fn handle(key: KeyEvent, state: &mut AppState, root: &Path) -> Result<()> {
         return Ok(());
     }
 
+    // F1 toggles help sidebar globally (works on all screens, even with overlay)
+    if key.code == KeyCode::F(1) {
+        state.help_visible = !state.help_visible;
+        return Ok(());
+    }
+
+    // Esc closes help sidebar first (priority over screen-specific Esc)
+    if key.code == KeyCode::Esc && state.help_visible {
+        state.help_visible = false;
+        return Ok(());
+    }
+
     // Topmost overlay layer captures all input (Ebene system)
     if state.has_overlay() {
         return handle_overlay(key, state, root);

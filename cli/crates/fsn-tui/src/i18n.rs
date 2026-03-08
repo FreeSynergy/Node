@@ -152,6 +152,32 @@ fn de(key: &str) -> Option<&'static str> {
         "form.bot.tags"          => "Tags",
         "form.bot.tags.hint"     => "Kommagetrennte Tags, z.B. notifications,alerts",
         "dash.hint.services"  => "↑↓=Nav  n=Service  b=Bot  d=Deploy  r=Restart  l=Logs  Tab=Sidebar",
+        // ── Help sidebar ──────────────────────────────────────────────────
+        "help.title"          => "Hilfe (F1)",
+        "help.close_hint"     => "F1=Schließen",
+        "help.nav"            => "Navigation",
+        "help.nav.select"     => "Zeile auswählen",
+        "help.nav.open"       => "Öffnen / Bestätigen",
+        "help.nav.panel"      => "Panel wechseln",
+        "help.new_project"    => "Neues Projekt anlegen",
+        "help.lang"           => "Sprache wechseln",
+        "help.quit"           => "Beenden",
+        "help.deploy"         => "Projekt deployen",
+        "help.export"         => "Compose exportieren",
+        "help.delete"         => "Löschen",
+        "help.form.project"   => "Projekt-Formular",
+        "help.form.host"      => "Host-Formular",
+        "help.form.service"   => "Service-Formular",
+        "help.form.bot"       => "Bot-Formular",
+        "help.form.next"      => "Nächstes Feld",
+        "help.form.prev"      => "Voriges Feld",
+        "help.form.select"    => "Option wählen",
+        "help.form.advance"   => "Nächster Tab",
+        "help.form.submit"    => "Formular absenden",
+        "help.form.tab_next"  => "Tab vorwärts",
+        "help.form.tab_prev"  => "Tab zurück",
+        "help.form.cancel"    => "Abbrechen / Schließen",
+        "help.field"          => "Dieses Feld",
         _ => return None,
     })
 }
@@ -262,6 +288,74 @@ fn en(key: &str) -> Option<&'static str> {
         "form.bot.tags"          => "Tags",
         "form.bot.tags.hint"     => "Comma-separated tags, e.g. notifications,alerts",
         "dash.hint.services"  => "↑↓=Nav  n=Service  b=Bot  d=Deploy  r=Restart  l=Logs  Tab=Sidebar",
+        // ── Help sidebar ──────────────────────────────────────────────────
+        "help.title"          => "Help (F1)",
+        "help.close_hint"     => "F1=Close",
+        "help.nav"            => "Navigation",
+        "help.nav.select"     => "Select row",
+        "help.nav.open"       => "Open / Confirm",
+        "help.nav.panel"      => "Switch panel",
+        "help.new_project"    => "Create new project",
+        "help.lang"           => "Toggle language",
+        "help.quit"           => "Quit",
+        "help.deploy"         => "Deploy project",
+        "help.export"         => "Export Compose file",
+        "help.delete"         => "Delete",
+        "help.form.project"   => "Project Form",
+        "help.form.host"      => "Host Form",
+        "help.form.service"   => "Service Form",
+        "help.form.bot"       => "Bot Form",
+        "help.form.next"      => "Next field",
+        "help.form.prev"      => "Previous field",
+        "help.form.select"    => "Choose option",
+        "help.form.advance"   => "Next tab",
+        "help.form.submit"    => "Submit form",
+        "help.form.tab_next"  => "Tab forward",
+        "help.form.tab_prev"  => "Tab backward",
+        "help.form.cancel"    => "Cancel / Close",
+        "help.field"          => "This field",
+        _ => return None,
+    })
+}
+
+// ── Field-specific help ───────────────────────────────────────────────────────
+
+/// Returns a longer contextual description for a form field, or `None` if no
+/// specific help is defined. Used by the F1 help sidebar.
+pub fn field_help(lang: Lang, field_key: &str) -> Option<&'static str> {
+    Some(match (lang, field_key) {
+        (Lang::De, "name") =>
+            "Eindeutiger Kurzname. Nur Kleinbuchstaben, Ziffern und Bindestriche. Wird für Dateinamen und Container-Namen verwendet.",
+        (Lang::De, "domain") =>
+            "Hauptdomain ohne http://. Wildcards möglich: *.example.com. Subdomains werden automatisch abgeleitet.",
+        (Lang::De, "description") =>
+            "Optionale Beschreibung. Mehrzeilige Eingabe möglich. Wird in der Projektübersicht angezeigt.",
+        (Lang::De, "email") | (Lang::De, "acme_email") =>
+            "E-Mail-Adresse für Let's Encrypt (ACME). Wird bei Zertifikatsproblemen kontaktiert.",
+        (Lang::De, "address") =>
+            "IPv4-Adresse oder FQDN des Hosts. Beispiel: 192.168.1.10 oder server.example.com",
+        (Lang::De, "subdomain") =>
+            "Subdomain dieser Instanz. Wird automatisch aus dem Name abgeleitet. Ergibt: subdomain.domain.tld",
+        (Lang::De, "install_dir") =>
+            "Basisverzeichnis für Daten und Konfiguration. Wird angelegt falls nicht vorhanden.",
+        (Lang::De, "ssh_port") =>
+            "Standard ist 22. Andere Ports für Sicherheit möglich, z.B. 2222.",
+        (Lang::En, "name") =>
+            "Unique short name. Lowercase letters, digits and hyphens only. Used for filenames and container names.",
+        (Lang::En, "domain") =>
+            "Primary domain without http://. Wildcards allowed: *.example.com. Subdomains are derived automatically.",
+        (Lang::En, "description") =>
+            "Optional description. Multi-line input supported. Shown in the project overview.",
+        (Lang::En, "email") | (Lang::En, "acme_email") =>
+            "Email address for Let's Encrypt (ACME). Used for certificate expiry notifications.",
+        (Lang::En, "address") =>
+            "IPv4 address or FQDN of the host. Example: 192.168.1.10 or server.example.com",
+        (Lang::En, "subdomain") =>
+            "Subdomain for this instance. Derived automatically from name. Results in: subdomain.domain.tld",
+        (Lang::En, "install_dir") =>
+            "Base directory for data and config. Created if it does not exist.",
+        (Lang::En, "ssh_port") =>
+            "Default is 22. Alternative ports for security, e.g. 2222.",
         _ => return None,
     })
 }

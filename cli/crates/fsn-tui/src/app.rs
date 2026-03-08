@@ -497,6 +497,8 @@ pub struct AppState {
     /// Modal overlay stack — topmost layer gets all input (Ebene system).
     pub overlay_stack:      Vec<OverlayLayer>,
     pub should_quit:        bool,
+    /// Whether the F1 help sidebar is visible.
+    pub help_visible:       bool,
     pub welcome_focus:      usize,
     pub current_form:       Option<ResourceForm>,
     pub ctrl_hint:          bool,
@@ -522,7 +524,7 @@ impl AppState {
         let mut s = Self {
             screen: Screen::Welcome, lang: Lang::De, sysinfo, services: vec![],
             selected: 0, overlay_stack: vec![],
-            should_quit: false, welcome_focus: 0, current_form: None,
+            should_quit: false, help_visible: false, welcome_focus: 0, current_form: None,
             ctrl_hint: false, projects, selected_project: 0,
             hosts: vec![], selected_host: 0, svc_handles: vec![],
             dash_focus: DashFocus::Sidebar,

@@ -15,9 +15,8 @@ use ratatui::{
 use crate::app::{AppState, ResourceForm, ResourceKind};
 use crate::ui::widgets;
 
-pub fn render(f: &mut Frame, state: &mut AppState) {
+pub fn render(f: &mut Frame, state: &mut AppState, area: Rect) {
     let Some(ref mut form) = state.current_form else { return };
-    let area = f.area();
 
     let outer = Layout::default()
         .direction(Direction::Vertical)
@@ -185,11 +184,16 @@ fn render_error(f: &mut Frame, lang: crate::app::Lang, form: &ResourceForm, area
 
 fn render_hint(f: &mut Frame, state: &AppState, area: Rect) {
     let key = if state.ctrl_hint { "form.hint.ctrl" } else { "form.hint" };
-    f.render_widget(
-        Paragraph::new(Line::from(Span::styled(
-            state.t(key),
-            Style::default().fg(Color::DarkGray),
-        ))).alignment(Alignment::Center),
-        area,
-    );
+    let hint_text = state.t(key);
+    let f1_label  = state.t("help.title");
+
+    let line = Line::from(vec![
+        Span::styled(hint_text, Style::default().fg(Color::DarkGray)),
+        Span::raw("  "),
+        Span::styled(
+            "F1=Hilfe",
+            Style::default().fg(if state.help_visible { Color::Cyan } else { Color::DarkGray }),
+        ),
+    ]);
+    f.render_widget(Paragraph::new(line).alignment(Alignment::Center), area);
 }
