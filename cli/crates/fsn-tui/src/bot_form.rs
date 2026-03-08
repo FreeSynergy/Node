@@ -33,7 +33,7 @@ pub struct BotFormData {
            default = "bot/matrix-hookshot")]
     pub service_class: String,
 
-    #[form(label = "form.bot.description", tab = 0)]
+    #[form(label = "form.bot.description", widget = "textarea", rows = 3, tab = 0)]
     pub description: String,
 
     // ── Tab 1: Options ───────────────────────────────────────────────────

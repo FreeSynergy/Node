@@ -147,36 +147,30 @@ impl FormNode for TextInputNode {
     fn set_rect(&mut self, r: Rect)     { self.rect = Some(r); }
     fn last_rect(&self) -> Option<Rect> { self.rect }
 
+    fn preferred_height(&self) -> u16 { 4 } // box-with-title(3) + hint(1)
+
     fn render(&mut self, f: &mut Frame, area: Rect, focused: bool, lang: Lang) {
         self.set_rect(area);
 
         let rows = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(1), // label
-                Constraint::Length(3), // input box
+                Constraint::Length(3), // input box (label in title)
                 Constraint::Length(1), // hint
             ])
             .split(area);
 
-        // Label
-        let req_marker = if self.required {
-            Span::styled(" *", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))
-        } else {
-            Span::raw("")
-        };
+        // Label displayed as block title
+        let label_text = crate::i18n::t(lang, self.label_key);
+        let req_suffix  = if self.required { " *" } else { "" };
         let label_style = if focused {
             Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(Color::White)
         };
-        f.render_widget(
-            Paragraph::new(Line::from(vec![
-                Span::styled(crate::i18n::t(lang, self.label_key), label_style),
-                req_marker,
-            ])),
-            rows[0],
-        );
+        let title = Line::from(vec![
+            Span::styled(format!(" {}{} ", label_text, req_suffix), label_style),
+        ]);
 
         // Input box with cursor
         let border_style = if focused {
@@ -200,8 +194,8 @@ impl FormNode for TextInputNode {
         };
         f.render_widget(
             Paragraph::new(input_line)
-                .block(Block::default().borders(Borders::ALL).border_style(border_style)),
-            rows[1],
+                .block(Block::default().borders(Borders::ALL).border_style(border_style).title(title)),
+            rows[0],
         );
 
         // Hint
@@ -211,7 +205,7 @@ impl FormNode for TextInputNode {
                     crate::i18n::t(lang, hk),
                     Style::default().fg(Color::DarkGray),
                 ))),
-                rows[2],
+                rows[1],
             );
         }
     }

@@ -94,7 +94,13 @@ pub trait FormNode: std::fmt::Debug {
 
     // ── Rendering ──────────────────────────────────────────────────────────
 
-    /// Render the field (label + input box + hint) into `area`.
+    /// How many rows this field needs in the form layout.
+    ///
+    /// Default: 4 (box-with-title 3 rows + hint 1 row).
+    /// TextAreaNode overrides this based on its configured `visible_lines`.
+    fn preferred_height(&self) -> u16 { 4 }
+
+    /// Render the field (label-in-title + input box + hint) into `area`.
     /// Must call `self.set_rect(area)` so hit-testing works.
     fn render(&mut self, f: &mut Frame, area: Rect, focused: bool, lang: Lang);
 
@@ -102,6 +108,11 @@ pub trait FormNode: std::fmt::Debug {
     /// Called *after* all fields are rendered so the overlay appears on top.
     /// Default: no-op (text inputs have no overlay).
     fn render_overlay(&mut self, _f: &mut Frame, _available: Rect, _lang: Lang) {}
+
+    /// Handle a mouse click that may land on this field's overlay (e.g., dropdown).
+    /// Returns `true` when the click was consumed.
+    /// Default: no-op (only SelectInputNode overrides this).
+    fn click_overlay(&mut self, _col: u16, _row: u16, _available: Rect) -> bool { false }
 
     /// Record the last rendered rect for hit-testing.
     fn set_rect(&mut self, rect: Rect);

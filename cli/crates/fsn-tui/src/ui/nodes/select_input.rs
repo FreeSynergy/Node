@@ -114,36 +114,30 @@ impl FormNode for SelectInputNode {
     fn set_rect(&mut self, r: Rect)     { self.rect = Some(r); }
     fn last_rect(&self) -> Option<Rect> { self.rect }
 
+    fn preferred_height(&self) -> u16 { 4 } // box-with-title(3) + hint(1)
+
     fn render(&mut self, f: &mut Frame, area: Rect, focused: bool, lang: Lang) {
         self.set_rect(area);
 
         let rows = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(1), // label
-                Constraint::Length(3), // input box
+                Constraint::Length(3), // input box (label in title)
                 Constraint::Length(1), // hint (hidden when focused)
             ])
             .split(area);
 
-        // Label
-        let req_marker = if self.required {
-            Span::styled(" *", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))
-        } else {
-            Span::raw("")
-        };
+        // Label in block title
+        let label_text  = crate::i18n::t(lang, self.label_key);
+        let req_suffix  = if self.required { " *" } else { "" };
         let label_style = if focused {
             Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(Color::White)
         };
-        f.render_widget(
-            Paragraph::new(Line::from(vec![
-                Span::styled(crate::i18n::t(lang, self.label_key), label_style),
-                req_marker,
-            ])),
-            rows[0],
-        );
+        let title = Line::from(vec![
+            Span::styled(format!(" {}{} ", label_text, req_suffix), label_style),
+        ]);
 
         // Input box — shows current selection + cursor when focused
         let border_style = if focused {
@@ -162,8 +156,8 @@ impl FormNode for SelectInputNode {
         };
         f.render_widget(
             Paragraph::new(input_line)
-                .block(Block::default().borders(Borders::ALL).border_style(border_style)),
-            rows[1],
+                .block(Block::default().borders(Borders::ALL).border_style(border_style).title(title)),
+            rows[0],
         );
 
         // Hint — hidden when focused (dropdown takes that space)
@@ -174,7 +168,7 @@ impl FormNode for SelectInputNode {
                         crate::i18n::t(lang, hk),
                         Style::default().fg(Color::DarkGray),
                     ))),
-                    rows[2],
+                    rows[1],
                 );
             }
         }
@@ -184,7 +178,7 @@ impl FormNode for SelectInputNode {
     /// `available` is the total form area — limits how tall the dropdown can grow.
     fn render_overlay(&mut self, f: &mut Frame, available: Rect, _lang: Lang) {
         let Some(input_rect) = self.last_rect() else { return };
-        let input_box_bottom = input_rect.y + 1 + 3; // label(1) + box(3)
+        let input_box_bottom = input_rect.y + 3; // box starts at top (compact: no separate label)
         let avail_h = available.bottom().saturating_sub(input_box_bottom);
         let want_h  = (self.options.len() as u16 + 2).min(avail_h);
         if want_h < 3 { return; }
@@ -239,6 +233,10 @@ impl FormNode for SelectInputNode {
             _ => FormAction::Unhandled,
         }
     }
+
+    fn click_overlay(&mut self, col: u16, row: u16, available: Rect) -> bool {
+        self.click_dropdown(col, row, available)
+    }
 }
 
 // ── Mouse click support ───────────────────────────────────────────────────────
@@ -247,7 +245,7 @@ impl SelectInputNode {
     /// If a mouse click lands on the dropdown list, set the option and return true.
     pub fn click_dropdown(&mut self, col: u16, row: u16, available: Rect) -> bool {
         let Some(input_rect) = self.last_rect() else { return false };
-        let input_box_bottom = input_rect.y + 1 + 3;
+        let input_box_bottom = input_rect.y + 3; // compact: box starts at field top
         let avail_h = available.bottom().saturating_sub(input_box_bottom);
         let want_h  = (self.options.len() as u16 + 2).min(avail_h);
         if want_h < 3 { return false; }

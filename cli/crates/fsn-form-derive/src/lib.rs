@@ -8,10 +8,11 @@
 //   label     = "i18n.key"      — i18n key for the label shown above the field
 //   hint      = "i18n.key"      — i18n key for the hint line below the field
 //   widget    = "text"          — UI control: text | password | email | ip |
-//                                 select | multi_select | toggle | number
+//                                 select | multi_select | toggle | number | textarea
 //   required                    — field must be non-empty to submit
 //   tab       = 0               — zero-based tab index (default: 0)
 //   max_len   = 255             — maximum character count for text-like widgets
+//   rows      = 4               — visible row count for textarea widgets
 //   default   = "value"         — static default value
 //   options   = "a,b,c"         — comma-separated choices for select / multi_select
 
@@ -30,6 +31,7 @@ struct FieldAttrs {
     required:    bool,
     tab:         usize,
     max_len:     Option<usize>,
+    rows:        Option<u16>,
     default_val: Option<String>,
     options:     Vec<String>,
 }
@@ -57,6 +59,9 @@ fn parse_form_attrs(field: &Field) -> FieldAttrs {
             } else if meta.path.is_ident("max_len") {
                 let v = meta.value()?;
                 a.max_len = Some(v.parse::<LitInt>()?.base10_parse().unwrap_or(255));
+            } else if meta.path.is_ident("rows") {
+                let v = meta.value()?;
+                a.rows = Some(v.parse::<LitInt>()?.base10_parse().unwrap_or(4));
             } else if meta.path.is_ident("default") {
                 let v = meta.value()?;
                 a.default_val = Some(v.parse::<LitStr>()?.value());
@@ -83,6 +88,7 @@ fn widget_tokens(widget: &str) -> Ts2 {
         "multi_select"  => quote! { ::fsn_form::WidgetType::MultiSelect },
         "toggle"        => quote! { ::fsn_form::WidgetType::Toggle },
         "number"        => quote! { ::fsn_form::WidgetType::Number },
+        "textarea"      => quote! { ::fsn_form::WidgetType::TextArea },
         _               => quote! { ::fsn_form::WidgetType::Text },
     }
 }
@@ -126,6 +132,10 @@ pub fn derive_form(input: TokenStream) -> TokenStream {
             Some(n) => quote! { Some(#n) },
             None    => quote! { None },
         };
+        let rows_tokens = match attrs.rows {
+            Some(n) => quote! { Some(#n) },
+            None    => quote! { None },
+        };
         let default_tokens = match &attrs.default_val {
             Some(d) => quote! { Some(#d) },
             None    => quote! { None },
@@ -141,6 +151,7 @@ pub fn derive_form(input: TokenStream) -> TokenStream {
                 required:    #required,
                 tab:         #tab,
                 max_len:     #max_len_tokens,
+                rows:        #rows_tokens,
                 default_val: #default_tokens,
                 options:     vec![#(#opts),*],
             }

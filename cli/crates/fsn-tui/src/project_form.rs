@@ -31,7 +31,7 @@ pub struct ProjectFormData {
     #[form(label = "form.project.domain", required, tab = 0, hint = "form.project.domain.hint")]
     pub domain: String,
 
-    #[form(label = "form.project.description", tab = 0, hint = "form.project.description.hint")]
+    #[form(label = "form.project.description", widget = "textarea", rows = 3, tab = 0, hint = "form.project.description.hint")]
     pub description: String,
 
     #[form(label = "form.project.email", required, tab = 0, widget = "email", hint = "form.project.email.hint")]

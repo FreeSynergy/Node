@@ -37,6 +37,8 @@ pub enum WidgetType {
     Toggle,
     /// Integer or float input.
     Number,
+    /// Multi-line text area. Height controlled by `FieldMeta::rows`.
+    TextArea,
 }
 
 // ── FieldMeta ─────────────────────────────────────────────────────────────────
@@ -67,6 +69,8 @@ pub struct FieldMeta {
 
     /// Maximum number of characters (applies to text-like widgets).
     pub max_len: Option<usize>,
+    /// Visible row count for `TextArea` widgets (default: 4 when `None`).
+    pub rows: Option<u16>,
 
     /// Static default value shown when the field is first opened.
     pub default_val: Option<&'static str>,

@@ -115,15 +115,16 @@ fn render_tabs(f: &mut Frame, lang: crate::app::Lang, form: &ResourceForm, area:
 
 fn render_fields(f: &mut Frame, form: &mut ResourceForm, inner: Rect, lang: crate::app::Lang) {
     let tab_indices = form.current_tab_indices();
-    let per_field   = 5u16; // label(1) + input(3) + hint(1)
+    
 
     let mut y = inner.y;
     let mut overlay_slot: Option<usize> = None; // which slot needs render_overlay
 
     for (slot, &node_idx) in tab_indices.iter().enumerate() {
-        if y + per_field > inner.bottom() { break; }
-        let field_rect = Rect { x: inner.x, y, width: inner.width, height: per_field };
-        y += per_field;
+        let h = form.nodes[node_idx].preferred_height();
+        if y + h > inner.bottom() { break; }
+        let field_rect = Rect { x: inner.x, y, width: inner.width, height: h };
+        y += h;
 
         let focused = form.active_field == slot;
         form.nodes[node_idx].render(f, field_rect, focused, lang);

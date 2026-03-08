@@ -753,7 +753,7 @@ pub fn handle_mouse(event: MouseEvent, state: &mut AppState) -> Result<()> {
             }
 
             if state.screen == Screen::NewProject {
-                handle_form_click(event.column, event.row, state);
+                handle_form_click(event.column, event.row, state, tw);
             } else if state.screen == Screen::Dashboard && !state.has_overlay() {
                 handle_dashboard_click(event.column, event.row, state);
             }
@@ -764,17 +764,22 @@ pub fn handle_mouse(event: MouseEvent, state: &mut AppState) -> Result<()> {
     Ok(())
 }
 
-fn handle_form_click(col: u16, row: u16, state: &mut AppState) {
+fn handle_form_click(col: u16, row: u16, state: &mut AppState, term_w: u16) {
     let Some(ref mut form) = state.current_form else { return };
 
-    // First check if a dropdown option was clicked
-    if let Some(idx) = form.focused_node_global_idx() {
-        // Dropdown click: synthesize Up/Down keys based on cursor position
-        // (full downcast-based approach is a future improvement)
-        let _ = idx;  // will be used when downcast is implemented
+    // The form inner area mirrors new_project.rs: 90% centered, header(3)+tabs(3) from top
+    let inner_x = term_w * 5 / 100;
+    let inner_w = term_w * 90 / 100;
+    let inner   = ratatui::layout::Rect { x: inner_x, y: 6, width: inner_w, height: 200 };
+
+    // First: try clicking the focused field's overlay (e.g. dropdown)
+    if let Some(global_idx) = form.focused_node_global_idx() {
+        if form.nodes[global_idx].click_overlay(col, row, inner) {
+            return; // overlay consumed the click
+        }
     }
 
-    // Focus the field that was clicked
+    // Then: focus whichever field was clicked
     form.click_focus(col, row);
 }
 
