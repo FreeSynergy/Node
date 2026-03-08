@@ -10,6 +10,7 @@ pub const GIT_HASH:   &str = env!("FSN_GIT_HASH");
 
 pub mod app;
 pub mod events;
+pub mod host_form;
 pub mod i18n;
 pub mod project_form;
 pub mod service_form;
@@ -30,7 +31,7 @@ use crossterm::{
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
 
-use app::{AppState, ProjectHandle, RunState};
+use app::{AppState, HostHandle, ProjectHandle, RunState, ServiceHandle};
 use sysinfo::SysInfo;
 
 // ── Background reconciler ─────────────────────────────────────────────────────
@@ -79,6 +80,12 @@ pub fn run(root: &Path) -> Result<()> {
     let sysinfo  = SysInfo::collect();
     let projects = load_projects(root);
     let mut state = AppState::new(sysinfo, projects);
+
+    // Load hosts for the first selected project
+    if let Some(proj) = state.projects.first() {
+        let project_dir = root.join("projects").join(&proj.slug);
+        state.hosts = load_hosts(&project_dir);
+    }
 
     // Build initial service list from desired state + Podman query.
     state.apply_podman_status(podman_container_statuses());
@@ -137,6 +144,47 @@ pub fn load_projects(root: &Path) -> Vec<ProjectHandle> {
         }
     }
     projects
+}
+
+/// Load all `.host.toml` files from a project directory.
+pub fn load_hosts(project_dir: &Path) -> Vec<HostHandle> {
+    let mut hosts = Vec::new();
+    let Ok(entries) = std::fs::read_dir(project_dir) else { return hosts; };
+    for entry in entries.flatten() {
+        let fp = entry.path();
+        let is_host_toml = fp.extension().and_then(|e| e.to_str()) == Some("toml")
+            && fp.file_stem().and_then(|s| s.to_str())
+                .map(|s| s.ends_with(".host"))
+                .unwrap_or(false);
+        if !is_host_toml { continue; }
+        let stem = fp.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+        let slug = stem.strip_suffix(".host").unwrap_or(stem).to_string();
+        if let Ok(config) = fsn_core::config::host::HostConfig::load(&fp) {
+            hosts.push(HostHandle { slug, toml_path: fp, config });
+        }
+    }
+    hosts
+}
+
+/// Load all `.service.toml` files from `{project_dir}/services/`.
+pub fn load_service_instances(project_dir: &Path) -> Vec<ServiceHandle> {
+    let services_dir = project_dir.join("services");
+    let mut handles = Vec::new();
+    let Ok(entries) = std::fs::read_dir(&services_dir) else { return handles; };
+    for entry in entries.flatten() {
+        let fp = entry.path();
+        let is_svc_toml = fp.extension().and_then(|e| e.to_str()) == Some("toml")
+            && fp.file_stem().and_then(|s| s.to_str())
+                .map(|s| s.ends_with(".service"))
+                .unwrap_or(false);
+        if !is_svc_toml { continue; }
+        let stem = fp.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+        let name = stem.strip_suffix(".service").unwrap_or(stem).to_string();
+        if let Ok(config) = fsn_core::config::project::ServiceInstanceConfig::load(&fp) {
+            handles.push(ServiceHandle { name, toml_path: fp, config });
+        }
+    }
+    handles
 }
 
 /// Returns true if any `*.project.toml` exists under `root/projects/`.

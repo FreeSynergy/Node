@@ -126,12 +126,110 @@ pub struct ServiceEntry {
     #[serde(alias = "module_class")]
     pub service_class: String,
 
+    /// Display alias, also used as subdomain override.
+    pub alias: Option<String>,
+
+    /// Which host slug this service runs on.
+    pub host: Option<String>,
+
+    /// Subdomain prefix → {subdomain}.{project.domain}. Defaults to instance name.
+    pub subdomain: Option<String>,
+
+    /// Port override (uses service-class default when absent).
+    pub port: Option<u16>,
+
+    /// Image version / tag.
+    #[serde(default = "default_service_version")]
+    pub version: String,
+
+    /// Free-form tags.
+    #[serde(default)]
+    pub tags: Vec<String>,
+
     #[serde(default)]
     pub vars: IndexMap<String, Value>,
 }
 
+fn default_service_version() -> String { "latest".into() }
+
 /// Backwards-compat alias.
 pub type ModuleRef = ServiceEntry;
+
+// ── Standalone service instance file ──────────────────────────────────────────
+
+/// Full service instance config stored in its own file.
+/// Maps to: projects/{project}/services/{name}.service.toml
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServiceInstanceConfig {
+    pub service: ServiceInstanceMeta,
+
+    #[serde(default)]
+    pub vars: IndexMap<String, Value>,
+}
+
+/// Metadata block inside a standalone service instance file.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServiceInstanceMeta {
+    /// Instance name (unique within the project).
+    pub name: String,
+
+    /// Service class path, e.g. "git/forgejo".
+    pub service_class: String,
+
+    /// Which project this service belongs to (project slug).
+    pub project: String,
+
+    /// Display alias; also used as subdomain when set.
+    pub alias: Option<String>,
+
+    /// Which host slug this service runs on.
+    pub host: Option<String>,
+
+    /// Subdomain prefix → {subdomain}.{project.domain}.
+    pub subdomain: Option<String>,
+
+    /// Port override (uses service-class default when absent).
+    pub port: Option<u16>,
+
+    #[serde(default = "default_version")]
+    pub version: String,
+
+    #[serde(default)]
+    pub tags: Vec<String>,
+
+    /// Git repository of the deployed code (optional metadata).
+    pub git_repo: Option<String>,
+
+    /// Public website URL (optional metadata).
+    pub website: Option<String>,
+
+    /// Bot names attached to this service.
+    #[serde(default)]
+    pub bots: Vec<String>,
+}
+
+impl ServiceInstanceConfig {
+    pub fn load(path: &std::path::Path) -> Result<Self, crate::error::FsnError> {
+        let content = std::fs::read_to_string(path).map_err(|_| crate::error::FsnError::ConfigNotFound {
+            path: path.display().to_string(),
+        })?;
+        toml::from_str(&content).map_err(|e| crate::error::FsnError::ConfigParse {
+            path: path.display().to_string(),
+            source: e,
+        })
+    }
+}
+
+impl crate::resource::Resource for ServiceInstanceConfig {
+    fn kind(&self) -> &'static str { "service" }
+
+    fn validate(&self) -> anyhow::Result<()> {
+        if self.service.name.is_empty()         { anyhow::bail!("service.name is required"); }
+        if self.service.service_class.is_empty() { anyhow::bail!("service.service_class is required"); }
+        if self.service.project.is_empty()       { anyhow::bail!("service.project is required"); }
+        Ok(())
+    }
+}
 
 impl ProjectConfig {
     pub fn load(path: &Path) -> Result<Self, FsnError> {

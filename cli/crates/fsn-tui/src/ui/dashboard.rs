@@ -70,6 +70,16 @@ fn render_header(f: &mut Frame, state: &AppState, area: Rect) {
         .alignment(Alignment::Left);
     f.render_widget(header, area);
 
+    // Build info — right side, left of lang button
+    let build_str = format!("v{} {} ({})  ", env!("CARGO_PKG_VERSION"), crate::BUILD_TIME, crate::GIT_HASH);
+    let build_w   = build_str.chars().count() as u16;
+    let build_x   = area.right().saturating_sub(build_w + 5);
+    let build_area = Rect { x: build_x, y: area.y + 1, width: build_w, height: 1 };
+    f.render_widget(
+        Paragraph::new(Line::from(Span::styled(build_str, Style::default().fg(Color::DarkGray)))),
+        build_area,
+    );
+
     let lang_area = Rect { x: area.right().saturating_sub(6), y: area.y + 1, width: 4, height: 1 };
     f.render_widget(Paragraph::new(Line::from(widgets::lang_button(state))), lang_area);
 }
@@ -144,6 +154,26 @@ fn render_sidebar(f: &mut Frame, state: &AppState, area: Rect) {
             };
 
             lines.push(Line::from(Span::styled(display, style)));
+
+            // Under the selected project: show hosts + "New Host" entry
+            if selected {
+                let host_max_w = inner.width.saturating_sub(5) as usize;
+                for host in &state.hosts {
+                    let hname = host.name();
+                    let hdisp = if hname.len() > host_max_w {
+                        format!("  ⊡ {}…", &hname[..host_max_w.saturating_sub(1)])
+                    } else {
+                        format!("  ⊡ {}", hname)
+                    };
+                    lines.push(Line::from(Span::styled(hdisp, Style::default().fg(Color::DarkGray))));
+                }
+                let new_host_style = if sidebar_focused {
+                    Style::default().fg(Color::Blue)
+                } else {
+                    Style::default().fg(Color::DarkGray)
+                };
+                lines.push(Line::from(Span::styled(state.t("dash.new_host"), new_host_style)));
+            }
         }
     }
 

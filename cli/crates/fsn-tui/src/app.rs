@@ -10,7 +10,8 @@ use crossterm::event::{self, Event};
 use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
 
-use fsn_core::config::project::ProjectConfig;
+use fsn_core::config::project::{ProjectConfig, ServiceInstanceConfig};
+use fsn_core::config::host::HostConfig;
 pub use fsn_core::state::actual::RunState;
 
 use crate::sysinfo::SysInfo;
@@ -79,6 +80,29 @@ impl ProjectHandle {
     }
 }
 
+// ── Host handle ───────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone)]
+pub struct HostHandle {
+    pub slug:      String,
+    pub toml_path: std::path::PathBuf,
+    pub config:    HostConfig,
+}
+
+impl HostHandle {
+    pub fn name(&self) -> &str { &self.config.host.name }
+    pub fn addr(&self) -> &str { self.config.host.addr() }
+}
+
+// ── Service instance handle ────────────────────────────────────────────────────
+
+#[derive(Debug, Clone)]
+pub struct ServiceHandle {
+    pub name:      String,
+    pub toml_path: std::path::PathBuf,
+    pub config:    ServiceInstanceConfig,
+}
+
 // ── Service table ─────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone)]
@@ -105,22 +129,26 @@ pub fn run_state_i18n(state: RunState) -> &'static str {
 pub const PROJECT_TABS: &[&str] = &["form.tab.project", "form.tab.options"];
 /// Tab key constants for service forms.
 pub const SERVICE_TABS: &[&str] = &["form.tab.service", "form.tab.options"];
+/// Tab key constants for host forms.
+pub const HOST_TABS:    &[&str] = &["form.tab.host", "form.tab.system", "form.tab.dns"];
 
 /// Which resource type the form is editing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ResourceKind { Project, Service }
+pub enum ResourceKind { Project, Service, Host }
 
 impl ResourceKind {
     pub fn new_title_key(self) -> &'static str {
         match self {
             ResourceKind::Project => "welcome.new_project",
             ResourceKind::Service => "form.new_service",
+            ResourceKind::Host    => "form.new_host",
         }
     }
     pub fn edit_title_key(self) -> &'static str {
         match self {
             ResourceKind::Project => "welcome.edit_project",
             ResourceKind::Service => "form.edit_service",
+            ResourceKind::Host    => "form.edit_host",
         }
     }
 }
@@ -380,6 +408,11 @@ pub struct AppState {
     /// Loaded projects from disk.
     pub projects:           Vec<ProjectHandle>,
     pub selected_project:   usize,
+    /// Hosts belonging to the currently selected project.
+    pub hosts:              Vec<HostHandle>,
+    pub selected_host:      usize,
+    /// Service instance handles (from .service.toml files).
+    pub svc_handles:        Vec<ServiceHandle>,
     pub dash_focus:         DashFocus,
     /// True = waiting for delete-confirm (J/N).
     pub dash_confirm:       bool,
@@ -402,6 +435,7 @@ impl AppState {
             selected: 0, logs_overlay: None, lang_dropdown_open: false,
             should_quit: false, welcome_focus: 0, current_form: None,
             ctrl_hint: false, projects, selected_project: 0,
+            hosts: vec![], selected_host: 0, svc_handles: vec![],
             dash_focus: DashFocus::Sidebar, dash_confirm: false,
             last_refresh: Instant::now(),
             last_podman_statuses: HashMap::new(),

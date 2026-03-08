@@ -1,36 +1,114 @@
-// Host config – maps to hosts/{hostname}.host.toml
+// Host config – maps to projects/{project}/{hostname}.host.toml
 //
 // Rules (per RULES.md):
 //   - One file per physical/virtual host
 //   - Proxy is ALWAYS defined here, never in project.toml
-//   - Host files are git-ignored (only example.host.toml is tracked)
-//   - ALWAYS required, even for localhost
+//   - Every host MUST have a proxy service
+//   - DNS/ACME at host level = default for all services on that host
+//   - Proxy-level DNS/ACME overrides the host default
 
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 use crate::error::FsnError;
+use crate::resource::Resource;
 
 /// Root structure of a host config file.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HostConfig {
-    pub host: HostMeta,
+    pub host:  HostMeta,
+
+    /// Proxy service declaration — required on every host.
+    #[serde(default)]
     pub proxy: IndexMap<String, ProxyInstance>,
+
+    /// Host-level DNS default (used by all services unless overridden).
+    pub dns:  Option<HostDns>,
+
+    /// Host-level ACME/TLS default.
+    pub acme: Option<HostAcme>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HostMeta {
     pub name: String,
+
+    /// Display alias, e.g. "main", "backup".
+    pub alias: Option<String>,
+
+    /// Primary IPv4 address or FQDN.
+    pub address: String,
+
+    /// Which project this host belongs to (project slug).
+    pub project: Option<String>,
+
+    /// Base install directory on this host (overrides project default).
+    pub install_dir: Option<String>,
+
+    /// SSH username for Ansible / deploy access.
+    #[serde(default = "default_ssh_user")]
+    pub ssh_user: String,
+
+    /// SSH port.
+    #[serde(default = "default_ssh_port")]
+    pub ssh_port: u16,
+
+    /// Free-form tags for grouping / filtering.
+    #[serde(default)]
+    pub tags: Vec<String>,
+
+    // ── Legacy fields (kept for backward compat) ──────────────────────────────
+
+    /// Legacy: IPv4 — prefer `address`.
+    #[serde(default)]
     pub ip: String,
 
+    /// IPv6 address (optional).
     #[serde(default)]
     pub ipv6: String,
 
-    /// true = no SSH, read-only from deployer (externally managed host)
+    /// true = no SSH, externally managed host.
     #[serde(default)]
     pub external: bool,
 }
+
+fn default_ssh_user() -> String { "root".into() }
+fn default_ssh_port() -> u16   { 22 }
+
+impl HostMeta {
+    /// Returns the canonical address: `address` if set, falls back to legacy `ip`.
+    pub fn addr(&self) -> &str {
+        if !self.address.is_empty() { &self.address } else { &self.ip }
+    }
+}
+
+/// Host-level DNS provider configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HostDns {
+    /// Provider name: "cloudflare" | "hetzner" | "manual".
+    pub provider: String,
+
+    /// Reference to the API token in vault (vault_* key).
+    pub token_ref: Option<String>,
+
+    /// DNS zones managed by this token.
+    #[serde(default)]
+    pub zones: Vec<String>,
+}
+
+/// Host-level ACME/TLS configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HostAcme {
+    /// Contact email for Let's Encrypt / ACME.
+    pub email: String,
+
+    /// ACME provider: "letsencrypt" | "zerossl" | "buypass" | "none".
+    #[serde(default = "default_acme_provider")]
+    pub provider: String,
+}
+
+fn default_acme_provider() -> String { "letsencrypt".into() }
 
 /// A proxy instance declaration (typically "zentinel").
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -49,24 +127,20 @@ pub struct ProxyLoad {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ProxyPlugins {
-    /// DNS provider: "hetzner", "cloudflare", "none"
+    /// DNS provider: "hetzner" | "cloudflare" | "none"
     #[serde(default = "default_dns")]
     pub dns: String,
 
-    /// ACME provider: "letsencrypt", "smallstep-ca", "none"
+    /// ACME provider: "letsencrypt" | "smallstep-ca" | "none"
     #[serde(default = "default_acme")]
     pub acme: String,
 
-    /// ACME contact email
+    /// ACME contact email (overrides host-level acme.email)
     pub acme_email: Option<String>,
 }
 
-fn default_dns() -> String {
-    "hetzner".to_string()
-}
-fn default_acme() -> String {
-    "letsencrypt".to_string()
-}
+fn default_dns()  -> String { "hetzner".into() }
+fn default_acme() -> String { "letsencrypt".into() }
 
 impl HostConfig {
     /// Load a host config from a TOML file.
@@ -78,5 +152,15 @@ impl HostConfig {
             path: path.display().to_string(),
             source: e,
         })
+    }
+}
+
+impl Resource for HostConfig {
+    fn kind(&self) -> &'static str { "host" }
+
+    fn validate(&self) -> anyhow::Result<()> {
+        if self.host.name.is_empty()    { anyhow::bail!("host.name is required"); }
+        if self.host.addr().is_empty()  { anyhow::bail!("host.address is required"); }
+        Ok(())
     }
 }

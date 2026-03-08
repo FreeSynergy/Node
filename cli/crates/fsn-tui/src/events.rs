@@ -164,12 +164,18 @@ fn handle_dashboard(key: KeyEvent, state: &mut AppState, root: &Path) -> Result<
                 if state.selected_project > 0 {
                     state.selected_project -= 1;
                     state.rebuild_services();
+                    if let Some(proj) = state.projects.get(state.selected_project) {
+                        state.hosts = crate::load_hosts(&root.join("projects").join(&proj.slug));
+                    }
                 }
             }
             KeyCode::Down => {
                 if state.selected_project + 1 < state.projects.len() {
                     state.selected_project += 1;
                     state.rebuild_services();
+                    if let Some(proj) = state.projects.get(state.selected_project) {
+                        state.hosts = crate::load_hosts(&root.join("projects").join(&proj.slug));
+                    }
                 }
             }
 
@@ -183,6 +189,15 @@ fn handle_dashboard(key: KeyEvent, state: &mut AppState, root: &Path) -> Result<
             KeyCode::Char('e') => {
                 if let Some(proj) = state.projects.get(state.selected_project) {
                     state.current_form = Some(crate::project_form::edit_project_form(proj));
+                    state.screen = Screen::NewProject;
+                }
+            }
+
+            // h = new host for selected project
+            KeyCode::Char('h') => {
+                if let Some(proj) = state.projects.get(state.selected_project) {
+                    let slug = proj.slug.clone();
+                    state.current_form = Some(crate::host_form::new_host_form(&slug));
                     state.screen = Screen::NewProject;
                 }
             }
@@ -300,6 +315,7 @@ fn submit_form(state: &mut AppState, root: &Path) -> Result<()> {
     match kind {
         Some(ResourceKind::Project) => submit_project(state, root),
         Some(ResourceKind::Service) => submit_service(state, root),
+        Some(ResourceKind::Host)    => submit_host(state, root),
         None => Ok(()),
     }
 }
@@ -363,6 +379,35 @@ fn submit_service(state: &mut AppState, root: &Path) -> Result<()> {
     state.screen = Screen::Dashboard;
     state.dash_focus = DashFocus::Services;
     state.current_form = None;
+    Ok(())
+}
+
+fn submit_host(state: &mut AppState, root: &Path) -> Result<()> {
+    let Some(proj) = state.projects.get(state.selected_project) else {
+        if let Some(ref mut f) = state.current_form {
+            f.error = Some("Kein Projekt ausgewählt".into());
+        }
+        return Ok(());
+    };
+    let project_dir = root.join("projects").join(&proj.slug);
+
+    let result = state.current_form.as_ref()
+        .map(|form| crate::host_form::submit_host_form(form, &project_dir));
+
+    match result {
+        Some(Ok(())) => {
+            state.hosts = crate::load_hosts(&project_dir);
+            state.screen = Screen::Dashboard;
+            state.dash_focus = DashFocus::Sidebar;
+            state.current_form = None;
+        }
+        Some(Err(e)) => {
+            if let Some(ref mut form) = state.current_form {
+                form.error = Some(format!("{}", e));
+            }
+        }
+        None => {}
+    }
     Ok(())
 }
 

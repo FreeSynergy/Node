@@ -30,10 +30,19 @@ pub fn service_class_display(code: &str) -> &'static str {
     }
 }
 
-// ── No-op change hook ─────────────────────────────────────────────────────────
+// ── Change hook ───────────────────────────────────────────────────────────────
 
-fn service_on_change(_form: &mut ResourceForm, _idx: usize) {
-    // Future: auto-derive subdomain from instance name, etc.
+fn service_on_change(form: &mut ResourceForm, idx: usize) {
+    if form.fields[idx].key == "name" {
+        let slug = crate::app::slugify(&form.fields[idx].value.clone());
+        if let Some(s) = form.fields.iter().position(|f| f.key == "subdomain") {
+            if !form.fields[s].dirty {
+                let len = slug.len();
+                form.fields[s].value  = slug;
+                form.fields[s].cursor = len;
+            }
+        }
+    }
 }
 
 // ── Form builder ──────────────────────────────────────────────────────────────
@@ -42,17 +51,20 @@ fn service_on_change(_form: &mut ResourceForm, _idx: usize) {
 pub fn new_service_form() -> ResourceForm {
     let fields = vec![
         // ── Tab 0: Service ────────────────────────────────────────────────────
-        FormField::new("name",  "form.service.name",  0, true,  FormFieldType::Text)
+        FormField::new("name",      "form.service.name",      0, true,  FormFieldType::Text)
             .hint("form.service.name.hint"),
-        FormField::new("class", "form.service.class", 0, true,  FormFieldType::Select)
+        FormField::new("class",     "form.service.class",     0, true,  FormFieldType::Select)
             .opts(SERVICE_CLASSES.to_vec())
             .default_val(SERVICE_CLASSES[0])
             .display(service_class_display),
-        FormField::new("alias", "form.service.alias", 0, false, FormFieldType::Text)
+        FormField::new("subdomain", "form.service.subdomain", 0, false, FormFieldType::Text)
+            .hint("form.service.subdomain.hint"),
+        FormField::new("alias",     "form.service.alias",     0, false, FormFieldType::Text)
             .hint("form.service.alias.hint"),
         // ── Tab 1: Options ────────────────────────────────────────────────────
         FormField::new("version", "form.options.version", 1, false, FormFieldType::Text)
             .default_val("latest"),
+        FormField::new("port",    "form.service.port",    1, false, FormFieldType::Text),
     ];
     ResourceForm::new(ResourceKind::Service, SERVICE_TABS, fields, None, service_on_change)
 }
