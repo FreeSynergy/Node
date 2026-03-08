@@ -26,7 +26,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::app::{AppState, DashFocus, RunState, SidebarItem};
+use crate::app::{AppState, DashFocus, Lang, RunState, SidebarItem};
 use crate::ui::widgets;
 
 pub fn render(f: &mut Frame, state: &mut AppState, area: ratatui::layout::Rect) {
@@ -137,92 +137,22 @@ fn render_sidebar(f: &mut Frame, state: &AppState, area: Rect) {
 
     let max_w = inner.width.saturating_sub(4) as usize;
 
-    let lines: Vec<Line> = state.sidebar_items.iter().enumerate().map(|(i, item)| {
-        let is_cursor = focused && i == state.sidebar_cursor;
-        match item {
-            SidebarItem::Section(key) => Line::from(Span::styled(
-                state.t(key),
-                Style::default().fg(Color::DarkGray).add_modifier(Modifier::UNDERLINED),
-            )),
-            SidebarItem::Project { name, .. } => {
-                let (prefix, style) = if is_cursor {
-                    ("▶ ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
-                } else {
-                    ("  ", Style::default().fg(Color::White))
-                };
-                Line::from(Span::styled(truncate(prefix, name, max_w), style))
-            }
-            SidebarItem::Host { name, .. } => {
-                let (prefix, style) = if is_cursor {
-                    ("  ▶ ", Style::default().fg(Color::Cyan))
-                } else {
-                    ("  ⊡ ", Style::default().fg(Color::DarkGray))
-                };
-                Line::from(Span::styled(truncate(prefix, name, max_w), style))
-            }
-            SidebarItem::Service { name, status, .. } => {
-                let status_char = match status {
-                    RunState::Running => "●",
-                    RunState::Stopped => "○",
-                    RunState::Failed  => "✕",
-                    RunState::Missing => "·",
-                };
-                let status_color = match status {
-                    RunState::Running => Color::Green,
-                    RunState::Stopped => Color::DarkGray,
-                    RunState::Failed  => Color::Red,
-                    RunState::Missing => Color::DarkGray,
-                };
-                let (prefix, name_style) = if is_cursor {
-                    ("  ▶ ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
-                } else {
-                    ("  ◆ ", Style::default().fg(Color::White))
-                };
-                let text = truncate(prefix, name, max_w.saturating_sub(2));
-                Line::from(vec![
-                    Span::styled(text, name_style),
-                    Span::styled(format!(" {}", status_char), Style::default().fg(status_color)),
-                ])
-            }
-            SidebarItem::Action { label_key, .. } => {
-                let style = if is_cursor {
-                    Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
-                } else if focused {
-                    Style::default().fg(Color::Green)
-                } else {
-                    Style::default().fg(Color::DarkGray)
-                };
-                Line::from(Span::styled(state.t(label_key), style))
-            }
-        }
-    }).collect();
+    // Each SidebarItem renders its own sidebar line — no external dispatch.
+    let lines: Vec<Line> = state.sidebar_items.iter().enumerate()
+        .map(|(i, item)| item.sidebar_line(i == state.sidebar_cursor, focused, max_w, state.lang))
+        .collect();
 
     f.render_widget(Paragraph::new(lines), inner);
 }
 
-fn truncate(prefix: &str, name: &str, max_w: usize) -> String {
-    let total = prefix.len() + name.len();
-    if total > max_w && max_w > prefix.len() + 1 {
-        format!("{}{}…", prefix, &name[..max_w - prefix.len() - 1])
-    } else {
-        format!("{}{}", prefix, name)
-    }
-}
+// ── Center panel ──────────────────────────────────────────────────────────────
 
-// ── Center panel — context-sensitive ──────────────────────────────────────────
-
+/// Dispatches to the center panel appropriate for the currently focused sidebar item.
+/// Each SidebarItem knows how to render its own center view.
 fn render_center(f: &mut Frame, state: &AppState, area: Rect) {
     match state.current_sidebar_item() {
-        Some(SidebarItem::Host { slug, .. }) => {
-            let slug = slug.clone();
-            render_host_detail(f, state, area, &slug);
-        }
-        Some(SidebarItem::Service { name, .. }) => {
-            let name = name.clone();
-            render_service_detail(f, state, area, &name);
-        }
-        // Project selected, New-Action, or nothing → show service table
-        _ => render_services(f, state, area),
+        Some(item) => item.render_center(f, state, area),
+        None       => render_services(f, state, area),
     }
 }
 
@@ -419,11 +349,10 @@ fn render_hint(f: &mut Frame, state: &AppState, area: Rect) {
     } else {
         match state.dash_focus {
             DashFocus::Services => "dash.hint.services",
-            DashFocus::Sidebar  => match state.current_sidebar_item() {
-                Some(SidebarItem::Host    { .. }) => "dash.hint.host",
-                Some(SidebarItem::Service { .. }) => "dash.hint.service",
-                _                                 => "dash.hint",
-            },
+            // Each SidebarItem knows its own hint key — no external dispatch needed.
+            DashFocus::Sidebar  => state.current_sidebar_item()
+                .map(|item| item.hint_key())
+                .unwrap_or("dash.hint"),
         }
     };
 
@@ -438,4 +367,92 @@ fn render_hint(f: &mut Frame, state: &AppState, area: Rect) {
             .alignment(Alignment::Center),
         area,
     );
+}
+
+// ── SidebarItem rendering — each item renders itself ─────────────────────────
+
+fn truncate(prefix: &str, name: &str, max_w: usize) -> String {
+    let total = prefix.len() + name.len();
+    if total > max_w && max_w > prefix.len() + 1 {
+        format!("{}{}…", prefix, &name[..max_w - prefix.len() - 1])
+    } else {
+        format!("{}{}", prefix, name)
+    }
+}
+
+impl SidebarItem {
+    /// Produce the sidebar row line for this item.
+    ///
+    /// Analogous to an element rendering its own `<li>` — the caller just
+    /// collects lines; no variant-specific logic leaks into the sidebar renderer.
+    fn sidebar_line(&self, is_cursor: bool, focused: bool, max_w: usize, lang: Lang) -> Line<'static> {
+        let t = |key| crate::i18n::t(lang, key);
+        match self {
+            SidebarItem::Section(key) => Line::from(Span::styled(
+                t(key),
+                Style::default().fg(Color::DarkGray).add_modifier(Modifier::UNDERLINED),
+            )),
+
+            SidebarItem::Project { name, .. } => {
+                let (prefix, style) = if is_cursor {
+                    ("▶ ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
+                } else {
+                    ("  ", Style::default().fg(Color::White))
+                };
+                Line::from(Span::styled(truncate(prefix, name, max_w), style))
+            }
+
+            SidebarItem::Host { name, .. } => {
+                let (prefix, style) = if is_cursor {
+                    ("  ▶ ", Style::default().fg(Color::Cyan))
+                } else {
+                    ("  ⊡ ", Style::default().fg(Color::DarkGray))
+                };
+                Line::from(Span::styled(truncate(prefix, name, max_w), style))
+            }
+
+            SidebarItem::Service { name, status, .. } => {
+                let (status_char, status_color) = match status {
+                    RunState::Running => ("●", Color::Green),
+                    RunState::Stopped => ("○", Color::DarkGray),
+                    RunState::Failed  => ("✕", Color::Red),
+                    RunState::Missing => ("·", Color::DarkGray),
+                };
+                let (prefix, name_style) = if is_cursor {
+                    ("  ▶ ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
+                } else {
+                    ("  ◆ ", Style::default().fg(Color::White))
+                };
+                let text = truncate(prefix, name, max_w.saturating_sub(2));
+                Line::from(vec![
+                    Span::styled(text, name_style),
+                    Span::styled(format!(" {}", status_char), Style::default().fg(status_color)),
+                ])
+            }
+
+            SidebarItem::Action { label_key, .. } => {
+                let style = if is_cursor {
+                    Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
+                } else if focused {
+                    Style::default().fg(Color::Green)
+                } else {
+                    Style::default().fg(Color::DarkGray)
+                };
+                Line::from(Span::styled(t(label_key), style))
+            }
+        }
+    }
+
+    /// Render the center detail panel appropriate for this item's type.
+    ///
+    /// Analogous to a component rendering its own detail view — the caller
+    /// only knows "show the center panel for the selected item".
+    fn render_center(&self, f: &mut Frame, state: &AppState, area: Rect) {
+        match self {
+            SidebarItem::Host    { slug, .. } => render_host_detail(f, state, area, slug),
+            SidebarItem::Service { name, .. } => render_service_detail(f, state, area, name),
+            // Project, Action, Section → show the service table (project overview)
+            _                                 => render_services(f, state, area),
+        }
+    }
 }

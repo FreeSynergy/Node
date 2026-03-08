@@ -160,7 +160,6 @@ fn de(key: &str) -> Option<&'static str> {
         "form.bot.description"   => "Beschreibung",
         "form.bot.tags"          => "Tags",
         "form.bot.tags.hint"     => "Kommagetrennte Tags, z.B. notifications,alerts",
-        "dash.hint.services"  => "↑↓=Nav  n=Neu  d=Deploy  r=Restart  l=Logs  Tab=Sidebar",
         // ── Wizard ───────────────────────────────────────────────────────
         "wizard.title"        => "Assistent",
         "wizard.hint"         => "Tab=Nächstes Feld  ^Enter=Speichern  Esc=Abbrechen",
@@ -321,7 +320,6 @@ fn en(key: &str) -> Option<&'static str> {
         "form.bot.description"   => "Description",
         "form.bot.tags"          => "Tags",
         "form.bot.tags.hint"     => "Comma-separated tags, e.g. notifications,alerts",
-        "dash.hint.services"  => "↑↓=Nav  n=New  d=Deploy  r=Restart  l=Logs  Tab=Sidebar",
         // ── Wizard ───────────────────────────────────────────────────────
         "wizard.title"        => "Wizard",
         "wizard.hint"         => "Tab=Next Field  ^Enter=Save  Esc=Cancel",

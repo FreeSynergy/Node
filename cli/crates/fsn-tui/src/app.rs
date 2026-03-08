@@ -73,6 +73,14 @@ impl SidebarItem {
     pub fn action_kind(&self) -> Option<SidebarAction> {
         if let SidebarItem::Action { kind, .. } = self { Some(*kind) } else { None }
     }
+    /// i18n key for the sidebar hint bar when this item has focus.
+    pub fn hint_key(&self) -> &'static str {
+        match self {
+            SidebarItem::Host    { .. } => "dash.hint.host",
+            SidebarItem::Service { .. } => "dash.hint.service",
+            _                           => "dash.hint",
+        }
+    }
 }
 
 // ── Language ──────────────────────────────────────────────────────────────────
@@ -223,13 +231,11 @@ pub struct ServiceRow {
     pub status:       RunState,
 }
 
+/// i18n key for a run state — delegates to `RunState::i18n_key()`.
+/// Kept as a free function for backwards-compatibility with existing call sites.
+#[inline]
 pub fn run_state_i18n(state: RunState) -> &'static str {
-    match state {
-        RunState::Running => "status.running",
-        RunState::Stopped => "status.stopped",
-        RunState::Failed  => "status.error",
-        RunState::Missing => "status.unknown",
-    }
+    state.i18n_key()
 }
 
 // ── Resource kind ─────────────────────────────────────────────────────────────
@@ -249,6 +255,19 @@ impl ResourceKind {
             ResourceKind::Service => "form.submit.service",
             ResourceKind::Host    => "form.submit.host",
             ResourceKind::Bot     => "form.submit.bot",
+        }
+    }
+
+    /// i18n key for the form screen header — depends on whether this is a new or edit form.
+    pub fn title_key(self, is_edit: bool) -> &'static str {
+        match (self, is_edit) {
+            (ResourceKind::Project, false) => "welcome.new_project",
+            (ResourceKind::Project, true)  => "welcome.edit_project",
+            (ResourceKind::Service, false) => "form.new_service",
+            (ResourceKind::Service, true)  => "form.edit_service",
+            (ResourceKind::Host,    false) => "form.new_host",
+            (ResourceKind::Host,    true)  => "form.edit_host",
+            (ResourceKind::Bot,     _)     => "form.tab.bot",
         }
     }
 }
@@ -299,6 +318,12 @@ impl ResourceForm {
         on_change: fn(&mut Vec<Box<dyn FormNode>>, &'static str),
     ) -> Self {
         Self { kind, tab_keys, active_tab: 0, active_field: 0, nodes, error: None, edit_id, on_change }
+    }
+
+    /// i18n key for the form screen header.
+    /// Delegates to `ResourceKind::title_key` — no external match required.
+    pub fn title_key(&self) -> &'static str {
+        self.kind.title_key(self.edit_id.is_some())
     }
 
     // ── Tab helpers ────────────────────────────────────────────────────────

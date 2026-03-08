@@ -23,6 +23,21 @@ use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::Frame;
 use crate::app::{AppState, OverlayLayer, Screen};
 
+// ── OverlayLayer rendering — each variant renders itself ──────────────────────
+
+impl OverlayLayer {
+    /// Render this overlay layer on top of the main content.
+    /// Analogous to `Element::render()` — the caller just iterates the stack.
+    fn render(&self, f: &mut Frame, state: &AppState) {
+        match self {
+            OverlayLayer::Logs(_)            => logs::render(f, state),
+            OverlayLayer::Confirm { .. }     => render_confirm(f, state),
+            OverlayLayer::Deploy(_)          => render_deploy(f, state),
+            OverlayLayer::NewResource { .. } => render_new_resource(f, state),
+        }
+    }
+}
+
 pub fn render(f: &mut Frame, state: &mut AppState) {
     let full = f.area();
 
@@ -57,15 +72,10 @@ pub fn render(f: &mut Frame, state: &mut AppState) {
         help_sidebar::render_help_sidebar(f, area, &sections, state.lang);
     }
 
-    // Overlay layers drawn on top (Ebene system)
-    // Each variant is rendered by its own function — OOP: variant carries own rendering.
+    // Overlay layers drawn on top (Ebene system).
+    // Each layer renders itself — no external dispatch needed.
     for layer in &state.overlay_stack {
-        match layer {
-            OverlayLayer::Logs(_)             => logs::render(f, state),
-            OverlayLayer::Confirm { .. }      => render_confirm(f, state),
-            OverlayLayer::Deploy(_)           => render_deploy(f, state),
-            OverlayLayer::NewResource { .. }  => render_new_resource(f, state),
-        }
+        layer.render(f, state);
     }
 }
 

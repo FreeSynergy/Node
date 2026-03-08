@@ -500,8 +500,7 @@ fn handle_dashboard(key: KeyEvent, state: &mut AppState, root: &Path) -> Result<
                         }
                         state.dash_focus = DashFocus::Services;
                     }
-                    Some(SidebarItem::Host { .. }) | Some(SidebarItem::Service { .. })
-                    | Some(SidebarItem::Action { .. }) => {
+                    Some(SidebarItem::Host { .. }) | Some(SidebarItem::Service { .. }) => {
                         state.dash_focus = DashFocus::Services;
                     }
                     _ => {}

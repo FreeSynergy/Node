@@ -39,6 +39,19 @@ pub enum RunState {
     Missing,
 }
 
+impl RunState {
+    /// i18n key for human-readable status label.
+    /// Defined here (not in fsn-tui) so any consumer can translate without reimplementing.
+    pub fn i18n_key(self) -> &'static str {
+        match self {
+            RunState::Running => "status.running",
+            RunState::Stopped => "status.stopped",
+            RunState::Failed  => "status.error",
+            RunState::Missing => "status.unknown",
+        }
+    }
+}
+
 impl std::fmt::Display for RunState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

@@ -47,16 +47,7 @@ pub fn render(f: &mut Frame, state: &mut AppState, area: Rect) {
 // ── Header ────────────────────────────────────────────────────────────────────
 
 fn render_header(f: &mut Frame, lang: crate::app::Lang, form: &ResourceForm, area: Rect) {
-    let title_key = match (form.kind, form.edit_id.is_some()) {
-        (ResourceKind::Project, false) => "welcome.new_project",
-        (ResourceKind::Project, true)  => "welcome.edit_project",
-        (ResourceKind::Service, false) => "form.new_service",
-        (ResourceKind::Service, true)  => "form.edit_service",
-        (ResourceKind::Host,    false) => "form.new_host",
-        (ResourceKind::Host,    true)  => "form.edit_host",
-        (ResourceKind::Bot,     false) => "form.tab.bot",
-        (ResourceKind::Bot,     true)  => "form.tab.bot",
-    };
+    let title_key = form.title_key();
 
     let title = Line::from(vec![
         Span::styled(" FreeSynergy.Node ",
