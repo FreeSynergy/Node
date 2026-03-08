@@ -44,6 +44,8 @@ fn render_header(f: &mut Frame, state: &AppState, form: &ResourceForm, area: Rec
         (ResourceKind::Project, true)  => "welcome.edit_project",
         (ResourceKind::Service, false) => "form.new_service",
         (ResourceKind::Service, true)  => "form.edit_service",
+        (ResourceKind::Host,    false) => "form.new_host",
+        (ResourceKind::Host,    true)  => "form.edit_host",
     };
 
     let title = Line::from(vec![
