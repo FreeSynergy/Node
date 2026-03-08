@@ -12,7 +12,7 @@ use crate::app::AppState;
 use crate::ui::widgets;
 
 pub fn render(f: &mut Frame, state: &AppState) {
-    let Some(ref logs) = state.logs_overlay else { return };
+    let Some(ref logs) = state.logs_overlay() else { return };
 
     let area = f.area();
     let popup = widgets::popup_area(80, 70, area);

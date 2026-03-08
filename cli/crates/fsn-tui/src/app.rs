@@ -16,6 +16,7 @@ pub use fsn_core::state::actual::RunState;
 
 use crate::sysinfo::SysInfo;
 use crate::ui;
+use crate::ui::form_node::{FormAction, FormNode};
 
 // ── Screens ───────────────────────────────────────────────────────────────────
 
@@ -51,11 +52,8 @@ impl Lang {
     }
 }
 
-// ── Project handle (loaded from disk) ─────────────────────────────────────────
+// ── Project handle ────────────────────────────────────────────────────────────
 
-/// A project loaded from `projects/{slug}/{slug}.project.toml`.
-/// `config` is the parsed `ProjectConfig` from fsn-core.
-/// `slug` and `toml_path` are TUI-level metadata not stored inside the TOML.
 #[derive(Debug, Clone)]
 pub struct ProjectHandle {
     pub slug:      String,
@@ -64,19 +62,15 @@ pub struct ProjectHandle {
 }
 
 impl ProjectHandle {
-    /// Convenience: project display name.
-    pub fn name(&self) -> &str { &self.config.project.name }
-    /// Convenience: primary domain.
-    pub fn domain(&self) -> &str { &self.config.project.domain }
-    /// Convenience: contact e-mail (first non-empty of email / acme_email).
+    pub fn name(&self)        -> &str { &self.config.project.name }
+    pub fn domain(&self)      -> &str { &self.config.project.domain }
+    pub fn install_dir(&self) -> &str {
+        self.config.project.install_dir.as_deref().unwrap_or("")
+    }
     pub fn email(&self) -> &str {
         self.config.project.contact.as_ref()
             .and_then(|c| c.email.as_deref().or(c.acme_email.as_deref()))
             .unwrap_or("")
-    }
-    /// Convenience: install directory.
-    pub fn install_dir(&self) -> &str {
-        self.config.project.install_dir.as_deref().unwrap_or("")
     }
 }
 
@@ -103,7 +97,7 @@ pub struct ServiceHandle {
     pub config:    ServiceInstanceConfig,
 }
 
-// ── Service table ─────────────────────────────────────────────────────────────
+// ── Service table row ─────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone)]
 pub struct ServiceRow {
@@ -113,7 +107,6 @@ pub struct ServiceRow {
     pub status:       RunState,
 }
 
-/// Map `RunState` to an i18n key for the status column.
 pub fn run_state_i18n(state: RunState) -> &'static str {
     match state {
         RunState::Running => "status.running",
@@ -123,35 +116,16 @@ pub fn run_state_i18n(state: RunState) -> &'static str {
     }
 }
 
-// ── Resource form — generic editor for any Resource type ──────────────────────
+// ── Resource kind ─────────────────────────────────────────────────────────────
 
-/// Tab key constants for project forms.
 pub const PROJECT_TABS: &[&str] = &["form.tab.project", "form.tab.options"];
-/// Tab key constants for service forms.
 pub const SERVICE_TABS: &[&str] = &["form.tab.service", "form.tab.options"];
-/// Tab key constants for host forms.
 pub const HOST_TABS:    &[&str] = &["form.tab.host", "form.tab.system", "form.tab.dns"];
 
-/// Which resource type the form is editing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ResourceKind { Project, Service, Host }
 
 impl ResourceKind {
-    pub fn new_title_key(self) -> &'static str {
-        match self {
-            ResourceKind::Project => "welcome.new_project",
-            ResourceKind::Service => "form.new_service",
-            ResourceKind::Host    => "form.new_host",
-        }
-    }
-    pub fn edit_title_key(self) -> &'static str {
-        match self {
-            ResourceKind::Project => "welcome.edit_project",
-            ResourceKind::Service => "form.edit_service",
-            ResourceKind::Host    => "form.edit_host",
-        }
-    }
-    /// i18n key for the submit button (create mode).
     pub fn submit_key(self) -> &'static str {
         match self {
             ResourceKind::Project => "form.submit",
@@ -161,246 +135,181 @@ impl ResourceKind {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FormFieldType { Text, Email, Ip, Secret, Path, Select }
+// ── ResourceForm — component-based generic form ───────────────────────────────
+//
+// Holds a list of `FormNode` objects (TextInputNode, SelectInputNode, …).
+// Each node is fully self-contained: it renders itself, handles its own input,
+// and knows how to hit-test mouse clicks.
+//
+// The `on_change` hook receives the nodes slice and the key of the field that
+// changed, so smart-default logic (e.g. derive domain from name) can update
+// sibling nodes via `node.set_value()`.
 
-#[derive(Debug, Clone)]
-pub struct FormField {
-    pub key:        &'static str,
-    pub label_key:  &'static str,
-    pub hint_key:   Option<&'static str>,
-    /// Index into `ResourceForm.tab_keys` — which tab this field belongs to.
-    pub tab:        usize,
-    pub required:   bool,
-    pub field_type: FormFieldType,
-    pub value:      String,
-    /// Fallback used by `effective_value()` when `value` is empty.
-    pub default:    String,
-    pub cursor:     usize,
-    pub dirty:      bool,
-    pub options:    Vec<&'static str>,
-    /// Optional display mapper for Select fields (code → human label).
-    pub display_fn: Option<fn(&str) -> &'static str>,
-}
-
-impl FormField {
-    pub fn new(key: &'static str, label_key: &'static str, tab: usize, required: bool, field_type: FormFieldType) -> Self {
-        Self { key, label_key, hint_key: None, tab, required, field_type,
-               value: String::new(), default: String::new(), cursor: 0, dirty: false,
-               options: vec![], display_fn: None }
-    }
-    pub fn hint(mut self, k: &'static str) -> Self { self.hint_key = Some(k); self }
-    pub fn default_val(mut self, v: &str) -> Self {
-        self.value   = v.to_string();
-        self.default = v.to_string();
-        self.cursor  = v.len();
-        self
-    }
-    pub fn opts(mut self, o: Vec<&'static str>) -> Self { self.options = o; self }
-    pub fn dirty(mut self) -> Self { self.dirty = true; self }
-    pub fn display(mut self, f: fn(&str) -> &'static str) -> Self { self.display_fn = Some(f); self }
-
-    /// Value to use on submit: returns `default` if the user left the field empty.
-    pub fn effective_value(&self) -> &str {
-        if self.value.trim().is_empty() && !self.default.is_empty() {
-            &self.default
-        } else {
-            &self.value
-        }
-    }
-
-    /// Human-readable display value (for Select fields with a display_fn).
-    pub fn display_value(&self) -> &str {
-        if let Some(f) = self.display_fn {
-            let s = f(&self.value);
-            if s.is_empty() { &self.value } else { s }
-        } else {
-            &self.value
-        }
-    }
-}
-
-/// Generic resource editor form.
-/// Works for projects, services, and any future resource type.
-#[derive(Debug)]
 pub struct ResourceForm {
     pub kind:         ResourceKind,
-    /// i18n keys for each tab header.
+    /// i18n keys for tab headers.
     pub tab_keys:     &'static [&'static str],
     pub active_tab:   usize,
+    /// Index within the CURRENT TAB's node list.
     pub active_field: usize,
-    pub fields:       Vec<FormField>,
+    /// All field nodes across all tabs.
+    pub nodes:        Vec<Box<dyn FormNode>>,
     pub error:        Option<String>,
-    /// None = create new, Some(id) = edit existing (for projects: slug).
+    /// None = create, Some(id) = edit existing (slug for projects).
     pub edit_id:      Option<String>,
-    /// Hook called after any field edit — resource-specific smart defaults.
-    pub on_change:    fn(&mut ResourceForm, usize),
+    /// Called after any value change: `(nodes, changed_field_key)`.
+    pub on_change:    fn(&mut Vec<Box<dyn FormNode>>, &'static str),
+}
+
+impl std::fmt::Debug for ResourceForm {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ResourceForm")
+            .field("kind",         &self.kind)
+            .field("active_tab",   &self.active_tab)
+            .field("active_field", &self.active_field)
+            .field("edit_id",      &self.edit_id)
+            .finish()
+    }
 }
 
 impl ResourceForm {
     pub fn new(
         kind:      ResourceKind,
         tab_keys:  &'static [&'static str],
-        fields:    Vec<FormField>,
+        nodes:     Vec<Box<dyn FormNode>>,
         edit_id:   Option<String>,
-        on_change: fn(&mut ResourceForm, usize),
+        on_change: fn(&mut Vec<Box<dyn FormNode>>, &'static str),
     ) -> Self {
-        Self { kind, tab_keys, active_tab: 0, active_field: 0, fields, error: None, edit_id, on_change }
+        Self { kind, tab_keys, active_tab: 0, active_field: 0, nodes, error: None, edit_id, on_change }
     }
+
+    // ── Tab helpers ────────────────────────────────────────────────────────
 
     pub fn is_last_tab(&self) -> bool {
         self.active_tab == self.tab_keys.len().saturating_sub(1)
     }
 
-    pub fn tab_field_indices(&self) -> Vec<usize> {
-        let tab = self.active_tab;
-        self.fields.iter().enumerate()
-            .filter(|(_, f)| f.tab == tab)
+    pub fn next_tab(&mut self) {
+        self.active_tab   = (self.active_tab + 1) % self.tab_keys.len();
+        self.active_field = 0;
+    }
+    pub fn prev_tab(&mut self) {
+        self.active_tab   = self.active_tab.checked_sub(1).unwrap_or(self.tab_keys.len() - 1);
+        self.active_field = 0;
+    }
+
+    // ── Node access ────────────────────────────────────────────────────────
+
+    /// Indices into `self.nodes` for fields on the active tab.
+    pub fn current_tab_indices(&self) -> Vec<usize> {
+        self.nodes.iter().enumerate()
+            .filter(|(_, n)| n.tab() == self.active_tab)
             .map(|(i, _)| i)
             .collect()
     }
 
-    pub fn focused_field_idx(&self) -> Option<usize> {
-        self.tab_field_indices().get(self.active_field).copied()
+    /// Global index of the focused node, or `None`.
+    pub fn focused_node_global_idx(&self) -> Option<usize> {
+        self.current_tab_indices().get(self.active_field).copied()
     }
 
+    pub fn focused_node(&self) -> Option<&dyn FormNode> {
+        self.focused_node_global_idx().map(|i| self.nodes[i].as_ref())
+    }
+
+    pub fn focused_node_mut(&mut self) -> Option<&mut dyn FormNode> {
+        let idx = self.focused_node_global_idx()?;
+        Some(self.nodes[idx].as_mut())
+    }
+
+    // ── Focus movement ─────────────────────────────────────────────────────
+
     pub fn focus_next(&mut self) {
-        let count = self.tab_field_indices().len();
+        let count = self.current_tab_indices().len();
         if count > 0 { self.active_field = (self.active_field + 1) % count; }
     }
     pub fn focus_prev(&mut self) {
-        let count = self.tab_field_indices().len();
-        if count > 0 { self.active_field = self.active_field.checked_sub(1).unwrap_or(count - 1); }
-    }
-    pub fn next_tab(&mut self) {
-        self.active_tab = (self.active_tab + 1) % self.tab_keys.len();
-        self.active_field = 0;
-    }
-    pub fn prev_tab(&mut self) {
-        self.active_tab = self.active_tab.checked_sub(1).unwrap_or(self.tab_keys.len() - 1);
-        self.active_field = 0;
-    }
-
-    pub fn insert_char(&mut self, c: char) {
-        if let Some(idx) = self.focused_field_idx() {
-            let f = &mut self.fields[idx];
-            f.value.insert(f.cursor, c);
-            f.cursor += c.len_utf8();
-            f.dirty = true;
-            let hook = self.on_change;
-            hook(self, idx);
+        let count = self.current_tab_indices().len();
+        if count > 0 {
+            self.active_field = self.active_field.checked_sub(1).unwrap_or(count - 1);
         }
     }
 
-    pub fn backspace(&mut self) {
-        if let Some(idx) = self.focused_field_idx() {
-            let changed = {
-                let f = &mut self.fields[idx];
-                if f.cursor > 0 {
-                    let prev = f.value[..f.cursor].char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
-                    f.value.remove(prev);
-                    f.cursor = prev;
-                    f.dirty = true;
-                    true
-                } else { false }
-            };
-            if changed { let hook = self.on_change; hook(self, idx); }
+    // ── Key dispatch ───────────────────────────────────────────────────────
+
+    /// Dispatch a key event to the focused node, handle focus/tab navigation,
+    /// and fire `on_change` when a value was modified.
+    /// Returns the action for the outer handler (Submit, Cancel, LangToggle, etc.).
+    pub fn handle_key(&mut self, key: crossterm::event::KeyEvent) -> FormAction {
+        let global_idx = self.focused_node_global_idx();
+        let action = if let Some(idx) = global_idx {
+            self.nodes[idx].handle_key(key)
+        } else {
+            FormAction::Unhandled
+        };
+
+        // Fire on_change when the value was actually modified
+        if action == FormAction::ValueChanged {
+            if let Some(idx) = global_idx {
+                let key = self.nodes[idx].key();
+                (self.on_change)(&mut self.nodes, key);
+            }
+        }
+
+        // Handle intra-form navigation so the outer handler sees only high-level actions
+        match action {
+            FormAction::FocusNext   => { self.focus_next(); self.error = None; FormAction::Consumed }
+            FormAction::FocusPrev   => { self.focus_prev(); self.error = None; FormAction::Consumed }
+            FormAction::TabNext     => { self.next_tab();   self.error = None; FormAction::Consumed }
+            FormAction::TabPrev     => { self.prev_tab();   self.error = None; FormAction::Consumed }
+            FormAction::ValueChanged => FormAction::Consumed,
+            other => other,
         }
     }
 
-    pub fn cursor_left(&mut self) {
-        if let Some(idx) = self.focused_field_idx() {
-            let f = &mut self.fields[idx];
-            if f.cursor > 0 {
-                f.cursor = f.value[..f.cursor].char_indices().next_back().map(|(i, _)| i).unwrap_or(0);
-            }
-        }
-    }
-    pub fn cursor_right(&mut self) {
-        if let Some(idx) = self.focused_field_idx() {
-            let f = &mut self.fields[idx];
-            if f.cursor < f.value.len() {
-                let next = f.value[f.cursor..].chars().next().map(|c| f.cursor + c.len_utf8()).unwrap_or(f.cursor);
-                f.cursor = next;
-            }
-        }
-    }
-    pub fn delete_char(&mut self) {
-        if let Some(idx) = self.focused_field_idx() {
-            let changed = {
-                let f = &mut self.fields[idx];
-                if f.cursor < f.value.len() {
-                    let next = f.value[f.cursor..].chars().next().map(|c| f.cursor + c.len_utf8()).unwrap_or(f.cursor);
-                    f.value.drain(f.cursor..next);
-                    f.dirty = true;
-                    true
-                } else { false }
-            };
-            if changed { let hook = self.on_change; hook(self, idx); }
-        }
-    }
-    pub fn cursor_home(&mut self) {
-        if let Some(idx) = self.focused_field_idx() { self.fields[idx].cursor = 0; }
-    }
-    pub fn cursor_end(&mut self) {
-        if let Some(idx) = self.focused_field_idx() {
-            let f = &mut self.fields[idx];
-            f.cursor = f.value.len();
-        }
-    }
-
-    pub fn select_next(&mut self) {
-        if let Some(idx) = self.focused_field_idx() {
-            let f = &mut self.fields[idx];
-            if matches!(f.field_type, FormFieldType::Select) && !f.options.is_empty() {
-                let cur = f.options.iter().position(|&o| o == f.value).unwrap_or(0);
-                let next = (cur + 1) % f.options.len();
-                f.value = f.options[next].to_string();
-            }
-        }
-    }
-    pub fn select_prev(&mut self) {
-        if let Some(idx) = self.focused_field_idx() {
-            let f = &mut self.fields[idx];
-            if matches!(f.field_type, FormFieldType::Select) && !f.options.is_empty() {
-                let cur = f.options.iter().position(|&o| o == f.value).unwrap_or(0);
-                let prev = if cur == 0 { f.options.len() - 1 } else { cur - 1 };
-                f.value = f.options[prev].to_string();
-            }
-        }
-    }
+    // ── Validation ─────────────────────────────────────────────────────────
 
     pub fn tab_missing_count(&self, tab_idx: usize) -> usize {
-        self.fields.iter()
-            .filter(|f| f.tab == tab_idx && f.required && f.value.trim().is_empty())
+        self.nodes.iter()
+            .filter(|n| n.tab() == tab_idx && n.required() && !n.is_filled())
             .count()
     }
 
+    pub fn missing_required(&self) -> Vec<&'static str> {
+        self.nodes.iter()
+            .filter(|n| n.required() && !n.is_filled())
+            .map(|n| n.label_key())
+            .collect()
+    }
+
+    // ── Value access ───────────────────────────────────────────────────────
+
     pub fn field_value(&self, key: &str) -> String {
-        self.fields.iter().find(|f| f.key == key)
-            .map(|f| f.effective_value().to_string())
+        self.nodes.iter().find(|n| n.key() == key)
+            .map(|n| n.effective_value().to_string())
             .unwrap_or_default()
     }
 
-    pub fn set_select_by_index(&mut self, option_idx: usize) {
-        if let Some(idx) = self.focused_field_idx() {
-            let f = &mut self.fields[idx];
-            if matches!(f.field_type, FormFieldType::Select) && option_idx < f.options.len() {
-                f.value = f.options[option_idx].to_string();
-            }
+    pub fn set_field_value(&mut self, key: &str, value: &str) {
+        if let Some(n) = self.nodes.iter_mut().find(|n| n.key() == key) {
+            n.set_value(value);
         }
     }
 
-    pub fn missing_required(&self) -> Vec<&'static str> {
-        self.fields.iter()
-            .filter(|f| f.required && f.value.trim().is_empty())
-            .map(|f| f.label_key)
-            .collect()
+    // ── Mouse click ────────────────────────────────────────────────────────
+
+    /// Try to focus the node that was clicked. Returns its slot index on the tab.
+    pub fn click_focus(&mut self, col: u16, row: u16) -> Option<usize> {
+        let tab_indices = self.current_tab_indices();
+        for (slot, &global_idx) in tab_indices.iter().enumerate() {
+            if self.nodes[global_idx].hit_test(col, row) {
+                self.active_field = slot;
+                return Some(slot);
+            }
+        }
+        None
     }
 }
-
-/// Backwards-compat alias so call sites still compile during transition.
-pub type NewProjectForm = ResourceForm;
 
 // ── Slugify helper ────────────────────────────────────────────────────────────
 
@@ -416,37 +325,11 @@ pub fn slugify(s: &str) -> String {
     out.trim_matches('-').to_string()
 }
 
-// ── Full application state ────────────────────────────────────────────────────
-
-pub struct AppState {
-    pub screen:             Screen,
-    pub lang:               Lang,
-    pub sysinfo:            SysInfo,
-    pub services:           Vec<ServiceRow>,
-    pub selected:           usize,
-    pub logs_overlay:       Option<LogsState>,
-    pub lang_dropdown_open: bool,
-    pub should_quit:        bool,
-    /// Focused button on welcome screen (0=New, 1=Open)
-    pub welcome_focus:      usize,
-    pub current_form:       Option<ResourceForm>,
-    /// True when last keypress included CONTROL — switches hint bar to Ctrl shortcuts.
-    pub ctrl_hint:          bool,
-    /// Loaded projects from disk.
-    pub projects:           Vec<ProjectHandle>,
-    pub selected_project:   usize,
-    /// Hosts belonging to the currently selected project.
-    pub hosts:              Vec<HostHandle>,
-    pub selected_host:      usize,
-    /// Service instance handles (from .service.toml files).
-    pub svc_handles:        Vec<ServiceHandle>,
-    pub dash_focus:         DashFocus,
-    /// True = waiting for delete-confirm (J/N).
-    pub dash_confirm:       bool,
-    last_refresh:           Instant,
-    /// Last known Podman container statuses (name → RunState).
-    last_podman_statuses:   HashMap<String, RunState>,
-}
+// ── Overlay layer — modal screens above the main UI ───────────────────────────
+//
+// Implements the "Ebene" (layer) concept: the topmost overlay captures all
+// input. Esc pops it. This replaces the old `logs_overlay: Option<LogsState>`
+// and `dash_confirm: bool` flags.
 
 #[derive(Debug, Clone)]
 pub struct LogsState {
@@ -455,28 +338,94 @@ pub struct LogsState {
     pub scroll:       usize,
 }
 
+#[derive(Debug, Clone)]
+pub enum OverlayLayer {
+    Logs(LogsState),
+    /// Confirmation prompt. `yes_action` is a tag processed by events.rs.
+    Confirm { message: String, yes_action: ConfirmAction },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConfirmAction {
+    DeleteProject,
+}
+
+// ── Full application state ────────────────────────────────────────────────────
+
+pub struct AppState {
+    pub screen:             Screen,
+    pub lang:               Lang,
+    pub sysinfo:            SysInfo,
+    pub services:           Vec<ServiceRow>,
+    pub selected:           usize,
+    /// Modal overlay stack — topmost layer gets all input (Ebene system).
+    pub overlay_stack:      Vec<OverlayLayer>,
+    pub should_quit:        bool,
+    pub welcome_focus:      usize,
+    pub current_form:       Option<ResourceForm>,
+    pub ctrl_hint:          bool,
+    pub projects:           Vec<ProjectHandle>,
+    pub selected_project:   usize,
+    pub hosts:              Vec<HostHandle>,
+    pub selected_host:      usize,
+    pub svc_handles:        Vec<ServiceHandle>,
+    pub dash_focus:         DashFocus,
+    last_refresh:           Instant,
+    last_podman_statuses:   HashMap<String, RunState>,
+}
+
 impl AppState {
     pub fn new(sysinfo: SysInfo, projects: Vec<ProjectHandle>) -> Self {
         Self {
             screen: Screen::Welcome, lang: Lang::De, sysinfo, services: vec![],
-            selected: 0, logs_overlay: None, lang_dropdown_open: false,
+            selected: 0, overlay_stack: vec![],
             should_quit: false, welcome_focus: 0, current_form: None,
             ctrl_hint: false, projects, selected_project: 0,
             hosts: vec![], selected_host: 0, svc_handles: vec![],
-            dash_focus: DashFocus::Sidebar, dash_confirm: false,
+            dash_focus: DashFocus::Sidebar,
             last_refresh: Instant::now(),
             last_podman_statuses: HashMap::new(),
         }
     }
 
-    /// Apply freshly-queried Podman statuses and rebuild the service list.
+    // ── Overlay helpers ────────────────────────────────────────────────────
+
+    pub fn push_overlay(&mut self, layer: OverlayLayer) { self.overlay_stack.push(layer); }
+    pub fn pop_overlay(&mut self) -> Option<OverlayLayer> { self.overlay_stack.pop() }
+    pub fn top_overlay(&self) -> Option<&OverlayLayer> { self.overlay_stack.last() }
+    pub fn top_overlay_mut(&mut self) -> Option<&mut OverlayLayer> { self.overlay_stack.last_mut() }
+    pub fn has_overlay(&self) -> bool { !self.overlay_stack.is_empty() }
+
+    /// Shortcut — is the topmost overlay a Logs panel?
+    pub fn logs_overlay(&self) -> Option<&LogsState> {
+        self.overlay_stack.last().and_then(|o| {
+            if let OverlayLayer::Logs(ref l) = o { Some(l) } else { None }
+        })
+    }
+    pub fn logs_overlay_mut(&mut self) -> Option<&mut LogsState> {
+        self.overlay_stack.last_mut().and_then(|o| {
+            if let OverlayLayer::Logs(ref mut l) = o { Some(l) } else { None }
+        })
+    }
+
+    /// Shortcut — is the topmost overlay a Confirm dialog?
+    pub fn confirm_overlay(&self) -> Option<(&str, ConfirmAction)> {
+        self.overlay_stack.last().and_then(|o| {
+            if let OverlayLayer::Confirm { message, yes_action } = o {
+                Some((message.as_str(), *yes_action))
+            } else {
+                None
+            }
+        })
+    }
+
+    // ── Podman / service helpers ───────────────────────────────────────────
+
     pub fn apply_podman_status(&mut self, statuses: HashMap<String, RunState>) {
         self.last_podman_statuses = statuses;
         self.rebuild_services();
     }
 
-    /// Rebuild `self.services` from the current project's desired state
-    /// merged with the last known Podman container statuses.
     pub fn rebuild_services(&mut self) {
         let Some(proj) = self.projects.get(self.selected_project) else {
             self.services.clear();
@@ -491,7 +440,6 @@ impl AppState {
                 name:         name.clone(),
             })
             .collect();
-        // Clamp selection
         if self.selected >= self.services.len() && !self.services.is_empty() {
             self.selected = self.services.len() - 1;
         }
@@ -518,7 +466,7 @@ pub fn run_loop(
 
         if event::poll(Duration::from_millis(POLL_MS))? {
             match event::read()? {
-                Event::Key(key) => crate::events::handle(key, state, root)?,
+                Event::Key(key)   => crate::events::handle(key, state, root)?,
                 Event::Mouse(mouse) => crate::events::handle_mouse(mouse, state)?,
                 _ => {}
             }
@@ -526,7 +474,6 @@ pub fn run_loop(
 
         if state.should_quit { break; }
 
-        // Apply latest Podman status updates from background reconciler
         while let Ok(statuses) = reconcile_rx.try_recv() {
             state.apply_podman_status(statuses);
         }

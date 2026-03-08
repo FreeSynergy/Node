@@ -24,7 +24,7 @@ use ratatui::{
 use crate::app::{AppState, DashFocus};
 use crate::ui::widgets;
 
-pub fn render(f: &mut Frame, state: &AppState) {
+pub fn render(f: &mut Frame, state: &mut AppState) {
     let area = f.area();
 
     let outer = Layout::default()
@@ -266,7 +266,8 @@ fn render_services(f: &mut Frame, state: &AppState, area: Rect) {
 // ── Hint bar ──────────────────────────────────────────────────────────────────
 
 fn render_hint(f: &mut Frame, state: &AppState, area: Rect) {
-    let key = if state.dash_confirm {
+    let has_confirm = state.confirm_overlay().is_some();
+    let key = if has_confirm {
         "dash.hint.confirm"
     } else if state.dash_focus == DashFocus::Services {
         "dash.hint.services"
@@ -274,7 +275,7 @@ fn render_hint(f: &mut Frame, state: &AppState, area: Rect) {
         "dash.hint"
     };
 
-    let style = if state.dash_confirm {
+    let style = if has_confirm {
         Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
     } else {
         Style::default().fg(Color::DarkGray)

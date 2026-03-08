@@ -4,7 +4,7 @@ use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph},
+    widgets::{Block, Borders, Clear},
     Frame,
 };
 
@@ -12,8 +12,14 @@ use crate::app::{run_state_i18n, AppState, RunState};
 
 /// Language toggle button: "[DE]" or "[EN]" in the top-right corner.
 pub fn lang_button<'a>(state: &AppState) -> Span<'a> {
+    lang_button_raw(state.lang)
+}
+
+/// Language toggle button without requiring a full AppState reference.
+/// Used by form screens that only have `lang: Lang`.
+pub fn lang_button_raw(lang: crate::app::Lang) -> Span<'static> {
     Span::styled(
-        format!("[{}]", state.lang.label()),
+        format!("[{}]", lang.label()),
         Style::default()
             .fg(Color::Cyan)
             .add_modifier(Modifier::BOLD),

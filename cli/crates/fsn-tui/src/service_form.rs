@@ -1,11 +1,8 @@
 // Service-specific form builders.
-//
-// Adding this module required zero changes to the generic form machinery —
-// that's the whole point of Phase 2.
 
-use crate::app::{FormField, FormFieldType, ResourceForm, ResourceKind, SERVICE_TABS};
-
-// ── Available service classes ─────────────────────────────────────────────────
+use crate::app::{ResourceForm, ResourceKind, SERVICE_TABS};
+use crate::ui::form_node::FormNode;
+use crate::ui::nodes::{SelectInputNode, TextInputNode};
 
 pub const SERVICE_CLASSES: &[&str] = &[
     "git/forgejo",
@@ -30,16 +27,19 @@ pub fn service_class_display(code: &str) -> &'static str {
     }
 }
 
-// ── Change hook ───────────────────────────────────────────────────────────────
+// ── Smart-defaults hook ───────────────────────────────────────────────────────
 
-fn service_on_change(form: &mut ResourceForm, idx: usize) {
-    if form.fields[idx].key == "name" {
-        let slug = crate::app::slugify(&form.fields[idx].value.clone());
-        if let Some(s) = form.fields.iter().position(|f| f.key == "subdomain") {
-            if !form.fields[s].dirty {
-                let len = slug.len();
-                form.fields[s].value  = slug;
-                form.fields[s].cursor = len;
+fn service_on_change(nodes: &mut Vec<Box<dyn FormNode>>, key: &'static str) {
+    if key == "name" {
+        let name_val = nodes.iter().find(|n| n.key() == "name")
+            .map(|n| n.value().to_string()).unwrap_or_default();
+        let slug = crate::app::slugify(&name_val);
+
+        let subdomain_dirty = nodes.iter().find(|n| n.key() == "subdomain")
+            .map(|n| n.is_dirty()).unwrap_or(false);
+        if !subdomain_dirty {
+            if let Some(n) = nodes.iter_mut().find(|n| n.key() == "subdomain") {
+                n.set_value(&slug);
             }
         }
     }
@@ -47,24 +47,23 @@ fn service_on_change(form: &mut ResourceForm, idx: usize) {
 
 // ── Form builder ──────────────────────────────────────────────────────────────
 
-/// New (empty) service form.
 pub fn new_service_form() -> ResourceForm {
-    let fields = vec![
-        // ── Tab 0: Service ────────────────────────────────────────────────────
-        FormField::new("name",      "form.service.name",      0, true,  FormFieldType::Text)
-            .hint("form.service.name.hint"),
-        FormField::new("class",     "form.service.class",     0, true,  FormFieldType::Select)
-            .opts(SERVICE_CLASSES.to_vec())
+    let nodes: Vec<Box<dyn FormNode>> = vec![
+        // ── Tab 0: Service ─────────────────────────────────────────────────
+        Box::new(TextInputNode::new("name",      "form.service.name",      0, true)
+            .hint("form.service.name.hint")),
+        Box::new(SelectInputNode::new("class", "form.service.class", 0, true,
+            SERVICE_CLASSES.to_vec())
             .default_val(SERVICE_CLASSES[0])
-            .display(service_class_display),
-        FormField::new("subdomain", "form.service.subdomain", 0, false, FormFieldType::Text)
-            .hint("form.service.subdomain.hint"),
-        FormField::new("alias",     "form.service.alias",     0, false, FormFieldType::Text)
-            .hint("form.service.alias.hint"),
-        // ── Tab 1: Options ────────────────────────────────────────────────────
-        FormField::new("version", "form.options.version", 1, false, FormFieldType::Text)
-            .default_val("latest"),
-        FormField::new("port",    "form.service.port",    1, false, FormFieldType::Text),
+            .display(service_class_display)),
+        Box::new(TextInputNode::new("subdomain", "form.service.subdomain", 0, false)
+            .hint("form.service.subdomain.hint")),
+        Box::new(TextInputNode::new("alias",     "form.service.alias",     0, false)
+            .hint("form.service.alias.hint")),
+        // ── Tab 1: Options ─────────────────────────────────────────────────
+        Box::new(TextInputNode::new("version", "form.options.version", 1, false)
+            .default_val("latest")),
+        Box::new(TextInputNode::new("port",    "form.service.port",    1, false)),
     ];
-    ResourceForm::new(ResourceKind::Service, SERVICE_TABS, fields, None, service_on_change)
+    ResourceForm::new(ResourceKind::Service, SERVICE_TABS, nodes, None, service_on_change)
 }

@@ -1,44 +1,53 @@
 // Generic resource editor screen.
 //
-// Renders any `ResourceForm` — works for projects, services, and future types.
-// Tab bar is driven by `form.tab_keys`; fields by `form.fields`.
+// Renders any `ResourceForm`. Each field node renders itself via `node.render()`.
+// After all nodes are rendered, the focused node gets `render_overlay()` so
+// that dropdowns appear on top of other fields — no special-casing needed here.
 
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Tabs},
+    widgets::{Block, Borders, Paragraph, Tabs},
     Frame,
 };
 
-use crate::app::{AppState, FormFieldType, ResourceForm, ResourceKind};
+use crate::app::{AppState, ResourceForm, ResourceKind};
 use crate::ui::widgets;
 
-pub fn render(f: &mut Frame, state: &AppState) {
-    let Some(ref form) = state.current_form else { return };
+pub fn render(f: &mut Frame, state: &mut AppState) {
+    let Some(ref mut form) = state.current_form else { return };
     let area = f.area();
 
     let outer = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),  // header
-            Constraint::Length(3),  // tab bar
-            Constraint::Min(1),     // form fields
-            Constraint::Length(1),  // error line
-            Constraint::Length(1),  // hint bar
+            Constraint::Length(3), // header
+            Constraint::Length(3), // tab bar
+            Constraint::Min(1),    // form fields
+            Constraint::Length(1), // error line
+            Constraint::Length(1), // hint bar
         ])
         .split(area);
 
-    render_header(f, state, form, outer[0]);
-    render_tabs(f, state, form, outer[1]);
-    render_fields(f, state, form, outer[2]);
-    render_error(f, state, form, outer[3]);
+    render_header(f, state.lang, form, outer[0]);
+    render_tabs(f, state.lang, form, outer[1]);
+
+    // Build inner area with horizontal padding (5% each side)
+    let padding = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(5), Constraint::Percentage(90), Constraint::Percentage(5)])
+        .split(outer[2]);
+    let inner = padding[1];
+
+    render_fields(f, form, inner, state.lang);
+    render_error(f, state.lang, form, outer[3]);
     render_hint(f, state, outer[4]);
 }
 
 // ── Header ────────────────────────────────────────────────────────────────────
 
-fn render_header(f: &mut Frame, state: &AppState, form: &ResourceForm, area: Rect) {
+fn render_header(f: &mut Frame, lang: crate::app::Lang, form: &ResourceForm, area: Rect) {
     let title_key = match (form.kind, form.edit_id.is_some()) {
         (ResourceKind::Project, false) => "welcome.new_project",
         (ResourceKind::Project, true)  => "welcome.edit_project",
@@ -49,23 +58,30 @@ fn render_header(f: &mut Frame, state: &AppState, form: &ResourceForm, area: Rec
     };
 
     let title = Line::from(vec![
-        Span::styled(" FreeSynergy.Node ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-        Span::styled("– ",                  Style::default().fg(Color::DarkGray)),
-        Span::styled(state.t(title_key),    Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
+        Span::styled(" FreeSynergy.Node ",
+            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+        Span::styled("– ", Style::default().fg(Color::DarkGray)),
+        Span::styled(crate::i18n::t(lang, title_key),
+            Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
     ]);
     let header = Paragraph::new(title)
-        .block(Block::default().borders(Borders::BOTTOM).border_style(Style::default().fg(Color::DarkGray)));
+        .block(Block::default().borders(Borders::BOTTOM)
+            .border_style(Style::default().fg(Color::DarkGray)));
     f.render_widget(header, area);
 
+    // Language button top-right
     let lang_area = Rect { x: area.right().saturating_sub(6), y: area.y + 1, width: 4, height: 1 };
-    f.render_widget(Paragraph::new(Line::from(widgets::lang_button(state))), lang_area);
+    f.render_widget(
+        Paragraph::new(Line::from(widgets::lang_button_raw(lang))),
+        lang_area,
+    );
 }
 
 // ── Tab bar ───────────────────────────────────────────────────────────────────
 
-fn render_tabs(f: &mut Frame, state: &AppState, form: &ResourceForm, area: Rect) {
+fn render_tabs(f: &mut Frame, lang: crate::app::Lang, form: &ResourceForm, area: Rect) {
     let tab_titles: Vec<Line> = form.tab_keys.iter().enumerate().map(|(i, &key)| {
-        let label      = state.t(key);
+        let label       = crate::i18n::t(lang, key);
         let has_missing = form.tab_missing_count(i) > 0;
         let is_active   = i == form.active_tab;
 
@@ -76,7 +92,8 @@ fn render_tabs(f: &mut Frame, state: &AppState, form: &ResourceForm, area: Rect)
         };
 
         if is_active {
-            Line::from(Span::styled(text, Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD)))
+            Line::from(Span::styled(text,
+                Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD)))
         } else if has_missing {
             Line::from(Span::styled(text, Style::default().fg(Color::Yellow)))
         } else {
@@ -85,7 +102,8 @@ fn render_tabs(f: &mut Frame, state: &AppState, form: &ResourceForm, area: Rect)
     }).collect();
 
     let tabs = Tabs::new(tab_titles)
-        .block(Block::default().borders(Borders::BOTTOM).border_style(Style::default().fg(Color::DarkGray)))
+        .block(Block::default().borders(Borders::BOTTOM)
+            .border_style(Style::default().fg(Color::DarkGray)))
         .select(form.active_tab)
         .divider(Span::styled("  ", Style::default()));
     f.render_widget(tabs, area);
@@ -93,175 +111,68 @@ fn render_tabs(f: &mut Frame, state: &AppState, form: &ResourceForm, area: Rect)
 
 // ── Form fields ───────────────────────────────────────────────────────────────
 
-fn render_fields(f: &mut Frame, state: &AppState, form: &ResourceForm, area: Rect) {
-    let padding = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(5), Constraint::Percentage(90), Constraint::Percentage(5)])
-        .split(area);
-    let inner = padding[1];
-
-    let tab_indices = form.tab_field_indices();
-    let per_field   = 5usize;
-    let mut field_areas: Vec<Rect> = Vec::new();
+fn render_fields(f: &mut Frame, form: &mut ResourceForm, inner: Rect, lang: crate::app::Lang) {
+    let tab_indices = form.current_tab_indices();
+    let per_field   = 5u16; // label(1) + input(3) + hint(1)
 
     let mut y = inner.y;
-    for _ in 0..tab_indices.len() {
-        if y + per_field as u16 > inner.bottom() { break; }
-        field_areas.push(Rect { x: inner.x, y, width: inner.width, height: per_field as u16 });
-        y += per_field as u16;
-    }
+    let mut overlay_slot: Option<usize> = None; // which slot needs render_overlay
 
-    // Track focused Select field for dropdown overlay (rendered last, on top)
-    let mut dropdown_info: Option<(Rect, &ResourceForm)> = None;
+    for (slot, &node_idx) in tab_indices.iter().enumerate() {
+        if y + per_field > inner.bottom() { break; }
+        let field_rect = Rect { x: inner.x, y, width: inner.width, height: per_field };
+        y += per_field;
 
-    for (slot, &field_idx) in tab_indices.iter().enumerate() {
-        let Some(area) = field_areas.get(slot) else { break };
-        let field   = &form.fields[field_idx];
         let focused = form.active_field == slot;
+        form.nodes[node_idx].render(f, field_rect, focused, lang);
 
-        let rows = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Length(1), Constraint::Length(3), Constraint::Length(1)])
-            .split(*area);
-
-        // Label
-        let req_marker = if field.required {
-            Span::styled(" *", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))
-        } else {
-            Span::styled("", Style::default())
-        };
-        let label_style = if focused {
-            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
-        } else {
-            Style::default().fg(Color::White)
-        };
-        f.render_widget(
-            Paragraph::new(Line::from(vec![
-                Span::styled(state.t(field.label_key), label_style),
-                req_marker,
-            ])),
-            rows[0],
-        );
-
-        // Input box
-        let border_style = if focused { Style::default().fg(Color::Cyan) } else { Style::default().fg(Color::DarkGray) };
-        let input_block  = Block::default().borders(Borders::ALL).border_style(border_style);
-
-        let input_text = if matches!(field.field_type, FormFieldType::Select) {
-            let display = field.display_value();
-            if focused {
-                Line::from(vec![
-                    Span::styled(display.to_string(), Style::default().fg(Color::White)),
-                    Span::styled("█", Style::default().fg(Color::Cyan)),
-                ])
-            } else {
-                Line::from(Span::styled(display.to_string(), Style::default().fg(Color::White)))
-            }
-        } else {
-            let display_value = match field.field_type {
-                FormFieldType::Secret => "•".repeat(field.value.len()),
-                _ => field.value.clone(),
-            };
-            if focused {
-                let before = &display_value[..field.cursor.min(display_value.len())];
-                let after  = &display_value[field.cursor.min(display_value.len())..];
-                Line::from(vec![
-                    Span::styled(before.to_string(), Style::default().fg(Color::White)),
-                    Span::styled("█",                Style::default().fg(Color::Cyan)),
-                    Span::styled(after.to_string(),  Style::default().fg(Color::White)),
-                ])
-            } else if display_value.is_empty() {
-                Line::from(Span::styled("", Style::default().fg(Color::DarkGray)))
-            } else {
-                Line::from(Span::styled(display_value, Style::default().fg(Color::White)))
-            }
-        };
-        f.render_widget(Paragraph::new(input_text).block(input_block), rows[1]);
-
-        // Hint (hidden when Select dropdown is open)
-        if !(focused && matches!(field.field_type, FormFieldType::Select)) {
-            if let Some(hint_key) = field.hint_key {
-                f.render_widget(
-                    Paragraph::new(Line::from(Span::styled(state.t(hint_key), Style::default().fg(Color::DarkGray)))),
-                    rows[2],
-                );
-            }
-        }
-
-        if focused && matches!(field.field_type, FormFieldType::Select) {
-            dropdown_info = Some((rows[1], form));
-        }
+        if focused { overlay_slot = Some(slot); }
     }
 
-    // Submit button on last tab
+    // Submit button on the last tab
     if form.is_last_tab() {
-        if let Some(last) = field_areas.last() {
-            let btn_y = last.y + last.height + 1;
-            if btn_y + 3 <= inner.bottom() {
-                let btn_area   = Rect { x: inner.x, y: btn_y, width: inner.width / 3, height: 3 };
-                let missing    = form.missing_required();
-                let disabled   = !missing.is_empty();
-                let submit_key = if form.edit_id.is_some() { "form.submit.edit" } else { form.kind.submit_key() };
-                let btn = Paragraph::new(widgets::button_line(state.t(submit_key), true, disabled))
-                    .block(Block::default().borders(Borders::ALL).border_style(
-                        if disabled { Style::default().fg(Color::DarkGray) } else { Style::default().fg(Color::Green) }
-                    ))
-                    .alignment(Alignment::Center);
-                f.render_widget(btn, btn_area);
-            }
+        let btn_y = y + 1;
+        if btn_y + 3 <= inner.bottom() {
+            let btn_area = Rect { x: inner.x, y: btn_y, width: inner.width / 3, height: 3 };
+            let missing  = form.missing_required();
+            let disabled = !missing.is_empty();
+            let submit_key = if form.edit_id.is_some() { "form.submit.edit" } else { form.kind.submit_key() };
+            let btn = Paragraph::new(widgets::button_line(crate::i18n::t(lang, submit_key), true, disabled))
+                .block(Block::default().borders(Borders::ALL).border_style(
+                    if disabled { Style::default().fg(Color::DarkGray) }
+                    else        { Style::default().fg(Color::Green) }
+                ))
+                .alignment(Alignment::Center);
+            f.render_widget(btn, btn_area);
         }
     }
 
-    // Dropdown overlay — rendered last so it appears on top
-    if let Some((input_rect, form)) = dropdown_info {
-        render_select_dropdown(f, form, input_rect, inner);
+    // Dropdown overlay rendered LAST so it appears on top of other fields
+    if let Some(slot) = overlay_slot {
+        if let Some(&node_idx) = tab_indices.get(slot) {
+            form.nodes[node_idx].render_overlay(f, inner, lang);
+        }
     }
-}
-
-// ── Select dropdown overlay ───────────────────────────────────────────────────
-
-fn render_select_dropdown(f: &mut Frame, form: &ResourceForm, input_rect: Rect, inner: Rect) {
-    let Some(idx) = form.focused_field_idx() else { return };
-    let field = &form.fields[idx];
-
-    let dropdown_y = input_rect.bottom();
-    let avail_h    = inner.bottom().saturating_sub(dropdown_y);
-    let want_h     = (field.options.len() as u16 + 2).min(avail_h);
-    if want_h < 3 { return; }
-
-    let dropdown = Rect { x: input_rect.x, y: dropdown_y, width: input_rect.width, height: want_h };
-    let cur = field.options.iter().position(|&o| o == field.value).unwrap_or(0);
-
-    let items: Vec<ListItem> = field.options.iter().enumerate().map(|(i, &opt)| {
-        let display = if let Some(f) = field.display_fn { f(opt) } else { opt };
-        let prefix  = if i == cur { "▶ " } else { "  " };
-        let style   = if i == cur {
-            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
-        } else {
-            Style::default().fg(Color::White)
-        };
-        ListItem::new(Line::from(Span::styled(format!("{}{}", prefix, display), style)))
-    }).collect();
-
-    let list = List::new(items)
-        .block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::Cyan)));
-
-    f.render_widget(Clear, dropdown);
-    f.render_widget(list, dropdown);
 }
 
 // ── Error line ────────────────────────────────────────────────────────────────
 
-fn render_error(f: &mut Frame, state: &AppState, form: &ResourceForm, area: Rect) {
+fn render_error(f: &mut Frame, lang: crate::app::Lang, form: &ResourceForm, area: Rect) {
     if let Some(ref err) = form.error {
         let line = Line::from(vec![
-            Span::styled(format!("  {} ", state.t("form.error")), Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                format!("  {} ", crate::i18n::t(lang, "form.error")),
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            ),
             Span::styled(err.as_str(), Style::default().fg(Color::Red)),
         ]);
         f.render_widget(Paragraph::new(line), area);
     } else {
         f.render_widget(
-            Paragraph::new(Line::from(Span::styled(state.t("form.required"), Style::default().fg(Color::DarkGray)))),
+            Paragraph::new(Line::from(Span::styled(
+                crate::i18n::t(lang, "form.required"),
+                Style::default().fg(Color::DarkGray),
+            ))),
             area,
         );
     }
@@ -272,8 +183,10 @@ fn render_error(f: &mut Frame, state: &AppState, form: &ResourceForm, area: Rect
 fn render_hint(f: &mut Frame, state: &AppState, area: Rect) {
     let key = if state.ctrl_hint { "form.hint.ctrl" } else { "form.hint" };
     f.render_widget(
-        Paragraph::new(Line::from(Span::styled(state.t(key), Style::default().fg(Color::DarkGray))))
-            .alignment(Alignment::Center),
+        Paragraph::new(Line::from(Span::styled(
+            state.t(key),
+            Style::default().fg(Color::DarkGray),
+        ))).alignment(Alignment::Center),
         area,
     );
 }
