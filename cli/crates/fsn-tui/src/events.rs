@@ -12,6 +12,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKi
 
 use crate::app::{
     AppState, ConfirmAction, DashFocus, LogsState, OverlayLayer, ResourceKind, RunState, Screen,
+    SidebarAction, SidebarItem,
 };
 use crate::ui::form_node::FormAction;
 
@@ -191,44 +192,74 @@ fn handle_dashboard(key: KeyEvent, state: &mut AppState, root: &Path) -> Result<
             KeyCode::Tab => state.dash_focus = DashFocus::Services,
 
             KeyCode::Up => {
-                if state.selected_project > 0 {
-                    state.selected_project -= 1;
-                    state.rebuild_services();
-                    reload_hosts(state, root);
+                let cur = state.sidebar_cursor;
+                let prev = (0..cur).rev().find(|&i| state.sidebar_items[i].is_selectable());
+                if let Some(prev) = prev {
+                    state.sidebar_cursor = prev;
+                    sync_sidebar_selection(state, root);
                 }
             }
             KeyCode::Down => {
-                if state.selected_project + 1 < state.projects.len() {
-                    state.selected_project += 1;
-                    state.rebuild_services();
-                    reload_hosts(state, root);
+                let cur = state.sidebar_cursor;
+                let len = state.sidebar_items.len();
+                let next = (cur + 1..len).find(|&i| state.sidebar_items[i].is_selectable());
+                if let Some(next) = next {
+                    state.sidebar_cursor = next;
+                    sync_sidebar_selection(state, root);
                 }
             }
 
+            // Context-aware 'n': new project when on project context, new host when on host context.
             KeyCode::Char('n') => {
-                state.current_form = Some(crate::project_form::new_project_form());
-                state.screen = Screen::NewProject;
+                let item = state.current_sidebar_item().cloned();
+                match item {
+                    Some(SidebarItem::Host { .. })
+                    | Some(SidebarItem::Action { kind: SidebarAction::NewHost, .. }) => {
+                        let project_slugs = state.projects.iter().map(|p| p.slug.clone()).collect();
+                        let current = state.projects.get(state.selected_project)
+                            .map(|p| p.slug.as_str()).unwrap_or("");
+                        state.current_form = Some(crate::host_form::new_host_form(project_slugs, current));
+                        state.screen = Screen::NewProject;
+                    }
+                    _ => {
+                        state.current_form = Some(crate::project_form::new_project_form());
+                        state.screen = Screen::NewProject;
+                    }
+                }
             }
+
+            // Context-aware 'e': edit the item under the cursor (project or host).
             KeyCode::Char('e') => {
-                if let Some(proj) = state.projects.get(state.selected_project) {
-                    state.current_form = Some(crate::project_form::edit_project_form(proj));
-                    state.screen = Screen::NewProject;
+                let item = state.current_sidebar_item().cloned();
+                match item {
+                    Some(SidebarItem::Project { slug, .. }) => {
+                        if let Some(proj) = state.projects.iter().find(|p| p.slug == slug).cloned() {
+                            state.current_form = Some(crate::project_form::edit_project_form(&proj));
+                            state.screen = Screen::NewProject;
+                        }
+                    }
+                    Some(SidebarItem::Host { slug, .. }) => {
+                        if let Some(host) = state.hosts.iter().find(|h| h.slug == slug).cloned() {
+                            let project_slugs = state.projects.iter().map(|p| p.slug.clone()).collect();
+                            state.current_form = Some(crate::host_form::edit_host_form(&host, project_slugs));
+                            state.screen = Screen::NewProject;
+                        }
+                    }
+                    _ => {}
                 }
             }
-            KeyCode::Char('h') => {
-                if let Some(proj) = state.projects.get(state.selected_project) {
-                    let current_slug = proj.slug.clone();
-                    let project_slugs: Vec<String> = state.projects.iter().map(|p| p.slug.clone()).collect();
-                    state.current_form = Some(crate::host_form::new_host_form(project_slugs, &current_slug));
-                    state.screen = Screen::NewProject;
-                }
-            }
+
+            // Context-aware 'x': delete project or (future) host.
             KeyCode::Char('x') | KeyCode::Delete => {
-                if !state.projects.is_empty() {
-                    state.push_overlay(OverlayLayer::Confirm {
-                        message:    "dash.hint.confirm".into(),
-                        yes_action: ConfirmAction::DeleteProject,
-                    });
+                let item = state.current_sidebar_item();
+                match item {
+                    Some(SidebarItem::Project { .. }) if !state.projects.is_empty() => {
+                        state.push_overlay(OverlayLayer::Confirm {
+                            message:    "dash.hint.confirm".into(),
+                            yes_action: ConfirmAction::DeleteProject,
+                        });
+                    }
+                    _ => {}
                 }
             }
 
@@ -303,6 +334,9 @@ fn delete_selected_project(state: &mut AppState, root: &Path) -> Result<()> {
     if state.selected_project > 0 && state.selected_project >= state.projects.len() {
         state.selected_project -= 1;
     }
+    state.hosts.clear();
+    state.rebuild_sidebar();
+    state.rebuild_services();
     if state.projects.is_empty() { state.screen = Screen::Welcome; }
     Ok(())
 }
@@ -310,6 +344,27 @@ fn delete_selected_project(state: &mut AppState, root: &Path) -> Result<()> {
 fn reload_hosts(state: &mut AppState, root: &Path) {
     if let Some(proj) = state.projects.get(state.selected_project) {
         state.hosts = crate::load_hosts(&root.join("projects").join(&proj.slug));
+        state.rebuild_sidebar();
+    }
+}
+
+/// Called after `sidebar_cursor` moves — syncs `selected_project` / `selected_host`
+/// and reloads dependent data when a Project item is selected.
+fn sync_sidebar_selection(state: &mut AppState, root: &Path) {
+    match state.current_sidebar_item().cloned() {
+        Some(SidebarItem::Project { slug, .. }) => {
+            if let Some(idx) = state.projects.iter().position(|p| p.slug == slug) {
+                state.selected_project = idx;
+                reload_hosts(state, root);
+                state.rebuild_services();
+            }
+        }
+        Some(SidebarItem::Host { slug, .. }) => {
+            if let Some(idx) = state.hosts.iter().position(|h| h.slug == slug) {
+                state.selected_host = idx;
+            }
+        }
+        _ => {}
     }
 }
 
@@ -329,6 +384,7 @@ fn submit_project(state: &mut AppState, root: &Path) -> Result<()> {
                     .position(|p| p.slug == slug).unwrap_or(0);
             }
             state.rebuild_services();
+            state.rebuild_sidebar();
             state.screen     = Screen::Dashboard;
             state.dash_focus = DashFocus::Sidebar;
             state.current_form = None;
@@ -419,6 +475,7 @@ fn submit_host(state: &mut AppState, root: &Path) -> Result<()> {
     match result {
         Some(Ok(())) => {
             state.hosts = crate::load_hosts(&project_dir);
+            state.rebuild_sidebar();
             state.screen     = Screen::Dashboard;
             state.dash_focus = DashFocus::Sidebar;
             state.current_form = None;
@@ -521,19 +578,15 @@ fn handle_dashboard_click(col: u16, row: u16, state: &mut AppState) {
 
     if col < SIDEBAR_W {
         state.dash_focus = DashFocus::Sidebar;
-        if state.projects.is_empty() { return; }
-
-        let mut cur_row: u16 = 0;
-        for (i, _) in state.projects.iter().enumerate() {
-            if body_row == cur_row {
-                state.selected_project = i;
-                return;
-            }
-            cur_row += 1;
-            if i == state.selected_project {
-                let extra = state.hosts.len() as u16 + 1;
-                if body_row > cur_row && body_row < cur_row + extra { return; }
-                cur_row += extra;
+        // inner area starts 1 row below the block (top padding in render_sidebar)
+        const INNER_OFFSET: u16 = 1;
+        if body_row < INNER_OFFSET { return; }
+        let item_idx = (body_row - INNER_OFFSET) as usize;
+        if let Some(item) = state.sidebar_items.get(item_idx) {
+            if item.is_selectable() {
+                state.sidebar_cursor = item_idx;
+                // Note: full sync (reload_hosts, rebuild_services) only via keyboard.
+                // Mouse click just moves focus; press a key to activate.
             }
         }
     } else {

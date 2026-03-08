@@ -1,16 +1,17 @@
-// Dashboard screen — project sidebar + services table.
+// Dashboard screen — sidebar (projects + hosts) + services table.
 //
 // ┌──────────────────────────────────────────────────────────────────┐
 // │  FSN · myproject @ example.com                          [DE]    │
 // ├────────────────────┬─────────────────────────────────────────────┤
-// │ Projekte           │  Services                                   │
+// │ PROJEKTE           │  Services                                   │
 // │ ▶ myproject        │  ┌───────────────────────────────────────┐  │
 // │   testprojekt      │  │  Name      Typ    Domain    Status    │  │
-// │                    │  │▶ kanidm    iam    auth.ex   ● Aktiv   │  │
-// │  + Neues Projekt   │  │  forgejo   git    git.ex    ○ Stopp   │  │
-// │                    │  └───────────────────────────────────────┘  │
+// │ + Neues Projekt    │  │▶ kanidm    iam    auth.ex   ● Aktiv   │  │
+// │ HOSTS              │  │  forgejo   git    git.ex    ○ Stopp   │  │
+// │   ⊡ srv1           │  └───────────────────────────────────────┘  │
+// │ + Neuer Host       │                                             │
 // ├────────────────────┴─────────────────────────────────────────────┤
-// │  ↑↓=Projekt  n=Neu  e=Bearbeiten  x=Löschen  Tab=Services  q=Quit │
+// │  ↑↓=Nav  n=Neu  e=Bearbeiten  x=Löschen  Tab=Services  q=Quit   │
 // └──────────────────────────────────────────────────────────────────┘
 
 use ratatui::{
@@ -21,7 +22,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::app::{AppState, DashFocus};
+use crate::app::{AppState, DashFocus, SidebarItem};
 use crate::ui::widgets;
 
 pub fn render(f: &mut Frame, state: &mut AppState) {
@@ -44,7 +45,6 @@ pub fn render(f: &mut Frame, state: &mut AppState) {
 // ── Header ────────────────────────────────────────────────────────────────────
 
 fn render_header(f: &mut Frame, state: &AppState, area: Rect) {
-    // Show active project's name + domain if available
     let (name, domain) = state.projects.get(state.selected_project)
         .map(|p| (p.name(), p.domain()))
         .unwrap_or(("FreeSynergy.Node", ""));
@@ -70,7 +70,6 @@ fn render_header(f: &mut Frame, state: &AppState, area: Rect) {
         .alignment(Alignment::Left);
     f.render_widget(header, area);
 
-    // Build info — right side, left of lang button
     let build_str = format!("v{} {} ({})  ", env!("CARGO_PKG_VERSION"), crate::BUILD_TIME, crate::GIT_HASH);
     let build_w   = build_str.chars().count() as u16;
     let build_x   = area.right().saturating_sub(build_w + 5);
@@ -90,8 +89,8 @@ fn render_body(f: &mut Frame, state: &AppState, area: Rect) {
     let cols = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Length(22),  // sidebar
-            Constraint::Min(1),      // main panel
+            Constraint::Length(22),
+            Constraint::Min(1),
         ])
         .split(area);
 
@@ -102,22 +101,18 @@ fn render_body(f: &mut Frame, state: &AppState, area: Rect) {
 // ── Sidebar ───────────────────────────────────────────────────────────────────
 
 fn render_sidebar(f: &mut Frame, state: &AppState, area: Rect) {
-    let sidebar_focused = state.dash_focus == DashFocus::Sidebar;
+    let focused = state.dash_focus == DashFocus::Sidebar;
 
-    let border_style = if sidebar_focused {
+    let border_style = if focused {
         Style::default().fg(Color::Cyan)
     } else {
         Style::default().fg(Color::DarkGray)
     };
 
-    let block = Block::default()
-        .borders(Borders::RIGHT)
-        .border_style(border_style)
-        .title(Span::styled(
-            format!(" {} ", state.t("sidebar.projects")),
-            Style::default().fg(if sidebar_focused { Color::Cyan } else { Color::DarkGray }),
-        ));
-    f.render_widget(block, area);
+    f.render_widget(
+        Block::default().borders(Borders::RIGHT).border_style(border_style),
+        area,
+    );
 
     let inner = Rect {
         x: area.x + 1,
@@ -126,75 +121,64 @@ fn render_sidebar(f: &mut Frame, state: &AppState, area: Rect) {
         height: area.height.saturating_sub(2),
     };
 
-    let mut lines: Vec<Line> = Vec::new();
+    if state.sidebar_items.is_empty() {
+        f.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                state.t("dash.no_projects"),
+                Style::default().fg(Color::DarkGray),
+            ))),
+            inner,
+        );
+        return;
+    }
 
-    if state.projects.is_empty() {
-        lines.push(Line::from(Span::styled(
-            state.t("dash.no_projects"),
-            Style::default().fg(Color::DarkGray),
-        )));
-    } else {
-        for (i, proj) in state.projects.iter().enumerate() {
-            let selected = i == state.selected_project;
-            let (prefix, style) = if selected && sidebar_focused {
-                ("▶ ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
-            } else if selected {
-                ("▶ ", Style::default().fg(Color::White).add_modifier(Modifier::BOLD))
-            } else {
-                ("  ", Style::default().fg(Color::White))
-            };
+    let max_w = inner.width.saturating_sub(4) as usize;
 
-            // Truncate to fit sidebar width
-            let max_w = inner.width.saturating_sub(2) as usize;
-            let proj_name = proj.name();
-            let display = if proj_name.len() > max_w {
-                format!("{}{}…", prefix, &proj_name[..max_w.saturating_sub(1)])
-            } else {
-                format!("{}{}", prefix, proj_name)
-            };
-
-            lines.push(Line::from(Span::styled(display, style)));
-
-            // Under the selected project: show hosts + "New Host" entry
-            if selected {
-                let host_max_w = inner.width.saturating_sub(5) as usize;
-                for host in &state.hosts {
-                    let hname = host.name();
-                    let hdisp = if hname.len() > host_max_w {
-                        format!("  ⊡ {}…", &hname[..host_max_w.saturating_sub(1)])
-                    } else {
-                        format!("  ⊡ {}", hname)
-                    };
-                    lines.push(Line::from(Span::styled(hdisp, Style::default().fg(Color::DarkGray))));
-                }
-                let new_host_style = if sidebar_focused {
-                    Style::default().fg(Color::Blue)
+    let lines: Vec<Line> = state.sidebar_items.iter().enumerate().map(|(i, item)| {
+        let is_cursor = focused && i == state.sidebar_cursor;
+        match item {
+            SidebarItem::Section(key) => Line::from(Span::styled(
+                state.t(key),
+                Style::default().fg(Color::DarkGray).add_modifier(Modifier::UNDERLINED),
+            )),
+            SidebarItem::Project { name, .. } => {
+                let (prefix, style) = if is_cursor {
+                    ("▶ ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
+                } else {
+                    ("  ", Style::default().fg(Color::White))
+                };
+                Line::from(Span::styled(truncate(prefix, name, max_w), style))
+            }
+            SidebarItem::Host { name, .. } => {
+                let (prefix, style) = if is_cursor {
+                    ("  ▶ ", Style::default().fg(Color::Cyan))
+                } else {
+                    ("  ⊡ ", Style::default().fg(Color::DarkGray))
+                };
+                Line::from(Span::styled(truncate(prefix, name, max_w), style))
+            }
+            SidebarItem::Action { label_key, .. } => {
+                let style = if is_cursor {
+                    Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
+                } else if focused {
+                    Style::default().fg(Color::Green)
                 } else {
                     Style::default().fg(Color::DarkGray)
                 };
-                lines.push(Line::from(Span::styled(state.t("dash.new_host"), new_host_style)));
+                Line::from(Span::styled(state.t(label_key), style))
             }
         }
-    }
+    }).collect();
 
-    // Spacer + "New Project" button at bottom
-    let btn_y = inner.y + lines.len() as u16 + 1;
-    if btn_y < inner.bottom() {
-        let para = Paragraph::new(lines);
-        f.render_widget(para, inner);
+    f.render_widget(Paragraph::new(lines), inner);
+}
 
-        let btn_area = Rect { x: inner.x, y: btn_y, width: inner.width, height: 1 };
-        let btn_style = if sidebar_focused {
-            Style::default().fg(Color::Green)
-        } else {
-            Style::default().fg(Color::DarkGray)
-        };
-        f.render_widget(
-            Paragraph::new(Line::from(Span::styled(state.t("dash.new_project"), btn_style))),
-            btn_area,
-        );
+fn truncate(prefix: &str, name: &str, max_w: usize) -> String {
+    let total = prefix.len() + name.len();
+    if total > max_w && max_w > prefix.len() + 1 {
+        format!("{}{}…", prefix, &name[..max_w - prefix.len() - 1])
     } else {
-        f.render_widget(Paragraph::new(lines), inner);
+        format!("{}{}", prefix, name)
     }
 }
 
@@ -267,12 +251,17 @@ fn render_services(f: &mut Frame, state: &AppState, area: Rect) {
 
 fn render_hint(f: &mut Frame, state: &AppState, area: Rect) {
     let has_confirm = state.confirm_overlay().is_some();
-    let key = if has_confirm {
+
+    let key: &'static str = if has_confirm {
         "dash.hint.confirm"
-    } else if state.dash_focus == DashFocus::Services {
-        "dash.hint.services"
     } else {
-        "dash.hint"
+        match state.dash_focus {
+            DashFocus::Services => "dash.hint.services",
+            DashFocus::Sidebar  => match state.current_sidebar_item() {
+                Some(SidebarItem::Host { .. }) => "dash.hint.host",
+                _                              => "dash.hint",
+            },
+        }
     };
 
     let style = if has_confirm {

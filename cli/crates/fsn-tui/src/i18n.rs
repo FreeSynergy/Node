@@ -70,7 +70,8 @@ fn de(key: &str) -> Option<&'static str> {
         "dash.col.type"   => "Typ",
         "dash.col.domain" => "Domain",
         "dash.col.status" => "Status",
-        "dash.hint"           => "↑↓=Projekt  n=Neu  e=Bearbeiten  h=Host  x=Löschen  Tab=Services  q=Beenden",
+        "dash.hint"           => "↑↓=Nav  n=Neu  e=Bearbeiten  x=Löschen  Tab=Services  q=Beenden",
+        "dash.hint.host"      => "↑↓=Nav  n=Neuer Host  e=Bearbeiten  x=Löschen  Tab=Services  q=Beenden",
         "dash.hint.services"  => "↑↓=Nav  d=Deploy  r=Restart  x=Stop  l=Logs  Tab=Sidebar  q=Beenden",
         "dash.hint.confirm"   => "Projekt wirklich löschen?  J=Ja  N=Abbrechen",
         "dash.no_projects"    => "(Kein Projekt angelegt)",
@@ -78,6 +79,7 @@ fn de(key: &str) -> Option<&'static str> {
         "welcome.edit_project" => "Projekt bearbeiten",
         "form.submit.edit"    => "Speichern",
         "sidebar.projects"    => "Projekte",
+        "sidebar.hosts"       => "Hosts",
         "sidebar.system"  => "System",
         "status.running"  => "● Aktiv",
         "status.stopped"  => "○ Gestoppt",
@@ -136,7 +138,7 @@ fn de(key: &str) -> Option<&'static str> {
         "form.host.acme_provider"   => "ACME-Anbieter (↑↓ zum Wählen)",
         "form.host.acme_email"      => "ACME-E-Mail",
         "form.host.acme_email.hint" => "Kontakt-E-Mail für Let's Encrypt (wird aus Adresse abgeleitet)",
-        "dash.new_host"   => "  + Neuer Host",
+        "dash.new_host"   => "+ Neuer Host",
         _ => return None,
     })
 }
@@ -165,7 +167,8 @@ fn en(key: &str) -> Option<&'static str> {
         "dash.col.type"   => "Type",
         "dash.col.domain" => "Domain",
         "dash.col.status" => "Status",
-        "dash.hint"           => "↑↓=Project  n=New  e=Edit  h=Host  x=Delete  Tab=Services  q=Quit",
+        "dash.hint"           => "↑↓=Nav  n=New  e=Edit  x=Delete  Tab=Services  q=Quit",
+        "dash.hint.host"      => "↑↓=Nav  n=New Host  e=Edit  x=Delete  Tab=Services  q=Quit",
         "dash.hint.services"  => "↑↓=Nav  d=Deploy  r=Restart  x=Stop  l=Logs  Tab=Sidebar  q=Quit",
         "dash.hint.confirm"   => "Really delete project?  Y=Yes  N=Cancel",
         "dash.no_projects"    => "(No project found)",
@@ -173,6 +176,7 @@ fn en(key: &str) -> Option<&'static str> {
         "welcome.edit_project" => "Edit Project",
         "form.submit.edit"    => "Save",
         "sidebar.projects"    => "Projects",
+        "sidebar.hosts"       => "Hosts",
         "sidebar.system"  => "System",
         "status.running"  => "● Running",
         "status.stopped"  => "○ Stopped",
@@ -231,7 +235,7 @@ fn en(key: &str) -> Option<&'static str> {
         "form.host.acme_provider"   => "ACME Provider (↑↓ to select)",
         "form.host.acme_email"      => "ACME Email",
         "form.host.acme_email.hint" => "Contact email for Let's Encrypt (derived from address)",
-        "dash.new_host"   => "  + New Host",
+        "dash.new_host"   => "+ New Host",
         _ => return None,
     })
 }

@@ -86,6 +86,7 @@ pub fn run(root: &Path) -> Result<()> {
     if let Some(proj) = state.projects.first() {
         let project_dir = root.join("projects").join(&proj.slug);
         state.hosts = load_hosts(&project_dir);
+        state.rebuild_sidebar();
     }
 
     // Build initial service list from desired state + Podman query.

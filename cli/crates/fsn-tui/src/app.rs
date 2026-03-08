@@ -37,6 +37,40 @@ pub enum DashFocus {
     Services,
 }
 
+// ── Sidebar item ──────────────────────────────────────────────────────────────
+
+/// The action triggered when a sidebar item is activated.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SidebarAction { NewProject, NewHost }
+
+/// One navigable row in the sidebar.
+///
+/// Analogous to a DOM element — each variant knows its own visual appearance
+/// and the action it triggers when selected. Generic navigation code uses
+/// `is_selectable()` without pattern-matching on the variant.
+#[derive(Debug, Clone)]
+pub enum SidebarItem {
+    /// Non-navigable section header (i18n key).
+    Section(&'static str),
+    /// A project entry — selecting updates `selected_project`.
+    Project { slug: String, name: String },
+    /// A host entry — selecting updates `selected_host`.
+    Host    { slug: String, name: String },
+    /// An action button ("+ New Project", "+ New Host").
+    Action  { label_key: &'static str, kind: SidebarAction },
+}
+
+impl SidebarItem {
+    /// Returns `true` for all variants except `Section` (headers are not navigable).
+    pub fn is_selectable(&self) -> bool {
+        !matches!(self, SidebarItem::Section(_))
+    }
+    /// If this item is an `Action`, returns its kind.
+    pub fn action_kind(&self) -> Option<SidebarAction> {
+        if let SidebarItem::Action { kind, .. } = self { Some(*kind) } else { None }
+    }
+}
+
 // ── Language ──────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -448,22 +482,29 @@ pub struct AppState {
     pub selected_host:      usize,
     pub svc_handles:        Vec<ServiceHandle>,
     pub dash_focus:         DashFocus,
+    /// Flat list of navigable sidebar rows — rebuilt whenever projects or hosts change.
+    pub sidebar_items:      Vec<SidebarItem>,
+    /// Index into `sidebar_items` — always points to a selectable item.
+    pub sidebar_cursor:     usize,
     last_refresh:           Instant,
     last_podman_statuses:   HashMap<String, RunState>,
 }
 
 impl AppState {
     pub fn new(sysinfo: SysInfo, projects: Vec<ProjectHandle>) -> Self {
-        Self {
+        let mut s = Self {
             screen: Screen::Welcome, lang: Lang::De, sysinfo, services: vec![],
             selected: 0, overlay_stack: vec![],
             should_quit: false, welcome_focus: 0, current_form: None,
             ctrl_hint: false, projects, selected_project: 0,
             hosts: vec![], selected_host: 0, svc_handles: vec![],
             dash_focus: DashFocus::Sidebar,
+            sidebar_items: vec![], sidebar_cursor: 0,
             last_refresh: Instant::now(),
             last_podman_statuses: HashMap::new(),
-        }
+        };
+        s.rebuild_sidebar();
+        s
     }
 
     // ── Overlay helpers ────────────────────────────────────────────────────
@@ -521,6 +562,48 @@ impl AppState {
         if self.selected >= self.services.len() && !self.services.is_empty() {
             self.selected = self.services.len() - 1;
         }
+    }
+
+    /// Rebuild the flat sidebar item list from current `projects` and `hosts`.
+    ///
+    /// Preserves the cursor position where possible; clamps and advances past
+    /// non-selectable items (section headers) automatically.
+    /// Call this whenever `projects` or `hosts` change.
+    pub fn rebuild_sidebar(&mut self) {
+        let prev = self.sidebar_cursor;
+
+        let mut items: Vec<SidebarItem> = vec![SidebarItem::Section("sidebar.projects")];
+        for p in &self.projects {
+            items.push(SidebarItem::Project {
+                slug: p.slug.clone(),
+                name: p.config.project.name.clone(),
+            });
+        }
+        items.push(SidebarItem::Action { label_key: "dash.new_project", kind: SidebarAction::NewProject });
+
+        items.push(SidebarItem::Section("sidebar.hosts"));
+        for h in &self.hosts {
+            items.push(SidebarItem::Host {
+                slug: h.slug.clone(),
+                name: h.display_name().to_string(),
+            });
+        }
+        items.push(SidebarItem::Action { label_key: "dash.new_host", kind: SidebarAction::NewHost });
+
+        self.sidebar_items = items;
+
+        // Clamp; if the clamped index is non-selectable, advance to the next selectable item.
+        let clamped = prev.min(self.sidebar_items.len().saturating_sub(1));
+        self.sidebar_cursor = if self.sidebar_items.get(clamped).map(|i| i.is_selectable()).unwrap_or(false) {
+            clamped
+        } else {
+            self.sidebar_items.iter().position(|i| i.is_selectable()).unwrap_or(0)
+        };
+    }
+
+    /// The sidebar item currently pointed to by the cursor, if any.
+    pub fn current_sidebar_item(&self) -> Option<&SidebarItem> {
+        self.sidebar_items.get(self.sidebar_cursor)
     }
 
     pub fn t<'a>(&self, key: &'a str) -> &'a str {
