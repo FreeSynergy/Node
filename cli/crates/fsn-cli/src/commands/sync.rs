@@ -16,7 +16,7 @@ pub async fn run(root: &Path, project: Option<&Path>) -> Result<()> {
     let vault_pass = std::env::var("FSN_VAULT_PASS").ok();
     let vault = VaultConfig::load(proj_path.parent().unwrap_or(root), vault_pass.as_deref())?;
     let registry  = ServiceRegistry::load(&root.join("modules"))?;
-    let desired   = resolve_desired(&proj, &host, &registry, &vault)?;
+    let desired   = resolve_desired(&proj, &host, &registry, &vault, None)?;
     let actual    = observe().await?;
     let diff      = compute_diff(&desired, &actual);
 

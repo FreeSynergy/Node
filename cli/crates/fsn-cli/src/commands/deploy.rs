@@ -38,7 +38,10 @@ pub async fn run(
     let registry = ServiceRegistry::load(&root.join("modules"))?;
 
     // ── Resolve desired state ─────────────────────────────────────────────────
-    let desired = resolve_desired(&proj, &host, &registry, &vault)
+    let data_root = project_path.parent()
+        .map(|p| p.join("data"))
+        .unwrap_or_else(|| root.join("data"));
+    let desired = resolve_desired(&proj, &host, &registry, &vault, Some(&data_root))
         .context("Resolving desired state")?;
 
     // ── Observe actual state ──────────────────────────────────────────────────
@@ -66,10 +69,7 @@ pub async fn run(
     };
 
     // ── Deploy ────────────────────────────────────────────────────────────────
-    let opts      = DeployOpts::default_for_user();
-    let data_root = project_path.parent()
-        .map(|p| p.join("data"))
-        .unwrap_or_else(|| root.join("data"));
+    let opts = DeployOpts::default_for_user();
 
     deploy_all(&deploy_desired, &proj, &vault, &opts, root, &data_root).await
         .context("Deploy failed")?;
@@ -92,6 +92,24 @@ pub(crate) fn find_project(root: &Path, explicit: Option<&Path>) -> Option<PathB
 }
 
 pub(crate) fn find_host(root: &Path) -> Option<PathBuf> {
+    // Primary: project directories (TUI stores hosts as projects/{slug}/*.host.toml)
+    let projects_dir = root.join("projects");
+    if let Ok(entries) = std::fs::read_dir(&projects_dir) {
+        for proj_dir in entries.flatten().filter(|e| e.path().is_dir()) {
+            if let Ok(inner) = std::fs::read_dir(proj_dir.path()) {
+                let found = inner.flatten().map(|e| e.path()).find(|p| {
+                    let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                    p.extension().and_then(|e| e.to_str()) == Some("toml")
+                        && name.ends_with(".host.toml")
+                        && name != "example.host.toml"
+                });
+                if let Some(host_path) = found {
+                    return Some(host_path);
+                }
+            }
+        }
+    }
+    // Fallback: legacy global hosts/ directory
     let hosts = root.join("hosts");
     std::fs::read_dir(&hosts).ok()?.flatten()
         .map(|e| e.path())

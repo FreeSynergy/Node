@@ -98,8 +98,10 @@ pub async fn deploy_all(
         let unit = format!("{}.service", instance.name);
         info!("Starting {}…", instance.name);
 
-        systemd::enable(&unit).await
-            .with_context(|| format!("enabling {unit}"))?;
+        // Quadlet-generated units are auto-enabled via WantedBy=default.target
+        // during daemon-reload — calling enable separately is not needed and
+        // will fail with "unit is transient or generated". Best-effort only.
+        let _ = systemd::enable(&unit).await;
         systemd::start(&unit).await
             .with_context(|| format!("starting {unit}"))?;
 

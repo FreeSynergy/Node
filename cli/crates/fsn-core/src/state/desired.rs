@@ -43,6 +43,10 @@ pub struct ServiceInstance {
 
     /// Version from the class definition (used to detect updates).
     pub version: String,
+
+    /// Jinja2-expanded volume mount strings (ready for Quadlet Volume= lines).
+    /// Empty when resolved without a data_root (non-deploy contexts).
+    pub resolved_volumes: Vec<String>,
 }
 
 // ── VarProvider impl ──────────────────────────────────────────────────────────

@@ -19,7 +19,13 @@ pub struct ServiceRegistry {
 
 impl ServiceRegistry {
     /// Scan a modules/ directory and load all class TOMLs.
-    /// Expected layout: modules/{type}/{name}/{name}.toml
+    ///
+    /// Two supported layouts:
+    ///   Depth 3: `modules/{type}/{name}/{name}.toml`       → key = `{type}/{name}`
+    ///   Depth 4: `modules/{type}/{parent}/{name}/{name}.toml` → key = `{type}/{parent}/{name}`
+    ///
+    /// Depth-4 enables sub-modules nested under a parent module
+    /// (e.g. `proxy/zentinel/zentinel-control-plane`).
     pub fn load(modules_dir: &Path) -> Result<Self, FsnError> {
         let mut registry = Self {
             classes: HashMap::new(),
@@ -27,8 +33,8 @@ impl ServiceRegistry {
         };
 
         for entry in WalkDir::new(modules_dir)
-            .min_depth(3) // skip modules/ and type dirs
-            .max_depth(3)
+            .min_depth(3)
+            .max_depth(4)
             .into_iter()
             .filter_map(|e| e.ok())
         {
@@ -37,8 +43,7 @@ impl ServiceRegistry {
                 continue;
             }
 
-            // Extract module class key from path: modules/{type}/{name}/{name}.toml
-            // Verify the file name matches the parent directory name
+            // File name must match its parent directory (e.g. forgejo/forgejo.toml)
             let file_stem = path
                 .file_stem()
                 .and_then(|s| s.to_str())
@@ -50,18 +55,34 @@ impl ServiceRegistry {
                 .unwrap_or_default();
 
             if file_stem != parent_name {
-                continue; // skip hooks, templates, etc.
+                continue;
             }
 
-            // Build the class key: {type}/{name}
-            let type_name = path
-                .parent()
-                .and_then(|p| p.parent())
-                .and_then(|p| p.file_name())
-                .and_then(|n| n.to_str())
-                .unwrap_or_default();
+            // Compute depth relative to modules_dir to pick the right key format
+            let depth = path.components().count()
+                .saturating_sub(modules_dir.components().count());
 
-            let class_key = format!("{}/{}", type_name, file_stem);
+            let class_key = if depth == 3 {
+                // modules/{type}/{name}/{name}.toml  →  {type}/{name}
+                let type_name = path
+                    .parent().and_then(|p| p.parent())
+                    .and_then(|p| p.file_name()).and_then(|n| n.to_str())
+                    .unwrap_or_default();
+                format!("{type_name}/{file_stem}")
+            } else {
+                // modules/{type}/{parent}/{name}/{name}.toml  →  {type}/{parent}/{name}
+                let parent_dir = path
+                    .parent().and_then(|p| p.file_name()).and_then(|n| n.to_str())
+                    .unwrap_or_default();
+                let grandparent_dir = path
+                    .parent().and_then(|p| p.parent()).and_then(|p| p.file_name()).and_then(|n| n.to_str())
+                    .unwrap_or_default();
+                let type_name = path
+                    .parent().and_then(|p| p.parent()).and_then(|p| p.parent())
+                    .and_then(|p| p.file_name()).and_then(|n| n.to_str())
+                    .unwrap_or_default();
+                format!("{type_name}/{grandparent_dir}/{parent_dir}")
+            };
 
             match Self::load_class(path) {
                 Ok(class) => {

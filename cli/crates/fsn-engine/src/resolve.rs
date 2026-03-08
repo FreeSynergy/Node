@@ -23,15 +23,33 @@ use fsn_core::{
 use crate::template::TemplateContext;
 
 /// Build the desired state from the three config layers.
+///
+/// `data_root` – when `Some`, volumes in module TOMLs are rendered with a
+///   resolved `{{ project_root }}` and `{{ module_vars.* }}` context.
+///   Pass `None` in non-deploy contexts (init wizard, web API, sync diff).
 pub fn resolve_desired(
     project: &ProjectConfig,
     host: &HostConfig,
     registry: &ServiceRegistry,
     vault: &VaultConfig,
+    data_root: Option<&std::path::Path>,
 ) -> Result<DesiredState> {
     // Pre-compute cross-service vars from all service entries.
     // Done once before resolution so every service can reference sibling services.
     let cross_vars = collect_cross_service_vars(project);
+
+    // Compute project_root: parent of data_root (e.g. "projects/fsn-net/")
+    // so {{ project_root }}/data/{{ instance_name }} expands correctly.
+    let project_root_buf;
+    let project_root: &str = match data_root {
+        Some(dr) => {
+            project_root_buf = dr.parent()
+                .map(|p| p.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            &project_root_buf
+        }
+        None => "",
+    };
 
     let mut instances = Vec::new();
     let mut seen_names = HashMap::new();
@@ -56,6 +74,7 @@ pub fn resolve_desired(
             vault,
             None, // no parent
             &cross_vars,
+            project_root,
         )
         .with_context(|| format!("Resolving module '{}'", instance_name))?;
 
@@ -129,6 +148,7 @@ fn resolve_instance(
     vault: &VaultConfig,
     parent_name: Option<&str>,
     cross_vars: &HashMap<String, String>,
+    project_root: &str,
 ) -> Result<ServiceInstance> {
     let class = registry
         .get(class_key)
@@ -143,6 +163,10 @@ fn resolve_instance(
         .map(|a| format!("{}.{}", a, project.project.domain))
         .collect();
 
+    // Pre-compute [vars] block: render each var template with just the basic vars
+    // (no module_vars self-reference). This gives us e.g. config_dir = "/projects/fsn-net/data/zentinel".
+    let module_vars = precompute_module_vars(&class.vars, project_root, name, &project.project.name, &project.project.domain);
+
     // Build template context for Jinja2 expansion (includes cross-service vars)
     let ctx = TemplateContext {
         project_name: &project.project.name,
@@ -150,12 +174,17 @@ fn resolve_instance(
         instance_name: name,
         service_domain: &service_domain,
         parent_instance_name: parent_name.unwrap_or(name),
+        project_root,
         vault,
         cross_vars: cross_vars.clone(),
+        module_vars,
     };
 
     // Expand environment variables
     let resolved_env = resolve_env(&class.environment, &ctx)?;
+
+    // Expand volume mount strings ({{ module_vars.config_dir }}/data:/data:Z → real path)
+    let resolved_volumes = resolve_volumes(&class.container.volumes, &ctx)?;
 
     // Resolve sub-modules recursively (same cross_vars for the whole project)
     let mut sub_services = Vec::new();
@@ -170,6 +199,7 @@ fn resolve_instance(
             vault,
             Some(name),
             cross_vars,
+            project_root,
         )
         .with_context(|| format!("Resolving sub-module '{}'", sub_name))?;
         sub_services.push(sub);
@@ -182,6 +212,7 @@ fn resolve_instance(
         version: class.meta.version.clone(),
         class,
         resolved_env,
+        resolved_volumes,
         service_domain,
         alias_domains,
         sub_services,
@@ -200,4 +231,54 @@ fn resolve_env(
         out.insert(key.clone(), value);
     }
     Ok(out)
+}
+
+/// Expand Jinja2 templates in volume mount strings.
+fn resolve_volumes(raw_volumes: &[String], ctx: &TemplateContext) -> Result<Vec<String>> {
+    raw_volumes
+        .iter()
+        .map(|tpl| {
+            crate::template::render(tpl, ctx)
+                .with_context(|| format!("Expanding volume '{}'", tpl))
+        })
+        .collect()
+}
+
+/// Pre-compute the [vars] block from a module class.
+///
+/// Each var value is itself a Jinja2 template (may reference `project_root`,
+/// `instance_name`, `project_name`, `project_domain`). We render them with a
+/// minimal context (no module_vars self-reference) to get concrete paths/strings.
+fn precompute_module_vars(
+    vars: &indexmap::IndexMap<String, toml::Value>,
+    project_root: &str,
+    instance_name: &str,
+    project_name: &str,
+    project_domain: &str,
+) -> HashMap<String, String> {
+    use minijinja::Environment;
+    let mut out = HashMap::new();
+    let mut env = Environment::new();
+
+    let base_vars: HashMap<String, minijinja::Value> = [
+        ("project_root",   project_root),
+        ("instance_name",  instance_name),
+        ("project_name",   project_name),
+        ("project_domain", project_domain),
+    ]
+    .into_iter()
+    .map(|(k, v)| (k.to_string(), minijinja::Value::from(v)))
+    .collect();
+
+    for (key, val) in vars {
+        let template_str = match val {
+            toml::Value::String(s) => s.clone(),
+            other => other.to_string(),
+        };
+        let rendered = env.template_from_str(&template_str)
+            .and_then(|t| t.render(&base_vars))
+            .unwrap_or_else(|_| template_str.clone());
+        out.insert(key.clone(), rendered);
+    }
+    out
 }

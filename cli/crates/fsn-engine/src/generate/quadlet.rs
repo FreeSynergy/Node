@@ -48,7 +48,14 @@ pub fn generate(instance: &ServiceInstance, project_network: Option<&str>) -> Re
         out.push_str(&format!("Network={}\n", network));
     }
 
-    for volume in &c.volumes {
+    // Use resolved_volumes (Jinja2-expanded) when available; fall back to raw
+    // class volumes for backward compatibility with non-deploy contexts.
+    let volumes: &[String] = if !instance.resolved_volumes.is_empty() {
+        &instance.resolved_volumes
+    } else {
+        &c.volumes
+    };
+    for volume in volumes {
         out.push_str(&format!("Volume={}\n", volume));
     }
 

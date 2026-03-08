@@ -214,7 +214,7 @@ async fn try_load_project_config(
         vault_pass.as_deref(),
     ).unwrap_or_default();
 
-    let desired  = resolve_desired(&proj, &host, &registry, &vault).ok()?;
+    let desired  = resolve_desired(&proj, &host, &registry, &vault, None).ok()?;
     let actual   = observe().await.unwrap_or_default();
 
     let services = desired.services.iter().map(|inst| {
@@ -267,7 +267,7 @@ async fn load_setup_requirements(s: &AppState) -> Vec<SetupRequirementJson> {
         proj_path.parent().unwrap_or(root),
         vault_pass.as_deref(),
     ).unwrap_or_default();
-    let Ok(desired) = resolve_desired(&proj, &host, &registry, &vault) else { return Vec::new() };
+    let Ok(desired) = resolve_desired(&proj, &host, &registry, &vault, None) else { return Vec::new() };
 
     collect_requirements(&desired)
         .into_iter()

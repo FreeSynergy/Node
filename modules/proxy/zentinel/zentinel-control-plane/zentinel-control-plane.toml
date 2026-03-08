@@ -43,12 +43,14 @@ retries      = 3
 start_period = "15s"
 
 [environment]
-ZENTINEL_API_URL    = "http://{{ services.zentinel.container_name }}:{{ services.zentinel.port }}"
+# parent_instance_name = the Zentinel instance (e.g. "zentinel")
+ZENTINEL_API_URL    = "http://{{ parent_instance_name }}:443"
 ZENTINEL_CP_PORT    = "8080"
 OIDC_ENABLED        = "{{ zentinel_cp_oidc_enabled | default('true') }}"
-OIDC_ISSUER_URL     = "https://{{ services.kanidm.domain }}/oauth2/openid/zentinel-cp"
+# IAM cross-service var — falls back gracefully if no IAM service is configured
+OIDC_ISSUER_URL     = "{{ iam_url | default('https://auth.' ~ project_domain) }}/oauth2/openid/zentinel-cp"
 OIDC_CLIENT_ID      = "{{ vault_zentinel_cp_oidc_client_id | default('zentinel-cp') }}"
-OIDC_CLIENT_SECRET  = "{{ vault_zentinel_cp_oidc_client_secret }}"
+OIDC_CLIENT_SECRET  = "{{ vault_zentinel_cp_oidc_client_secret | default('') }}"
 OIDC_REDIRECT_URI   = "https://{{ service_domain }}/auth/callback"
 OIDC_SCOPES         = "openid profile email"
 

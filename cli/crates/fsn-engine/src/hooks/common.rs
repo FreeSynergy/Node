@@ -31,14 +31,19 @@ pub fn render_template(ctx: &HookContext<'_>, template_name: &str) -> Result<Str
     let source = std::fs::read_to_string(&tpl_path)
         .with_context(|| format!("reading template {}", tpl_path.display()))?;
 
+    let project_root_str = ctx.data_root.parent()
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_default();
     let tctx = TemplateContext {
         project_name:           &ctx.project.project.name,
         project_domain:         &ctx.project.project.domain,
         instance_name:          &ctx.instance.name,
         service_domain:         &ctx.instance.service_domain,
         parent_instance_name:   &ctx.instance.name,
+        project_root:           &project_root_str,
         vault:                  ctx.vault,
         cross_vars:             crate::resolve::collect_cross_service_vars(ctx.project),
+        module_vars:            std::collections::HashMap::new(),
     };
 
     crate::template::render(&source, &tctx)

@@ -1,0 +1,23 @@
+# FreeSynergyNet — lokaler Host
+# Hostname: FreeSynergyNet (dieser Rechner)
+
+[host]
+name        = "FreeSynergyNet"
+alias       = "main"
+address     = "192.168.1.115"
+ssh_user    = "kal"
+ssh_port    = 22
+install_dir = "/home/kal/Server/FreeSynergy.Node"
+tags        = ["local", "primary"]
+
+[acme]
+email    = "kal@freesynergy.net"
+provider = "letsencrypt"
+
+[proxy.zentinel]
+service_class = "proxy/zentinel"
+
+[proxy.zentinel.load.plugins]
+dns        = "cloudflare"
+acme       = "letsencrypt"
+acme_email = "kal@freesynergy.net"

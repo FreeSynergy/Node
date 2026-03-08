@@ -1,0 +1,17 @@
+# FreeSynergy.Net — Testprojekt
+# Erstes echtes Deployment: Zentinel (Reverse Proxy)
+
+[project]
+name        = "FreeSynergy.Net"
+domain      = "freesynergy.net"
+description = "FreeSynergy.Net — dezentrale Infrastruktur"
+version     = "0.1.0"
+language    = "de"
+
+[project.contact]
+email       = "kal@freesynergy.net"
+acme_email  = "kal@freesynergy.net"
+
+[load.services.zentinel]
+service_class = "proxy/zentinel"
+version       = "latest"
