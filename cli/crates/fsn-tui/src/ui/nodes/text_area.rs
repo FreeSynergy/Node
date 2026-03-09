@@ -240,15 +240,18 @@ impl FormNode for TextAreaNode {
             rows[0],
         );
 
-        if let Some(hk) = self.hint_key {
-            f.render_widget(
-                Paragraph::new(Line::from(Span::styled(
-                    crate::i18n::t(lang, hk),
-                    Style::default().fg(Color::DarkGray),
-                ))),
-                rows[1],
-            );
-        }
+        let hint_text = if let Some(hk) = self.hint_key {
+            crate::i18n::t(lang, hk)
+        } else {
+            crate::i18n::t(lang, "form.textarea.hint")
+        };
+        f.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                hint_text,
+                Style::default().fg(Color::DarkGray),
+            ))),
+            rows[1],
+        );
     }
 
     fn handle_key(&mut self, key: KeyEvent) -> FormAction {

@@ -92,6 +92,7 @@ fn de(key: &str) -> Option<&'static str> {
         "form.tab.project"     => "Projekt",
         "form.tab.options"     => "Optionen",
         "form.hint"            => "Tab=Nächstes Feld  ↑↓=Auswahl  Enter=Weiter  ^Enter=Senden  Esc=Schließen  ^=Strg",
+        "form.textarea.hint"   => "Tab=Nächstes Feld  Enter=Neue Zeile  ^Enter=Senden",
         "form.hint.ctrl"       => "^←=Voriger Tab  ^→=Nächster Tab  ^C=Beenden",
         "form.required"        => "* Pflichtfeld",
         "form.error"           => "Fehler",

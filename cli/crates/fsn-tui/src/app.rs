@@ -740,7 +740,7 @@ pub fn run_loop(
         if event::poll(Duration::from_millis(POLL_MS))? {
             match event::read()? {
                 Event::Key(key)   => crate::events::handle(key, state, root)?,
-                Event::Mouse(mouse) => crate::events::handle_mouse(mouse, state)?,
+                Event::Mouse(mouse) => crate::events::handle_mouse(mouse, state, root)?,
                 _ => {}
             }
         }

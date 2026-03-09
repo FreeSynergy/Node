@@ -92,7 +92,7 @@ fn render_body(f: &mut Frame, state: &AppState, area: Rect) {
     let cols = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Length(22),
+            Constraint::Length(28),
             Constraint::Min(1),
         ])
         .split(area);
@@ -449,10 +449,91 @@ impl SidebarItem {
     /// only knows "show the center panel for the selected item".
     fn render_center(&self, f: &mut Frame, state: &AppState, area: Rect) {
         match self {
+            SidebarItem::Project { slug, .. } => render_project_detail(f, state, area, slug),
             SidebarItem::Host    { slug, .. } => render_host_detail(f, state, area, slug),
             SidebarItem::Service { name, .. } => render_service_detail(f, state, area, name),
-            // Project, Action, Section → show the service table (project overview)
+            // Action, Section → show service table
             _                                 => render_services(f, state, area),
         }
     }
+}
+
+// ── Project detail panel ──────────────────────────────────────────────────────
+
+fn render_project_detail(f: &mut Frame, state: &AppState, area: Rect, slug: &str) {
+    let Some(proj) = state.projects.iter().find(|p| p.slug == slug) else {
+        f.render_widget(Paragraph::new("—"), area);
+        return;
+    };
+
+    let name       = proj.config.project.name.as_str();
+    let domain     = proj.config.project.domain.as_str();
+    let email      = proj.email();
+    let install    = proj.install_dir();
+    let svc_count  = proj.config.load.services.len();
+    let host_count = state.hosts.len();
+    let langs      = proj.config.project.languages.join(", ");
+
+    let svc_ok  = state.services.iter().filter(|s| s.status == RunState::Running).count();
+    let svc_err = state.services.iter().filter(|s| s.status == RunState::Failed).count();
+
+    let block = Block::default()
+        .borders(Borders::NONE)
+        .title(Span::styled(
+            format!(" {} ", name),
+            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+        ));
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+
+    let mut lines = vec![
+        Line::from(vec![
+            Span::styled("Domain:    ", Style::default().fg(Color::DarkGray)),
+            Span::styled(domain.to_string(), Style::default().fg(Color::Blue)),
+        ]),
+    ];
+    if !email.is_empty() {
+        lines.push(Line::from(vec![
+            Span::styled("E-Mail:    ", Style::default().fg(Color::DarkGray)),
+            Span::styled(email.to_string(), Style::default().fg(Color::White)),
+        ]));
+    }
+    if !langs.is_empty() {
+        lines.push(Line::from(vec![
+            Span::styled("Sprachen:  ", Style::default().fg(Color::DarkGray)),
+            Span::styled(langs, Style::default().fg(Color::White)),
+        ]));
+    }
+    if !install.is_empty() {
+        lines.push(Line::from(vec![
+            Span::styled("Install:   ", Style::default().fg(Color::DarkGray)),
+            Span::styled(install.to_string(), Style::default().fg(Color::White)),
+        ]));
+    }
+    lines.push(Line::from(""));
+    lines.push(Line::from(vec![
+        Span::styled("Services:  ", Style::default().fg(Color::DarkGray)),
+        Span::styled(svc_count.to_string(), Style::default().fg(Color::White)),
+        Span::styled("  (", Style::default().fg(Color::DarkGray)),
+        Span::styled(format!("● {}", svc_ok), Style::default().fg(Color::Green)),
+        if svc_err > 0 {
+            Span::styled(format!("  ✕ {}", svc_err), Style::default().fg(Color::Red))
+        } else {
+            Span::styled("", Style::default())
+        },
+        Span::styled(")", Style::default().fg(Color::DarkGray)),
+    ]));
+    lines.push(Line::from(vec![
+        Span::styled("Hosts:     ", Style::default().fg(Color::DarkGray)),
+        Span::styled(host_count.to_string(), Style::default().fg(Color::White)),
+    ]));
+
+    if let Some(desc) = proj.config.project.description.as_deref() {
+        if !desc.is_empty() {
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(desc.to_string(), Style::default().fg(Color::DarkGray))));
+        }
+    }
+
+    f.render_widget(Paragraph::new(lines), inner);
 }

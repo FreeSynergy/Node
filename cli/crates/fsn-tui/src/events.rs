@@ -452,7 +452,7 @@ fn handle_dashboard(key: KeyEvent, state: &mut AppState, root: &Path) -> Result<
                 state.push_overlay(OverlayLayer::NewResource { selected: 0 });
             }
 
-            // Context-aware 'e': edit the item under the cursor (project or host).
+            // Context-aware 'e': edit the item under the cursor (project, host, or service).
             KeyCode::Char('e') => {
                 let item = state.current_sidebar_item().cloned();
                 match item {
@@ -467,6 +467,17 @@ fn handle_dashboard(key: KeyEvent, state: &mut AppState, root: &Path) -> Result<
                             let project_slugs = state.projects.iter().map(|p| p.slug.clone()).collect();
                             state.current_form = Some(crate::host_form::edit_host_form(&host, project_slugs));
                             state.screen = Screen::NewProject;
+                        }
+                    }
+                    Some(SidebarItem::Service { name, .. }) => {
+                        if let Some(proj) = state.projects.get(state.selected_project).cloned() {
+                            if let Some(entry) = proj.config.load.services.get(&name).cloned() {
+                                let slug = crate::app::slugify(&name);
+                                state.current_form = Some(
+                                    crate::service_form::edit_service_form(&name, &entry, slug)
+                                );
+                                state.screen = Screen::NewProject;
+                            }
                         }
                     }
                     _ => {}
@@ -859,6 +870,7 @@ fn submit_service(state: &mut AppState, root: &Path) -> Result<()> {
             }
             state.projects = crate::load_projects(root);
             state.rebuild_services();
+            state.rebuild_sidebar();
             state.screen      = Screen::Dashboard;
             state.dash_focus  = DashFocus::Services;
             state.current_form = None;
@@ -933,7 +945,7 @@ fn submit_bot(state: &mut AppState, root: &Path) -> Result<()> {
 
 // ── Mouse events ──────────────────────────────────────────────────────────────
 
-pub fn handle_mouse(event: MouseEvent, state: &mut AppState) -> Result<()> {
+pub fn handle_mouse(event: MouseEvent, state: &mut AppState, root: &Path) -> Result<()> {
     let (tw, _) = crossterm::terminal::size().unwrap_or((80, 24));
 
     // Overlay scroll support
@@ -992,7 +1004,7 @@ pub fn handle_mouse(event: MouseEvent, state: &mut AppState) -> Result<()> {
             if state.screen == Screen::NewProject {
                 handle_form_click(event.column, event.row, state, eff_w);
             } else if state.screen == Screen::Dashboard && !state.has_overlay() {
-                handle_dashboard_click(event.column, event.row, state);
+                handle_dashboard_click(event.column, event.row, state, root);
             }
         }
 
@@ -1012,7 +1024,9 @@ fn handle_form_click(col: u16, row: u16, state: &mut AppState, term_w: u16) {
     // First: try clicking the focused field's overlay (e.g. dropdown)
     if let Some(global_idx) = form.focused_node_global_idx() {
         if form.nodes[global_idx].click_overlay(col, row, inner) {
-            return; // overlay consumed the click
+            // Dropdown item selected — advance focus so dropdown closes
+            form.focus_next();
+            return;
         }
     }
 
@@ -1022,8 +1036,8 @@ fn handle_form_click(col: u16, row: u16, state: &mut AppState, term_w: u16) {
 
 // ── Dashboard click handler ───────────────────────────────────────────────────
 
-fn handle_dashboard_click(col: u16, row: u16, state: &mut AppState) {
-    const SIDEBAR_W: u16 = 22;
+fn handle_dashboard_click(col: u16, row: u16, state: &mut AppState, root: &Path) {
+    const SIDEBAR_W: u16 = 28;
     const HEADER_H:  u16 = 3;
 
     if row < HEADER_H { return; }
@@ -1035,11 +1049,38 @@ fn handle_dashboard_click(col: u16, row: u16, state: &mut AppState) {
         const INNER_OFFSET: u16 = 1;
         if body_row < INNER_OFFSET { return; }
         let item_idx = (body_row - INNER_OFFSET) as usize;
-        if let Some(item) = state.sidebar_items.get(item_idx) {
+        if let Some(item) = state.sidebar_items.get(item_idx).cloned() {
             if item.is_selectable() {
                 state.sidebar_cursor = item_idx;
-                // Note: full sync (reload_hosts, rebuild_services) only via keyboard.
-                // Mouse click just moves focus; press a key to activate.
+                // If an Action item was clicked, open the form immediately.
+                match &item {
+                    SidebarItem::Action { kind: SidebarAction::NewProject, .. } => {
+                        let queue = crate::task_queue::TaskQueue::new(
+                            crate::task_queue::TaskKind::NewProject, state,
+                        );
+                        state.task_queue = Some(queue);
+                        state.screen = Screen::TaskWizard;
+                    }
+                    SidebarItem::Action { kind: SidebarAction::NewHost, .. } => {
+                        let project_slugs = state.projects.iter().map(|p| p.slug.clone()).collect();
+                        let current = state.projects.get(state.selected_project)
+                            .map(|p| p.slug.as_str()).unwrap_or("").to_string();
+                        state.current_form = Some(crate::host_form::new_host_form(project_slugs, &current));
+                        state.screen = Screen::NewProject;
+                    }
+                    SidebarItem::Action { kind: SidebarAction::NewService, .. } => {
+                        state.current_form = Some(crate::service_form::new_service_form());
+                        state.screen = Screen::NewProject;
+                    }
+                    SidebarItem::Project { slug, .. } => {
+                        if let Some(idx) = state.projects.iter().position(|p| p.slug == *slug) {
+                            state.selected_project = idx;
+                            reload_hosts(state, root);
+                            state.rebuild_services();
+                        }
+                    }
+                    _ => {}
+                }
             }
         }
     } else {

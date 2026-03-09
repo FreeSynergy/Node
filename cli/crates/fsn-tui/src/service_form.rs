@@ -166,3 +166,37 @@ pub fn submit_service_form(form: &ResourceForm, services_dir: &Path, project_slu
     std::fs::write(&path, content)?;
     Ok(())
 }
+
+/// Build a pre-filled service form for editing an existing service instance.
+///
+/// Reads from the in-memory `ServiceInstanceMeta` stored in the project config.
+/// The service `name` is locked as the edit ID (slug-based).
+pub fn edit_service_form(
+    svc_name:  &str,
+    svc_entry: &fsn_core::config::project::ServiceEntry,
+    edit_slug: String,
+) -> ResourceForm {
+    let tags   = svc_entry.tags.join(", ");
+    let port   = svc_entry.port.map(|p| p.to_string()).unwrap_or_default();
+    let sub    = svc_entry.subdomain.as_deref().unwrap_or("");
+    let alias  = svc_entry.alias.as_deref().unwrap_or("");
+    let ver    = svc_entry.version.as_str();
+
+    let mut prefill = HashMap::new();
+    prefill.insert("name",      svc_name);
+    prefill.insert("class",     svc_entry.service_class.as_str());
+    prefill.insert("version",   ver);
+    prefill.insert("tags",      tags.as_str());
+    prefill.insert("subdomain", sub);
+    prefill.insert("alias",     alias);
+    prefill.insert("port",      port.as_str());
+
+    let nodes = schema_form::build_nodes(
+        ServiceFormData::schema(),
+        &prefill,
+        DISPLAY_FNS,
+        &[],
+        &[],
+    );
+    ResourceForm::new(ResourceKind::Service, SERVICE_TABS, nodes, Some(edit_slug), service_on_change)
+}
