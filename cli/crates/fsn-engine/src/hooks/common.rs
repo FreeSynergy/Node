@@ -45,6 +45,7 @@ pub fn render_template(ctx: &HookContext<'_>, template_name: &str) -> Result<Str
         cross_vars:             crate::resolve::collect_cross_service_vars(ctx.project),
         module_vars:            std::collections::HashMap::new(),
         plugin_vars:            std::collections::HashMap::new(),
+        proxy_services:         Vec::new(),
     };
 
     crate::template::render(&source, &tctx)

@@ -20,6 +20,8 @@ use fsn_core::{
     state::desired::{DesiredState, ServiceInstance},
 };
 
+// collect_proxy_services is pub for use in hooks and deploy pipelines.
+
 use crate::template::TemplateContext;
 
 /// Build the desired state from the three config layers.
@@ -177,6 +179,14 @@ fn resolve_instance(
         HashMap::new()
     };
 
+    // Collect proxy service specs for proxy modules.
+    // Proxy templates iterate over `proxy_services` to generate per-service routing config.
+    let proxy_services = if class_key.starts_with("proxy/") {
+        collect_proxy_services(project, registry, project_root)
+    } else {
+        Vec::new()
+    };
+
     // Build template context for Jinja2 expansion (includes cross-service vars)
     let ctx = TemplateContext {
         project_name: &project.project.name,
@@ -189,6 +199,7 @@ fn resolve_instance(
         cross_vars: cross_vars.clone(),
         module_vars,
         plugin_vars,
+        proxy_services,
     };
 
     // Expand environment variables (module defaults + instance overrides)
@@ -258,6 +269,55 @@ fn resolve_volumes(raw_volumes: &[String], ctx: &TemplateContext) -> Result<Vec<
                 .with_context(|| format!("Expanding volume '{}'", tpl))
         })
         .collect()
+}
+
+/// Collect proxy service specs from all services that have declared routes.
+///
+/// Called when resolving a proxy module instance — provides `proxy_services`
+/// in the Jinja2 template context so proxy templates can iterate:
+///   `{% for svc in proxy_services %}{{ svc.domain }} { ... }{% endfor %}`
+///
+/// Services without `[contract.routes]` (e.g. databases, caches, the proxy itself)
+/// are excluded automatically.
+pub fn collect_proxy_services(
+    project: &ProjectConfig,
+    registry: &ServiceRegistry,
+    project_root: &str,
+) -> Vec<crate::template::ProxyServiceSpec> {
+    let mut specs = Vec::new();
+
+    for (instance_name, entry) in &project.load.services {
+        let Some(class) = registry.get(&entry.service_class) else { continue };
+
+        // Skip services with no declared routes — nothing to proxy.
+        if class.contract.routes.is_empty() { continue }
+
+        // Skip internal services (Database, Cache) — never user-facing.
+        if class.meta.service_type.is_internal() { continue }
+
+        let subdomain = entry.subdomain.as_deref().unwrap_or(instance_name.as_str());
+        let domain = format!("{}.{}", subdomain, project.project.domain);
+
+        // Resolve container name: replace {{ instance_name }} placeholder.
+        let container = class.container.name
+            .replace("{{ instance_name }}", instance_name)
+            .replace("{{ parent_instance_name }}", instance_name);
+
+        let health_path = class.contract.health_path.clone()
+            .or_else(|| class.meta.health_path.clone());
+
+        specs.push(crate::template::ProxyServiceSpec {
+            name: instance_name.clone(),
+            domain,
+            container,
+            port: class.meta.port,
+            routes: class.contract.routes.clone(),
+            upstream_tls: class.contract.upstream_tls,
+            health_path,
+        });
+    }
+
+    specs
 }
 
 /// Collect expanded plugin vars for a proxy module instance.

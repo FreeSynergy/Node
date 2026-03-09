@@ -108,3 +108,10 @@ label       = "Pretix SMTP password (optional)"
 field_type  = "secret"
 description = "SMTP password for sending order confirmations. Leave empty to disable mail."
 skip_if_set = true
+
+[contract]
+[[contract.routes]]
+id          = "main"
+path        = "/"
+strip       = false
+description = "Pretix ticket shop"

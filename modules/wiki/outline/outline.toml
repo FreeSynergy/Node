@@ -98,3 +98,10 @@ key         = "vault_outline_smtp_password"
 label       = "Outline SMTP password (optional)"
 field_type  = "secret"
 skip_if_set = true
+
+[contract]
+[[contract.routes]]
+id          = "main"
+path        = "/"
+strip       = false
+description = "Outline wiki"

@@ -80,3 +80,10 @@ key           = "vault_openobserver_admin_password"
 label         = "OpenObserve admin password"
 field_type    = "secret"
 auto_generate = true
+
+[contract]
+[[contract.routes]]
+id          = "main"
+path        = "/"
+strip       = false
+description = "OpenObserve observability dashboard"

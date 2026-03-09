@@ -13,6 +13,7 @@ pub use service::{
     ServiceClass, ServiceMeta, ServiceType,
     ServiceLoad, ServiceSetup, SetupField, FieldType,
     SubServiceRef, ServiceRef,
+    ServiceContract, RouteSpec, HeaderSpec,
 };
 pub use project::{
     ModuleRef,       // backwards-compat alias

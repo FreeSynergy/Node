@@ -62,3 +62,10 @@ key         = "cryptpad_admin_email"
 label       = "CryptPad administrator email address"
 field_type  = "email"
 description = "Used to display the admin contact in CryptPad's footer."
+
+[contract]
+[[contract.routes]]
+id          = "main"
+path        = "/"
+strip       = false
+description = "CryptPad collaborative editor"

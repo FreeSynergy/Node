@@ -101,3 +101,10 @@ label       = "Vikunja SMTP password (optional)"
 field_type  = "secret"
 description = "SMTP password for sending notifications via Stalwart. Leave empty to disable mail."
 skip_if_set = true
+
+[contract]
+[[contract.routes]]
+id          = "main"
+path        = "/"
+strip       = false
+description = "Vikunja task manager"

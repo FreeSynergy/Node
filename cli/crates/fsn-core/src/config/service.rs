@@ -110,9 +110,70 @@ pub struct ServiceClass {
     /// Setup wizard configuration – what this service needs before it can run.
     #[serde(default)]
     pub setup: ServiceSetup,
+
+    /// Routing contract – what the service exposes to the proxy.
+    /// Proxy modules iterate over all contracts to generate routing config.
+    #[serde(default)]
+    pub contract: ServiceContract,
 }
 
 // ── Setup wizard types ────────────────────────────────────────────────────────
+
+// ── Service Contract ──────────────────────────────────────────────────────────
+
+/// Routing and capability contract declared by a service module.
+///
+/// The proxy driver reads `ServiceContract` to generate per-service routing
+/// config — analogous to a Kubernetes `Ingress` spec.  The service declares
+/// what it needs; the proxy decides how to implement it.
+///
+/// Empty `routes` = no proxy routing generated (internal services).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ServiceContract {
+    /// HTTP routes this service exposes. Empty = proxy skips this service.
+    #[serde(default)]
+    pub routes: Vec<RouteSpec>,
+
+    /// Extra HTTP headers the proxy injects when forwarding to this service.
+    #[serde(default)]
+    pub headers: Vec<HeaderSpec>,
+
+    /// Whether the container speaks TLS internally.
+    /// `true` → proxy uses HTTPS to reach the container (e.g. Kanidm).
+    /// `false` (default) → proxy speaks plain HTTP to the container.
+    #[serde(default)]
+    pub upstream_tls: bool,
+
+    /// Override the proxy health-check path for this service.
+    /// Falls back to `module.health_path` when absent.
+    pub health_path: Option<String>,
+}
+
+/// A URL route this service exposes through the proxy.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RouteSpec {
+    /// Unique identifier within this module (e.g. "main", "admin", "api").
+    pub id: String,
+
+    /// URL path prefix to match (e.g. "/" or "/auth").
+    pub path: String,
+
+    /// Strip the matched prefix before forwarding to the upstream.
+    #[serde(default)]
+    pub strip: bool,
+
+    /// Human-readable description (shown in TUI and generated docs).
+    pub description: Option<String>,
+}
+
+/// An HTTP header the proxy injects when forwarding requests.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HeaderSpec {
+    /// Header name (e.g. "X-Forwarded-Proto").
+    pub name: String,
+    /// Header value — Jinja2 templates allowed (e.g. "{{ service_domain }}").
+    pub value: String,
+}
 
 /// All configuration fields this service requires during `fsn init`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

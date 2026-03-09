@@ -8,7 +8,7 @@ use anyhow::Result;
 use minijinja::Environment;
 use std::collections::HashMap;
 
-use fsn_core::config::VaultConfig;
+use fsn_core::config::{RouteSpec, VaultConfig};
 
 /// Template rendering context – mirrors the Ansible variable namespace.
 pub struct TemplateContext<'a> {
@@ -31,6 +31,33 @@ pub struct TemplateContext<'a> {
     /// Injected as flat top-level vars so templates can use `{{ dns_provider }}` etc.
     /// Empty for non-proxy modules.
     pub plugin_vars: HashMap<String, String>,
+    /// Services that need proxy routing — built from ServiceContracts.
+    /// Available as `{{ proxy_services }}` list in proxy module templates.
+    /// Each entry is an object with: name, domain, container, port, upstream_tls,
+    /// health_path (optional), routes (list of {id, path, strip}).
+    /// Empty for non-proxy modules.
+    pub proxy_services: Vec<ProxyServiceSpec>,
+}
+
+/// Describes one service that needs proxy routing.
+/// Derived from the service's `ServiceContract` at resolve time.
+/// Proxy module templates iterate over `proxy_services` to generate routing config.
+#[derive(Debug, Clone)]
+pub struct ProxyServiceSpec {
+    /// Instance name (e.g. "kanidm", "outline").
+    pub name: String,
+    /// Full service domain (e.g. "kanidm.example.com").
+    pub domain: String,
+    /// Resolved container name (e.g. "kanidm").
+    pub container: String,
+    /// Primary internal port.
+    pub port: u16,
+    /// Routes declared in the service's [contract] block.
+    pub routes: Vec<RouteSpec>,
+    /// Whether the upstream (container) uses TLS internally.
+    pub upstream_tls: bool,
+    /// Proxy health-check path (from contract.health_path or module.health_path).
+    pub health_path: Option<String>,
 }
 
 /// Render a single Jinja2 template string with the given context.
@@ -67,6 +94,35 @@ pub fn render(template: &str, ctx: &TemplateContext) -> Result<String> {
     for (k, v) in &ctx.plugin_vars {
         vars.insert(k.clone(), minijinja::Value::from(v.as_str()));
     }
+
+    // Inject proxy_services as a structured list for proxy module templates.
+    // Usage: {% for svc in proxy_services %} ... {{ svc.domain }} ... {% endfor %}
+    let svc_list: Vec<minijinja::Value> = ctx.proxy_services.iter().map(|svc| {
+        let routes: Vec<minijinja::Value> = svc.routes.iter().map(|r| {
+            minijinja::Value::from_iter([
+                ("id",          minijinja::Value::from(r.id.as_str())),
+                ("path",        minijinja::Value::from(r.path.as_str())),
+                ("strip",       minijinja::Value::from(r.strip)),
+                ("description", minijinja::Value::from(
+                    r.description.as_deref().unwrap_or("")
+                )),
+            ])
+        }).collect();
+
+        let mut obj: Vec<(&str, minijinja::Value)> = vec![
+            ("name",         minijinja::Value::from(svc.name.as_str())),
+            ("domain",       minijinja::Value::from(svc.domain.as_str())),
+            ("container",    minijinja::Value::from(svc.container.as_str())),
+            ("port",         minijinja::Value::from(u64::from(svc.port))),
+            ("upstream_tls", minijinja::Value::from(svc.upstream_tls)),
+            ("routes",       minijinja::Value::from(routes)),
+        ];
+        if let Some(hp) = &svc.health_path {
+            obj.push(("health_path", minijinja::Value::from(hp.as_str())));
+        }
+        minijinja::Value::from_iter(obj)
+    }).collect();
+    vars.insert("proxy_services".into(), minijinja::Value::from(svc_list));
 
     // Inject vault secrets (vault_* keys) into the template context.
     // Vault values are exposed only at render time, never stored as plain strings.

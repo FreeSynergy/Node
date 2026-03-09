@@ -73,3 +73,10 @@ key           = "vault_umap_secret_key"
 label         = "uMap secret key"
 field_type    = "secret"
 auto_generate = true
+
+[contract]
+[[contract.routes]]
+id          = "main"
+path        = "/"
+strip       = false
+description = "uMap collaborative maps"

@@ -64,3 +64,10 @@ key        = "tuwunel_allow_federation"
 label      = "Enable Matrix federation with other homeservers"
 field_type = "bool"
 default    = "true"
+
+[contract]
+[[contract.routes]]
+id          = "matrix"
+path        = "/"
+strip       = false
+description = "Matrix homeserver + Element web client"

@@ -47,3 +47,11 @@ start_period = "30s"
 # Use [[setup.fields]] if you add custom vault_ vars in your instance config.
 
 [setup]
+
+[contract]
+upstream_tls = true
+[[contract.routes]]
+id          = "main"
+path        = "/"
+strip       = false
+description = "Kanidm web UI + REST API"
