@@ -243,7 +243,7 @@ fn write_zentinel_kdl(desired: &DesiredState, data_root: &Path) -> Result<()> {
     let proxy = desired
         .services
         .iter()
-        .find(|s| s.class.meta.service_type == ServiceType::Proxy);
+        .find(|s| s.class.meta.has_type(&ServiceType::Proxy));
 
     let Some(proxy) = proxy else {
         return Ok(()); // no proxy in this project — nothing to do

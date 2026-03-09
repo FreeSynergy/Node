@@ -147,8 +147,8 @@ fn collect_proxy_instances(desired: &DesiredState) -> Vec<ServiceInstance> {
 }
 
 fn push_proxy_instance(inst: &ServiceInstance, out: &mut Vec<ServiceInstance>) {
-    let t = &inst.class.meta.service_type;
-    if !t.is_internal() && *t != ServiceType::Proxy {
+    // Include services that are user-facing and not the proxy itself.
+    if !inst.class.meta.is_internal_only() && !inst.class.meta.has_type(&ServiceType::Proxy) {
         out.push(inst.clone());
     }
     for sub in &inst.sub_services {

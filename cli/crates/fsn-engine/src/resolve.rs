@@ -235,7 +235,7 @@ fn resolve_instance(
     Ok(ServiceInstance {
         name: name.to_string(),
         class_key: class_key.to_string(),
-        service_type: class.meta.service_type.clone(),
+        service_types: class.meta.service_types.clone(),
         version: class.meta.version.clone(),
         class,
         resolved_env,
@@ -292,8 +292,8 @@ pub fn collect_proxy_services(
         // Skip services with no declared routes — nothing to proxy.
         if class.contract.routes.is_empty() { continue }
 
-        // Skip internal services (Database, Cache) — never user-facing.
-        if class.meta.service_type.is_internal() { continue }
+        // Skip services that are purely internal infrastructure (Database, Cache).
+        if class.meta.is_internal_only() { continue }
 
         let subdomain = entry.subdomain.as_deref().unwrap_or(instance_name.as_str());
         let domain = format!("{}.{}", subdomain, project.project.domain);

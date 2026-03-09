@@ -30,6 +30,7 @@ use ratatui::{
     Frame,
 };
 
+use fsn_core::health::HealthLevel;
 use crate::app::{AppState, DashFocus, Lang, SidebarItem};
 use crate::ui::{detail, widgets};
 
@@ -344,22 +345,40 @@ impl SidebarItem {
                 Style::default().fg(Color::DarkGray).add_modifier(Modifier::UNDERLINED),
             )),
 
-            SidebarItem::Project { name, .. } => {
-                let (prefix, style) = if is_cursor {
+            SidebarItem::Project { name, health, .. } => {
+                let (prefix, name_style) = if is_cursor {
                     ("▶ ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
                 } else {
                     ("  ", Style::default().fg(Color::White))
                 };
-                Line::from(Span::styled(widgets::truncate(prefix, name, max_w), style))
+                let indicator_style = match health {
+                    HealthLevel::Ok      => Style::default().fg(Color::Green),
+                    HealthLevel::Warning => Style::default().fg(Color::Yellow),
+                    HealthLevel::Error   => Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                };
+                let text = widgets::truncate(prefix, name, max_w.saturating_sub(2));
+                Line::from(vec![
+                    Span::styled(text, name_style),
+                    Span::styled(format!(" {}", health.indicator()), indicator_style),
+                ])
             }
 
-            SidebarItem::Host { name, .. } => {
-                let (prefix, style) = if is_cursor {
+            SidebarItem::Host { name, health, .. } => {
+                let (prefix, name_style) = if is_cursor {
                     ("  ▶ ", Style::default().fg(Color::Cyan))
                 } else {
                     ("  ⊡ ", Style::default().fg(Color::DarkGray))
                 };
-                Line::from(Span::styled(widgets::truncate(prefix, name, max_w), style))
+                let indicator_style = match health {
+                    HealthLevel::Ok      => Style::default().fg(Color::Green),
+                    HealthLevel::Warning => Style::default().fg(Color::Yellow),
+                    HealthLevel::Error   => Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                };
+                let text = widgets::truncate(prefix, name, max_w.saturating_sub(2));
+                Line::from(vec![
+                    Span::styled(text, name_style),
+                    Span::styled(format!(" {}", health.indicator()), indicator_style),
+                ])
             }
 
             SidebarItem::Service { name, status, .. } => {

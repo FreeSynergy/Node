@@ -15,6 +15,7 @@ use ratatui::{
     Frame,
 };
 
+use fsn_core::health::{self, HealthLevel};
 use crate::app::{AppState, RunState};
 use crate::ui::widgets;
 
@@ -95,6 +96,13 @@ pub fn render_project_detail(f: &mut Frame, state: &AppState, area: Rect, slug: 
         }
     }
 
+    // ── Health status ────────────────────────────────────────────────────────
+    let host_projects: Vec<&str> = state.hosts.iter()
+        .filter_map(|h| h.config.host.project.as_deref())
+        .collect();
+    let h_status = health::check_project(&proj.config, &host_projects);
+    push_health_lines(&mut lines, &h_status);
+
     f.render_widget(Paragraph::new(lines), inner);
 }
 
@@ -122,7 +130,11 @@ pub fn render_host_detail(f: &mut Frame, state: &AppState, area: Rect, slug: &st
     let external = if host.config.host.external { "extern" } else { "lokal" };
     let alias    = host.config.host.alias.as_deref().unwrap_or("—");
 
-    let lines = vec![
+    // ── Health status ────────────────────────────────────────────────────────
+    let h_status = health::check_host(&host.config);
+    let mut health_lines: Vec<Line> = Vec::new();
+    push_health_lines(&mut health_lines, &h_status);
+    let mut lines: Vec<Line> = vec![
         Line::from(vec![
             Span::styled("Adresse:   ", Style::default().fg(Color::DarkGray)),
             Span::styled(addr.to_string(), Style::default().fg(Color::White)),
@@ -140,6 +152,7 @@ pub fn render_host_detail(f: &mut Frame, state: &AppState, area: Rect, slug: &st
             Span::styled(external.to_string(), Style::default().fg(Color::White)),
         ]),
     ];
+    lines.extend(health_lines);
     f.render_widget(Paragraph::new(lines), inner);
 }
 
@@ -210,4 +223,34 @@ pub fn render_service_detail(f: &mut Frame, state: &AppState, area: Rect, svc_na
         ]),
     ];
     f.render_widget(Paragraph::new(lines), inner);
+}
+
+// ── Shared health helpers ──────────────────────────────────────────────────────
+
+/// Append health issue lines to an existing lines vec.
+/// Shows a separator + indicator + one line per issue.
+fn push_health_lines(lines: &mut Vec<Line<'static>>, status: &health::HealthStatus) {
+    if status.is_ok() { return; }
+    lines.push(Line::from(""));
+    let (indicator, header_color) = match status.overall {
+        HealthLevel::Ok      => ("✓", Color::Green),
+        HealthLevel::Warning => ("⚠", Color::Yellow),
+        HealthLevel::Error   => ("✗", Color::Red),
+    };
+    lines.push(Line::from(vec![
+        Span::styled("Health:    ", Style::default().fg(Color::DarkGray)),
+        Span::styled(indicator, Style::default().fg(header_color).add_modifier(Modifier::BOLD)),
+    ]));
+    for issue in &status.issues {
+        let (icon, color) = match issue.level {
+            HealthLevel::Ok      => ("  ✓", Color::Green),
+            HealthLevel::Warning => ("  ⚠", Color::Yellow),
+            HealthLevel::Error   => ("  ✗", Color::Red),
+        };
+        // msg_key used directly as fallback; proper i18n keys can be added later
+        lines.push(Line::from(vec![
+            Span::styled(icon, Style::default().fg(color)),
+            Span::styled(format!(" {}", issue.msg_key), Style::default().fg(color)),
+        ]));
+    }
 }

@@ -11,6 +11,7 @@ use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
 
 use fsn_core::config::AppSettings;
+use fsn_core::health::{self, HealthLevel};
 use fsn_core::resource::Resource;
 use fsn_core::store::StoreEntry;
 
@@ -69,8 +70,10 @@ pub enum SidebarAction { NewProject, NewHost, NewService }
 #[derive(Debug, Clone)]
 pub enum SidebarItem {
     Section(&'static str),
-    Project { slug: String, name: String },
-    Host    { slug: String, name: String },
+    /// A project entry — includes a pre-computed health level for the sidebar indicator.
+    Project { slug: String, name: String, health: HealthLevel },
+    /// A host entry — includes a pre-computed health level for the sidebar indicator.
+    Host    { slug: String, name: String, health: HealthLevel },
     Service { name: String, class: String, status: RunState },
     Action  { label_key: &'static str, kind: SidebarAction },
 }
@@ -322,15 +325,30 @@ impl AppState {
     pub fn rebuild_sidebar(&mut self) {
         let prev = self.sidebar_cursor;
 
+        // Pre-collect host→project assignments for cross-resource health checks.
+        let host_projects: Vec<&str> = self.hosts.iter()
+            .filter_map(|h| h.config.host.project.as_deref())
+            .collect();
+
         let mut items: Vec<SidebarItem> = vec![SidebarItem::Section("sidebar.projects")];
         for p in &self.projects {
-            items.push(SidebarItem::Project { slug: p.slug.clone(), name: p.config.project.name.clone() });
+            let h = health::check_project(&p.config, &host_projects);
+            items.push(SidebarItem::Project {
+                slug:   p.slug.clone(),
+                name:   p.config.project.name.clone(),
+                health: h.overall,
+            });
         }
         items.push(SidebarItem::Action { label_key: "dash.new_project", kind: SidebarAction::NewProject });
 
         items.push(SidebarItem::Section("sidebar.hosts"));
         for h in &self.hosts {
-            items.push(SidebarItem::Host { slug: h.slug.clone(), name: h.display_name().to_string() });
+            let hs = health::check_host(&h.config);
+            items.push(SidebarItem::Host {
+                slug:   h.slug.clone(),
+                name:   h.display_name().to_string(),
+                health: hs.overall,
+            });
         }
         items.push(SidebarItem::Action { label_key: "dash.new_host", kind: SidebarAction::NewHost });
 
@@ -477,7 +495,7 @@ mod tests {
 
     #[test]
     fn project_is_selectable() {
-        let item = SidebarItem::Project { slug: "p".into(), name: "My Project".into() };
+        let item = SidebarItem::Project { slug: "p".into(), name: "My Project".into(), health: HealthLevel::Ok };
         assert!(item.is_selectable());
     }
 
@@ -495,7 +513,7 @@ mod tests {
 
     #[test]
     fn hint_key_host() {
-        let item = SidebarItem::Host { slug: "h".into(), name: "srv1".into() };
+        let item = SidebarItem::Host { slug: "h".into(), name: "srv1".into(), health: HealthLevel::Ok };
         assert_eq!(item.hint_key(), "dash.hint.host");
     }
 
@@ -541,7 +559,7 @@ mod tests {
         let mut state = empty_state();
         state.sidebar_items = vec![
             SidebarItem::Section("sidebar.projects"),
-            SidebarItem::Project { slug: "p".into(), name: "Alpha".into() },
+            SidebarItem::Project { slug: "p".into(), name: "Alpha".into(), health: HealthLevel::Ok },
         ];
         state.sidebar_filter = None;
         let visible = state.visible_sidebar_items();
@@ -553,8 +571,8 @@ mod tests {
         let mut state = empty_state();
         state.sidebar_items = vec![
             SidebarItem::Section("sidebar.projects"),
-            SidebarItem::Project { slug: "alpha".into(), name: "Alpha".into() },
-            SidebarItem::Project { slug: "beta".into(),  name: "Beta".into()  },
+            SidebarItem::Project { slug: "alpha".into(), name: "Alpha".into(), health: HealthLevel::Ok },
+            SidebarItem::Project { slug: "beta".into(),  name: "Beta".into(),  health: HealthLevel::Ok },
         ];
         state.sidebar_filter = Some("alp".into());
         let visible = state.visible_sidebar_items();
@@ -566,7 +584,7 @@ mod tests {
     fn visible_sidebar_items_filter_case_insensitive() {
         let mut state = empty_state();
         state.sidebar_items = vec![
-            SidebarItem::Project { slug: "p".into(), name: "MyApp".into() },
+            SidebarItem::Project { slug: "p".into(), name: "MyApp".into(), health: HealthLevel::Ok },
         ];
         state.sidebar_filter = Some("myapp".into());
         assert_eq!(state.visible_sidebar_items().len(), 1);
@@ -576,7 +594,7 @@ mod tests {
     fn visible_sidebar_items_filter_no_match() {
         let mut state = empty_state();
         state.sidebar_items = vec![
-            SidebarItem::Project { slug: "p".into(), name: "Alpha".into() },
+            SidebarItem::Project { slug: "p".into(), name: "Alpha".into(), health: HealthLevel::Ok },
         ];
         state.sidebar_filter = Some("zzz".into());
         assert!(state.visible_sidebar_items().is_empty());

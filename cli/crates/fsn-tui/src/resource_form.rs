@@ -144,12 +144,24 @@ impl ResourceForm {
 
     pub fn focus_next(&mut self) {
         let count = self.current_tab_indices().len();
-        if count > 0 { self.active_field = (self.active_field + 1) % count; }
+        if count == 0 { return; }
+        if self.active_field + 1 >= count {
+            // Last field on this tab → advance to the next tab (wraps around).
+            self.next_tab();
+        } else {
+            self.active_field += 1;
+        }
     }
     pub fn focus_prev(&mut self) {
         let count = self.current_tab_indices().len();
-        if count > 0 {
-            self.active_field = self.active_field.checked_sub(1).unwrap_or(count - 1);
+        if count == 0 { return; }
+        if self.active_field == 0 {
+            // First field on this tab → go to previous tab, last field.
+            self.prev_tab();
+            let new_count = self.current_tab_indices().len();
+            self.active_field = new_count.saturating_sub(1);
+        } else {
+            self.active_field -= 1;
         }
     }
 

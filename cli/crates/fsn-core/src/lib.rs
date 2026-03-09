@@ -4,6 +4,7 @@
 // It is the foundation every other FSN crate depends on.
 
 pub mod config;
+pub mod health;
 pub mod resource;
 pub mod state;
 pub mod error;
