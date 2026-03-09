@@ -224,7 +224,7 @@ fn de(key: &str) -> Option<&'static str> {
         // ── Multi-select ──────────────────────────────────────────────────
         "dash.hint.multiselect"  => "Leertaste=Wählen  s=Alle starten  x=Alle stoppen  u=Abwählen",
         // ── Form navigation (updated hints) ──────────────────────────────
-        "form.hint"              => "Enter=Nächstes Feld  Tab=Tab-Wechsel  ↑↓=Auswahl  ^Enter=Absenden  Esc=Schließen",
+        "form.hint"              => "Enter=Nächstes Feld  Tab=Tab-Wechsel  ↑↓=Auswahl  ^S=Absenden  Esc=Schließen",
         // ── Project form – new fields ─────────────────────────────────────
         "form.tab.services"          => "Services",
         "form.project.tags"          => "Tags (kommagetrennt)",
@@ -424,7 +424,7 @@ fn en(key: &str) -> Option<&'static str> {
         // ── Multi-select ──────────────────────────────────────────────────
         "dash.hint.multiselect"  => "Space=Select  s=Start all  x=Stop all  u=Deselect",
         // ── Form navigation (updated hints) ──────────────────────────────
-        "form.hint"              => "Enter=Next field  Tab=Switch tab  ↑↓=Select  ^Enter=Submit  Esc=Close",
+        "form.hint"              => "Enter=Next field  Tab=Switch tab  ↑↓=Select  ^S=Submit  Esc=Close",
         // ── Project form – new fields ─────────────────────────────────────
         "form.tab.services"            => "Services",
         "form.project.tags"            => "Tags (comma-separated)",

@@ -220,8 +220,9 @@ impl FormNode for TextInputNode {
             KeyCode::Esc     => FormAction::Cancel,
             KeyCode::Left  if key.modifiers.contains(KM::CONTROL) => FormAction::TabPrev,
             KeyCode::Right if key.modifiers.contains(KM::CONTROL) => FormAction::TabNext,
-            // Ctrl+Enter submits the form; plain Enter moves to the next field.
-            KeyCode::Enter if key.modifiers.contains(KM::CONTROL) => FormAction::Submit,
+            // Ctrl+S submits the form; plain Enter moves to the next field.
+            // NOTE: Ctrl+Enter is NOT used — most terminals can't distinguish it from plain Enter.
+            KeyCode::Char('s') if key.modifiers.contains(KM::CONTROL) => FormAction::Submit,
             KeyCode::Enter => FormAction::FocusNext,
 
             // Cursor movement (no value change)

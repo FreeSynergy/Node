@@ -219,8 +219,8 @@ impl FormNode for SelectInputNode {
 
         if !self.is_open {
             match key.code {
-                // Ctrl+Enter submits the form (before the Enter→open-dropdown arm).
-                KeyCode::Enter if key.modifiers.contains(KM::CONTROL) => FormAction::Submit,
+                // Ctrl+S submits the form.
+                KeyCode::Char('s') if key.modifiers.contains(KM::CONTROL) => FormAction::Submit,
                 // Open dropdown
                 KeyCode::Down | KeyCode::Up | KeyCode::Enter => {
                     self.open();

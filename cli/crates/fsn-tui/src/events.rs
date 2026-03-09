@@ -126,7 +126,7 @@ fn handle_welcome(key: KeyEvent, state: &mut AppState) -> Result<()> {
         KeyCode::Left | KeyCode::Right => state.welcome_focus = 1 - state.welcome_focus,
         KeyCode::Enter => {
             if state.welcome_focus == 0 {
-                state.current_form = Some(crate::project_form::new_project_form());
+                state.current_form = Some(crate::project_form::new_project_form(&state.svc_handles));
                 state.screen = Screen::NewProject;
             }
         }

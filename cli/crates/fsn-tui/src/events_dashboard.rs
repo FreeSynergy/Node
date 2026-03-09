@@ -296,7 +296,8 @@ fn open_edit_form_for_item(item: &SidebarItem, state: &mut AppState) {
     match item {
         SidebarItem::Project { slug, .. } => {
             if let Some(proj) = state.projects.iter().find(|p| p.slug == *slug).cloned() {
-                state.current_form = Some(crate::project_form::edit_project_form(&proj));
+                let svcs = state.svc_handles.clone();
+                state.current_form = Some(crate::project_form::edit_project_form(&proj, &svcs));
                 state.screen = Screen::NewProject;
             }
         }

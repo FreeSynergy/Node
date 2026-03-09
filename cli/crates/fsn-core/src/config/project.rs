@@ -76,6 +76,10 @@ pub struct ProjectMeta {
     #[serde(default)]
     pub install_dir: Option<String>,
 
+    /// Free-form tags (e.g. for filtering or categorisation).
+    #[serde(default)]
+    pub tags: Vec<String>,
+
     pub contact: Option<ContactInfo>,
     pub branding: Option<BrandingConfig>,
     pub sites: Option<IndexMap<String, SiteConfig>>,
