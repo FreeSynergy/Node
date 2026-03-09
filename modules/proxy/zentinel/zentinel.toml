@@ -54,3 +54,18 @@ ZENTINEL_CONFIG = "/config/zentinel.kdl"
 
 # No setup.fields – TLS certificates are obtained automatically via ACME.
 # ACME email is configured in the host file (host.toml [proxy.acme_email]).
+
+# ── Plugin manifest ────────────────────────────────────────────────────────────
+# Declares what this module can do when called via the process plugin protocol.
+# The plugin executable lives at Store/Node/proxy/zentinel/plugin.
+[plugin]
+commands = ["generate-config"]
+protocol = 1
+
+[plugin.inputs]
+services = true   # needs all peer services to generate routing config
+
+[[plugin.outputs]]
+name     = "proxy-config"
+template = "templates/zentinel.kdl.j2"
+dest     = "{{ config_dir }}/config/zentinel.kdl"

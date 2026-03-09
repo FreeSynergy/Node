@@ -9,6 +9,7 @@ license.workspace    = true
 fsn-core   = { workspace = true }
 fsn-podman = { workspace = true }
 serde      = { workspace = true }
+serde_json = { workspace = true }
 toml       = { workspace = true }
 indexmap   = { workspace = true }
 minijinja  = { workspace = true }

@@ -10,6 +10,7 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use toml::Value;
 
+use crate::config::manifest::ModuleManifest;
 use crate::error::FsnError;
 use crate::resource::Resource;
 
@@ -224,6 +225,11 @@ pub struct ServiceClass {
     /// Proxy modules iterate over all contracts to generate routing config.
     #[serde(default)]
     pub contract: ServiceContract,
+
+    /// Plugin manifest – commands, inputs and outputs for the process plugin protocol.
+    /// Absent for modules that have not yet been migrated to the plugin system.
+    #[serde(default, rename = "plugin")]
+    pub manifest: Option<ModuleManifest>,
 }
 
 // ── Setup wizard types ────────────────────────────────────────────────────────

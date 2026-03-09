@@ -9,6 +9,7 @@ pub mod diff;
 pub mod generate;
 pub mod health;
 pub mod hooks;
+pub mod module_runner;
 pub mod observe;
 pub mod resolve;
 pub mod setup;
