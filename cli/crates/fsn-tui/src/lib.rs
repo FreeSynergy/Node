@@ -45,6 +45,30 @@ use app::AppState;
 use handles::{HostHandle, ProjectHandle, RunState, ServiceHandle};
 use sysinfo::SysInfo;
 
+// ── Background store fetcher ──────────────────────────────────────────────────
+
+/// Fetch the store index from all enabled stores in a background thread.
+///
+/// Sends the merged entry list back via channel once the HTTP requests
+/// complete. The main loop picks it up and updates `state.store_entries`.
+/// Called at startup so the wizard always has fresh module options,
+/// even when the bundled offline index is absent or stale.
+pub fn spawn_store_fetcher(
+    settings: fsn_core::config::AppSettings,
+) -> mpsc::Receiver<Vec<fsn_core::store::StoreEntry>> {
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        let rt      = tokio::runtime::Runtime::new().expect("tokio runtime");
+        let entries = rt.block_on(async move {
+            let registry = fsn_core::config::ServiceRegistry::default();
+            let client   = fsn_engine::store::StoreClient::new(settings, registry);
+            client.fetch_all().await
+        });
+        let _ = tx.send(entries);
+    });
+    rx
+}
+
 // ── Background reconciler ─────────────────────────────────────────────────────
 
 /// Spawn a background thread that periodically queries Podman and sends
@@ -110,6 +134,15 @@ pub fn run(root: &Path) -> Result<()> {
     if project_toml_exists(root) {
         state.screen = app::Screen::Dashboard;
     }
+
+    // Fetch fresh store index from HTTP in the background.
+    // Updates store_entries when done so the wizard has up-to-date options.
+    let store_fetcher_rx = if state.settings.stores.iter().any(|s| s.enabled) {
+        Some(spawn_store_fetcher(state.settings.clone()))
+    } else {
+        None
+    };
+    state.store_rx = store_fetcher_rx;
 
     // Start background reconciler (polls Podman every 5 seconds).
     let reconcile_rx = spawn_reconciler(Duration::from_secs(5));
@@ -225,4 +258,3 @@ fn project_toml_exists(root: &Path) -> bool {
     }
     false
 }
-

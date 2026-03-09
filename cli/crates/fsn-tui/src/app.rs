@@ -213,6 +213,8 @@ pub struct AppState {
     last_refresh:             Instant,
     pub last_podman_statuses: HashMap<String, RunState>,
     pub deploy_rx:            Option<mpsc::Receiver<DeployMsg>>,
+    /// Background store fetcher — receives fresh entries after HTTP fetch completes.
+    pub store_rx:             Option<mpsc::Receiver<Vec<fsn_core::store::StoreEntry>>>,
     pub task_queue:           Option<crate::task_queue::TaskQueue>,
     pub settings:             AppSettings,
     pub store_entries:        Vec<StoreEntry>,
@@ -239,6 +241,7 @@ impl AppState {
             last_refresh: Instant::now(),
             last_podman_statuses: HashMap::new(),
             deploy_rx: None,
+            store_rx: None,
             task_queue: None,
             settings: AppSettings::load().unwrap_or_default(),
             store_entries: Vec::new(),
@@ -460,6 +463,21 @@ pub fn run_loop(
         if let Some(ref rx) = state.deploy_rx {
             let msgs: Vec<DeployMsg> = std::iter::from_fn(|| rx.try_recv().ok()).collect();
             for msg in msgs { state.apply_deploy_msg(msg); }
+        }
+
+        // Pick up fresh store entries when the background fetcher completes.
+        if let Some(ref rx) = state.store_rx {
+            if let Ok(entries) = rx.try_recv() {
+                let count = entries.len();
+                state.store_entries = entries;
+                state.store_rx = None; // one-shot channel
+                if count > 0 {
+                    state.push_notif(
+                        crate::app::NotifKind::Info,
+                        format!("Store: {count} Module geladen"),
+                    );
+                }
+            }
         }
 
         if state.last_refresh.elapsed() >= Duration::from_secs(REFRESH_SECS) {

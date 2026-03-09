@@ -29,6 +29,8 @@ pub enum DependencyKind {
     Mail,
     /// A Git hosting service (Forgejo, Gitea, …).
     Git,
+    /// A host (server) to deploy services on.
+    Host,
     /// S3-compatible object storage (MinIO, …).
     ObjectStorage,
 }
@@ -130,6 +132,10 @@ impl TaskKind {
             DependencyKind::Mail => state.projects.iter().any(|p| {
                 p.config.load.services.values().any(|s| s.service_class.starts_with("mail/"))
             }),
+            // Host dep fulfilled when at least one host is already configured.
+            // First-time setup: no hosts → wizard prompts to create one.
+            // Subsequent projects: hosts exist → host step is skipped.
+            DependencyKind::Host => !state.hosts.is_empty(),
             _ => false,
         }
     }
@@ -144,6 +150,9 @@ impl TaskKind {
                 for_project: self.project_context().unwrap_or_default().to_string(),
             }),
             DependencyKind::Mail => Some(TaskKind::NewMail {
+                for_project: self.project_context().unwrap_or_default().to_string(),
+            }),
+            DependencyKind::Host => Some(TaskKind::NewHost {
                 for_project: self.project_context().unwrap_or_default().to_string(),
             }),
             _ => None,
@@ -174,7 +183,7 @@ impl TaskKind {
 impl DependencyResolver for TaskKind {
     fn required_deps(&self) -> &[DependencyKind] {
         match self {
-            Self::NewProject    => &[DependencyKind::IAM],
+            Self::NewProject    => &[DependencyKind::IAM, DependencyKind::Host],
             Self::NewHost { .. } => &[DependencyKind::Proxy],
             _                   => &[],
         }
