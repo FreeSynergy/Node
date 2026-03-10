@@ -13,6 +13,8 @@ use std::path::Path;
 use anyhow::Result;
 use fsn_form::Form;
 
+use fsn_core::store::StoreEntry;
+
 use crate::app::{ProjectHandle, ResourceForm, ResourceKind, PROJECT_TABS, ServiceHandle};
 use crate::schema_form;
 use crate::ui::form_node::FormNode;
@@ -105,29 +107,52 @@ const DISPLAY_FNS: &[(&str, fn(&str) -> &'static str)] = &[
 
 /// Build the dropdown options for a service slot.
 ///
-/// Includes:
-///   "" — not configured (shown as "—")
-///   {instance_name} — for each service whose class starts with `class_prefix`
-///   "external" — externally hosted service
-fn slot_options(class_prefix: &str, services: &[ServiceHandle]) -> Vec<String> {
+/// Includes (in order):
+///   ""             — not configured (shown as "—")
+///   {instance}     — each locally deployed service whose class starts with `class_prefix`
+///   {module_name}  — each Store entry of matching service_type, not yet deployed locally
+///   "external"     — externally hosted service
+fn slot_options(
+    class_prefix:  &str,
+    service_type:  &str,
+    services:      &[ServiceHandle],
+    store_entries: &[StoreEntry],
+) -> Vec<String> {
     let mut opts = vec!["".to_string()];
+
+    // 1. Already-deployed local instances of matching type
     for svc in services {
         if svc.config.service.service_class.starts_with(class_prefix) {
             opts.push(svc.name.clone());
         }
     }
+
+    // 2. Store modules of matching type that are not already listed
+    for entry in store_entries {
+        if entry.service_type == service_type {
+            // Extract the module short-name ("iam/kanidm" → "kanidm")
+            let module_name = entry.id.split('/').last().unwrap_or(&entry.id).to_string();
+            if !opts.contains(&module_name) {
+                opts.push(module_name);
+            }
+        }
+    }
+
     opts.push("external".to_string());
     opts
 }
 
 /// Build the full dynamic_options slice for all service slot fields.
-fn build_slot_options(services: &[ServiceHandle]) -> Vec<(&'static str, Vec<String>)> {
+fn build_slot_options(
+    services:      &[ServiceHandle],
+    store_entries: &[StoreEntry],
+) -> Vec<(&'static str, Vec<String>)> {
     vec![
-        ("iam",        slot_options("iam/",        services)),
-        ("wiki",       slot_options("wiki/",       services)),
-        ("mail",       slot_options("mail/",       services)),
-        ("monitoring", slot_options("monitoring/", services)),
-        ("git",        slot_options("git/",        services)),
+        ("iam",        slot_options("iam/",        "iam",        services, store_entries)),
+        ("wiki",       slot_options("wiki/",       "wiki",       services, store_entries)),
+        ("mail",       slot_options("mail/",       "mail",       services, store_entries)),
+        ("monitoring", slot_options("monitoring/", "monitoring", services, store_entries)),
+        ("git",        slot_options("git/",        "git",        services, store_entries)),
     ]
 }
 
@@ -170,12 +195,12 @@ fn sync_email_from_domain(nodes: &mut Vec<Box<dyn FormNode>>) {
 
 // ── Form builders ─────────────────────────────────────────────────────────────
 
-pub fn new_project_form(services: &[ServiceHandle]) -> ResourceForm {
+pub fn new_project_form(services: &[ServiceHandle], store_entries: &[StoreEntry]) -> ResourceForm {
     let home = std::env::var("HOME").unwrap_or_else(|_| "/home/user".into());
     let dynamics: &[(&str, String)] = &[
         ("install_dir", format!("{}/fsn", home)),
     ];
-    let dyn_opts = build_slot_options(services);
+    let dyn_opts = build_slot_options(services, store_entries);
     let nodes = schema_form::build_nodes(
         ProjectFormData::schema(),
         &HashMap::new(),
@@ -186,7 +211,11 @@ pub fn new_project_form(services: &[ServiceHandle]) -> ResourceForm {
     ResourceForm::new(ResourceKind::Project, PROJECT_TABS, nodes, None, project_on_change)
 }
 
-pub fn edit_project_form(handle: &ProjectHandle, services: &[ServiceHandle]) -> ResourceForm {
+pub fn edit_project_form(
+    handle:        &ProjectHandle,
+    services:      &[ServiceHandle],
+    store_entries: &[StoreEntry],
+) -> ResourceForm {
     let p    = &handle.config.project;
     let desc = p.description.as_deref().unwrap_or("").to_string();
     let slots = &handle.config.services;
@@ -205,7 +234,7 @@ pub fn edit_project_form(handle: &ProjectHandle, services: &[ServiceHandle]) -> 
         ("git",           slots.git.as_deref().unwrap_or("")),
     ].into_iter().filter(|(_, v)| !v.is_empty()).collect();
 
-    let dyn_opts = build_slot_options(services);
+    let dyn_opts = build_slot_options(services, store_entries);
     let nodes = schema_form::build_nodes(
         ProjectFormData::schema(),
         &prefill,

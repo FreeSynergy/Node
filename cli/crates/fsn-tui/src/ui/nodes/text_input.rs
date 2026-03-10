@@ -13,7 +13,7 @@ use ratatui::{
 };
 
 use crate::app::Lang;
-use crate::ui::form_node::{FormAction, FormNode};
+use crate::ui::form_node::{handle_form_nav, FormAction, FormNode};
 
 #[derive(Debug)]
 pub struct TextInputNode {
@@ -211,19 +211,16 @@ impl FormNode for TextInputNode {
     }
 
     fn handle_key(&mut self, key: KeyEvent) -> FormAction {
+        // Ctrl+S=Submit, Ctrl+←/→=TabPrev/Next — consistent across all nodes.
+        if let Some(nav) = handle_form_nav(key) { return nav; }
+
         use KeyModifiers as KM;
         match key.code {
-            // Navigation
             // Tab switches between form tabs; Enter moves to the next field.
             KeyCode::Tab     => FormAction::TabNext,
             KeyCode::BackTab => FormAction::TabPrev,
             KeyCode::Esc     => FormAction::Cancel,
-            KeyCode::Left  if key.modifiers.contains(KM::CONTROL) => FormAction::TabPrev,
-            KeyCode::Right if key.modifiers.contains(KM::CONTROL) => FormAction::TabNext,
-            // Ctrl+S submits the form; plain Enter moves to the next field.
-            // NOTE: Ctrl+Enter is NOT used — most terminals can't distinguish it from plain Enter.
-            KeyCode::Char('s') if key.modifiers.contains(KM::CONTROL) => FormAction::Submit,
-            KeyCode::Enter => FormAction::FocusNext,
+            KeyCode::Enter   => FormAction::FocusNext,
 
             // Cursor movement (no value change)
             KeyCode::Left  => { self.cursor_left();  FormAction::Consumed }

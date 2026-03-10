@@ -18,10 +18,30 @@
 //   fn render_html(&self, lang: Lang) -> String
 //   fn to_json(&self, lang: Lang) -> serde_json::Value
 
-use crossterm::event::KeyEvent;
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{layout::Rect, Frame};
 
 use crate::app::Lang;
+
+// ── Common navigation helper ──────────────────────────────────────────────────
+
+/// Handle form-level navigation shortcuts — call at the top of every `FormNode::handle_key`.
+///
+/// Returns `Some(action)` for:
+///   Ctrl+S           → Submit (works on all terminals; Ctrl+Enter does NOT)
+///   Ctrl+←           → TabPrev
+///   Ctrl+→           → TabNext
+///
+/// Tab / BackTab / Esc are intentionally excluded because widgets handle them
+/// differently (e.g. TextArea: Tab=FocusNext, EnvTable: Tab=column-nav).
+pub fn handle_form_nav(key: KeyEvent) -> Option<FormAction> {
+    match key.code {
+        KeyCode::Char('s') if key.modifiers.contains(KeyModifiers::CONTROL) => Some(FormAction::Submit),
+        KeyCode::Left      if key.modifiers.contains(KeyModifiers::CONTROL) => Some(FormAction::TabPrev),
+        KeyCode::Right     if key.modifiers.contains(KeyModifiers::CONTROL) => Some(FormAction::TabNext),
+        _ => None,
+    }
+}
 
 // ── FormAction ────────────────────────────────────────────────────────────────
 

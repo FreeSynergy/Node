@@ -7,7 +7,7 @@
 //                →/Enter/click on item accept + close.
 //   Click outside dropdown while open → close without change.
 
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -17,7 +17,7 @@ use ratatui::{
 };
 
 use crate::app::Lang;
-use crate::ui::form_node::{FormAction, FormNode};
+use crate::ui::form_node::{handle_form_nav, FormAction, FormNode};
 
 #[derive(Debug)]
 pub struct SelectInputNode {
@@ -215,23 +215,22 @@ impl FormNode for SelectInputNode {
     }
 
     fn handle_key(&mut self, key: KeyEvent) -> FormAction {
-        use KeyModifiers as KM;
+        // Ctrl+S=Submit, Ctrl+←/→=TabPrev/Next — consistent across all nodes.
+        // Only applies when dropdown is closed; open dropdown swallows all keys.
+        if !self.is_open {
+            if let Some(nav) = handle_form_nav(key) { return nav; }
+        }
 
         if !self.is_open {
             match key.code {
-                // Ctrl+S submits the form.
-                KeyCode::Char('s') if key.modifiers.contains(KM::CONTROL) => FormAction::Submit,
                 // Open dropdown
                 KeyCode::Down | KeyCode::Up | KeyCode::Enter => {
                     self.open();
                     FormAction::Consumed
                 }
-                // Tab switches between form tabs (mirrors TextInputNode behaviour).
                 KeyCode::Tab     => FormAction::TabNext,
                 KeyCode::BackTab => FormAction::TabPrev,
                 KeyCode::Esc     => FormAction::Cancel,
-                KeyCode::Left  if key.modifiers.contains(KM::CONTROL) => FormAction::TabPrev,
-                KeyCode::Right if key.modifiers.contains(KM::CONTROL) => FormAction::TabNext,
                 KeyCode::Char('l') | KeyCode::Char('L') => FormAction::LangToggle,
                 _ => FormAction::Unhandled,
             }

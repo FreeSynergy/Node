@@ -94,7 +94,7 @@ impl TaskKind {
     /// Build the `ResourceForm` for this task, pre-filled as needed.
     pub fn build_form(&self, state: &AppState) -> ResourceForm {
         match self {
-            Self::NewProject => crate::project_form::new_project_form(&state.svc_handles),
+            Self::NewProject => crate::project_form::new_project_form(&state.svc_handles, &state.store_entries),
 
             Self::NewHost { .. } => {
                 let slugs   = state.projects.iter().map(|p| p.slug.clone()).collect();

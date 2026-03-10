@@ -28,7 +28,7 @@ use ratatui::{
 };
 
 use crate::app::Lang;
-use crate::ui::form_node::{FormAction, FormNode};
+use crate::ui::form_node::{handle_form_nav, FormAction, FormNode};
 
 const DEFAULT_VISIBLE_ROWS: u16 = 3;
 
@@ -320,16 +320,20 @@ impl FormNode for EnvTableNode {
     }
 
     fn handle_key(&mut self, key: KeyEvent) -> FormAction {
+        // Ctrl+S=Submit, Ctrl+←/→=TabPrev/Next — consistent across all nodes.
+        if let Some(nav) = handle_form_nav(key) { return nav; }
+
         use KeyModifiers as KM;
 
         match key.code {
-            // Form-level navigation
-            KeyCode::Esc     => return FormAction::Cancel,
-            KeyCode::Left  if key.modifiers.contains(KM::CONTROL) => return FormAction::TabPrev,
-            KeyCode::Right if key.modifiers.contains(KM::CONTROL) => return FormAction::TabNext,
-            KeyCode::Enter if key.modifiers.contains(KM::CONTROL) => return FormAction::Submit,
+            // Form-level escape
+            KeyCode::Esc => return FormAction::Cancel,
 
-            // Column navigation via Tab
+            // Tab = column navigation within the table.
+            // At the last column, Tab exits the table and advances to the next field.
+            // At the first column, BackTab exits backwards.
+            // Using FocusNext/Prev (not TabNext/Prev) so the user stays on the same
+            // form tab and can reach other fields after the env table.
             KeyCode::Tab => {
                 if self.cur_col < 2 {
                     self.cur_col += 1;

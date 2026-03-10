@@ -19,7 +19,7 @@ use ratatui::{
 };
 
 use crate::app::Lang;
-use crate::ui::form_node::{FormAction, FormNode};
+use crate::ui::form_node::{handle_form_nav, FormAction, FormNode};
 
 const DEFAULT_ROWS: u16 = 4;
 
@@ -255,18 +255,18 @@ impl FormNode for TextAreaNode {
     }
 
     fn handle_key(&mut self, key: KeyEvent) -> FormAction {
+        // Ctrl+S=Submit, Ctrl+←/→=TabPrev/Next — consistent across all nodes.
+        if let Some(nav) = handle_form_nav(key) { return nav; }
+
         use KeyModifiers as KM;
         match key.code {
-            // Submit: Ctrl+Enter or Alt+Enter (terminal compatibility — many terminals
-            // cannot distinguish Ctrl+Enter from plain Enter).
-            KeyCode::Enter if key.modifiers.intersects(KM::CONTROL | KM::ALT) => FormAction::Submit,
-
+            // Tab / BackTab advance focus to the prev/next field on the same tab.
+            // (TextArea uses FocusNext, not TabNext, so the user stays on the same
+            // tab and reaches fields after the textarea — Tab=TabNext would skip them.)
             KeyCode::Tab     => FormAction::FocusNext,
             KeyCode::BackTab => FormAction::FocusPrev,
-            // Esc exits the textarea (back to dashboard or cancel form).
+            // Esc cancels the form (same as TextInputNode).
             KeyCode::Esc     => FormAction::Cancel,
-            KeyCode::Left  if key.modifiers.contains(KM::CONTROL) => FormAction::TabPrev,
-            KeyCode::Right if key.modifiers.contains(KM::CONTROL) => FormAction::TabNext,
 
             KeyCode::Up => {
                 if self.cursor_line > 0 {
