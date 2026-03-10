@@ -4,8 +4,8 @@ use ratatui::{
     layout::Alignment,
     style::{Color, Style},
     text::{Line, Span},
-    widgets::Paragraph,
 };
+use rat_widget::paragraph::{Paragraph, ParagraphState};
 
 use crate::ui::render_ctx::RenderCtx;
 
@@ -38,8 +38,7 @@ pub fn render(f: &mut RenderCtx<'_>, state: &AppState) {
         .map(|l| Line::from(Span::styled(l.as_str(), Style::default().fg(Color::White))))
         .collect();
 
-    let para = Paragraph::new(visible_lines);
-    f.render_widget(para, inner);
+    f.render_stateful_widget(Paragraph::new(visible_lines), inner, &mut ParagraphState::new());
 
     // Hint bar at bottom of popup
     let hint_area = Rect {
@@ -48,10 +47,13 @@ pub fn render(f: &mut RenderCtx<'_>, state: &AppState) {
         width: popup.width.saturating_sub(2),
         height: 1,
     };
-    let hint = Paragraph::new(Line::from(Span::styled(
-        state.t("logs.hint"),
-        Style::default().fg(Color::DarkGray),
-    )))
-    .alignment(Alignment::Right);
-    f.render_widget(hint, hint_area);
+    f.render_stateful_widget(
+        Paragraph::new(Line::from(Span::styled(
+            state.t("logs.hint"),
+            Style::default().fg(Color::DarkGray),
+        )))
+        .alignment(Alignment::Right),
+        hint_area,
+        &mut ParagraphState::new(),
+    );
 }

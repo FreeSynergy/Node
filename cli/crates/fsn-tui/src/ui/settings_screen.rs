@@ -17,8 +17,9 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Paragraph},
+    widgets::{Block, BorderType, Borders},
 };
+use rat_widget::paragraph::{Paragraph, ParagraphState};
 
 use crate::ui::render_ctx::RenderCtx;
 
@@ -52,11 +53,14 @@ fn render_store_list(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
     let stores = &state.settings.stores;
 
     if stores.is_empty() {
-        let p = Paragraph::new(Line::from(Span::styled(
-            state.t("settings.empty"),
-            Style::default().fg(Color::DarkGray),
-        )));
-        f.render_widget(p, area);
+        f.render_stateful_widget(
+            Paragraph::new(Line::from(Span::styled(
+                state.t("settings.empty"),
+                Style::default().fg(Color::DarkGray),
+            ))),
+            area,
+            &mut ParagraphState::new(),
+        );
         return;
     }
 
@@ -97,15 +101,16 @@ fn render_store_list(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
         lines.push(Line::from(""));
     }
 
-    f.render_widget(Paragraph::new(lines), area);
+    f.render_stateful_widget(Paragraph::new(lines), area, &mut ParagraphState::new());
 }
 
 fn render_hint(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
-    f.render_widget(
+    f.render_stateful_widget(
         Paragraph::new(Line::from(Span::styled(
             state.t("settings.hint"),
             Style::default().fg(Color::DarkGray),
         ))),
         area,
+        &mut ParagraphState::new(),
     );
 }

@@ -17,8 +17,9 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders},
 };
+use rat_widget::paragraph::{Paragraph, ParagraphState};
 
 use crate::app::Lang;
 use crate::ui::form_node::{handle_form_nav, FormAction, FormNode};
@@ -145,19 +146,21 @@ impl FormNode for MultiSelectInputNode {
         } else {
             Line::from(Span::styled(display, Style::default().fg(Color::White)))
         };
-        f.render_widget(
+        f.render_stateful_widget(
             Paragraph::new(input_line)
                 .block(Block::default().borders(Borders::ALL).border_style(border_style).title(title)),
             rows[0],
+            &mut ParagraphState::new(),
         );
 
         if let Some(hk) = self.hint_key {
-            f.render_widget(
+            f.render_stateful_widget(
                 Paragraph::new(Line::from(Span::styled(
                     crate::i18n::t(lang, hk),
                     Style::default().fg(Color::DarkGray),
                 ))),
                 rows[1],
+                &mut ParagraphState::new(),
             );
         }
     }

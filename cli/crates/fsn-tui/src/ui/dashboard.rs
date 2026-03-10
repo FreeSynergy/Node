@@ -24,10 +24,13 @@
 use tui_big_text::{BigText, PixelSize};
 use ratatui::{
     layout::{Alignment, Constraint, Layout, Rect},
-    style::{Color, Modifier, Style},
+    style::{Color, Modifier, Style, Styled},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Cell, Paragraph, Row, Table, TableState},
+    widgets::{Block, BorderType, Borders},
 };
+use rat_widget::paragraph::{Paragraph, ParagraphState};
+use rat_widget::table::{Table, TableState};
+use rat_widget::table::textdata::{Cell, Row};
 
 use crate::ui::render_ctx::RenderCtx;
 
@@ -99,12 +102,13 @@ fn render_logo_row(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
     .split(cols[1]);
 
     // Row 0: "FreeSynergy.Node" (left) + [DE] button (right)
-    f.render_widget(
+    f.render_stateful_widget(
         Paragraph::new(Line::from(vec![
             Span::styled("FreeSynergy", Style::new().fg(Color::White).add_modifier(Modifier::BOLD)),
             Span::styled(".Node", Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
         ])),
         info_rows[0],
+        &mut ParagraphState::new(),
     );
     let lang_area = Rect {
         x: cols[1].right().saturating_sub(5),
@@ -112,18 +116,20 @@ fn render_logo_row(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
         width: 5,
         height: 1,
     };
-    f.render_widget(
+    f.render_stateful_widget(
         Paragraph::new(Line::from(widgets::lang_button(state))),
         lang_area,
+        &mut ParagraphState::new(),
     );
 
     // Row 1: subtitle (left) + version (right)
-    f.render_widget(
+    f.render_stateful_widget(
         Paragraph::new(Line::from(Span::styled(
             "Modular Deployment System  —  by KalEl",
             Style::new().fg(Color::DarkGray),
         ))),
         info_rows[1],
+        &mut ParagraphState::new(),
     );
     let ver_str = format!("v{}  ", env!("CARGO_PKG_VERSION"));
     let ver_w = ver_str.chars().count() as u16;
@@ -133,9 +139,10 @@ fn render_logo_row(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
         width: ver_w,
         height: 1,
     };
-    f.render_widget(
+    f.render_stateful_widget(
         Paragraph::new(Line::from(Span::styled(ver_str, Style::new().fg(Color::DarkGray)))),
         ver_area,
+        &mut ParagraphState::new(),
     );
 
     // Row 2: project name @ domain
@@ -144,9 +151,10 @@ fn render_logo_row(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
         .get(state.selected_project)
         .map(|p| format!("{}  @  {}", p.name(), p.domain()))
         .unwrap_or_else(|| state.t("dash.no_project_selected").to_string());
-    f.render_widget(
+    f.render_stateful_widget(
         Paragraph::new(Line::from(Span::styled(domain_text, Style::new().fg(Color::DarkGray)))),
         info_rows[2],
+        &mut ParagraphState::new(),
     );
 
     // Row 3: separator line
@@ -183,7 +191,7 @@ fn render_tab_bar(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
         }
     }
 
-    f.render_widget(Paragraph::new(Line::from(spans)), area);
+    f.render_stateful_widget(Paragraph::new(Line::from(spans)), area, &mut ParagraphState::new());
 }
 
 fn active_tab_index(state: &AppState) -> usize {
@@ -277,12 +285,13 @@ fn render_sidebar(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
     };
 
     if let Some((farea, query)) = filter_row {
-        f.render_widget(
+        f.render_stateful_widget(
             Paragraph::new(Line::from(Span::styled(
                 format!("/{}_", query),
                 Style::new().fg(Color::Yellow).add_modifier(Modifier::BOLD),
             ))),
             farea,
+            &mut ParagraphState::new(),
         );
     }
 
@@ -298,9 +307,10 @@ fn render_sidebar(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
         } else {
             state.t("dash.no_projects")
         };
-        f.render_widget(
+        f.render_stateful_widget(
             Paragraph::new(Line::from(Span::styled(msg, Style::new().fg(Color::DarkGray)))),
             list_area,
+            &mut ParagraphState::new(),
         );
         return;
     }
@@ -310,7 +320,7 @@ fn render_sidebar(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
         .iter()
         .map(|(i, item)| item.sidebar_line(*i == state.sidebar_cursor, focused, max_w, state.lang))
         .collect();
-    f.render_widget(Paragraph::new(lines), list_area);
+    f.render_stateful_widget(Paragraph::new(lines), list_area, &mut ParagraphState::new());
 }
 
 // ── Detail panel ──────────────────────────────────────────────────────────────
@@ -376,13 +386,14 @@ fn render_stat_card(f: &mut RenderCtx<'_>, area: Rect, label: &str, value: &str,
 
     let inner = block.inner(area);
     f.render_widget(block, area);
-    f.render_widget(
+    f.render_stateful_widget(
         Paragraph::new(Line::from(Span::styled(
             value.to_string(),
             Style::new().fg(color).add_modifier(Modifier::BOLD),
         )))
         .alignment(Alignment::Center),
         inner,
+        &mut ParagraphState::new(),
     );
 }
 
@@ -410,26 +421,27 @@ fn render_services(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
         ));
 
     if state.services.is_empty() {
-        f.render_widget(
+        f.render_stateful_widget(
             Paragraph::new(Line::from(Span::styled(
                 state.t("dash.no_services"),
                 Style::new().fg(Color::DarkGray),
             )))
             .block(block),
             area,
+            &mut ParagraphState::new(),
         );
         return;
     }
 
     let header = Row::new(vec![
         Cell::from(state.t("dash.col.name"))
-            .style(Style::new().fg(Color::DarkGray).add_modifier(Modifier::UNDERLINED)),
+            .set_style(Style::new().fg(Color::DarkGray).add_modifier(Modifier::UNDERLINED)),
         Cell::from(state.t("dash.col.type"))
-            .style(Style::new().fg(Color::DarkGray).add_modifier(Modifier::UNDERLINED)),
+            .set_style(Style::new().fg(Color::DarkGray).add_modifier(Modifier::UNDERLINED)),
         Cell::from(state.t("dash.col.domain"))
-            .style(Style::new().fg(Color::DarkGray).add_modifier(Modifier::UNDERLINED)),
+            .set_style(Style::new().fg(Color::DarkGray).add_modifier(Modifier::UNDERLINED)),
         Cell::from(state.t("dash.col.status"))
-            .style(Style::new().fg(Color::DarkGray).add_modifier(Modifier::UNDERLINED)),
+            .set_style(Style::new().fg(Color::DarkGray).add_modifier(Modifier::UNDERLINED)),
     ])
     .height(1);
 
@@ -460,16 +472,16 @@ fn render_services(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
             };
 
             Row::new(vec![
-                Cell::from(format!("{}{}", prefix, svc.name)).style(name_style),
-                Cell::from(svc.service_type.as_str()).style(Style::new().fg(Color::DarkGray)),
-                Cell::from(svc.domain.as_str()).style(Style::new().fg(Color::Blue)),
+                Cell::from(format!("{}{}", prefix, svc.name)).set_style(name_style),
+                Cell::from(svc.service_type.as_str()).set_style(Style::new().fg(Color::DarkGray)),
+                Cell::from(svc.domain.as_str()).set_style(Style::new().fg(Color::Blue)),
                 Cell::from(Line::from(widgets::status_span(svc.status, state))),
             ])
             .height(1)
         })
         .collect();
 
-    let table = Table::new(
+    let table = Table::new_ratatui(
         rows,
         [
             Constraint::Length(20),
@@ -480,10 +492,10 @@ fn render_services(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
     )
     .header(header)
     .block(block)
-    .row_highlight_style(Style::new().bg(Color::DarkGray));
+    .select_row_style(Some(Style::new().bg(Color::DarkGray)));
 
-    let mut table_state = TableState::default()
-        .with_selected(if services_focused { Some(state.selected) } else { None });
+    let mut table_state = TableState::default();
+    if services_focused { table_state.select(Some(state.selected)); }
     f.render_stateful_widget(table, area, &mut table_state);
 }
 
@@ -499,9 +511,10 @@ fn render_footer(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
         width: mit_w.min(area.width / 2),
         height: 1,
     };
-    f.render_widget(
+    f.render_stateful_widget(
         Paragraph::new(Line::from(Span::styled(mit, Style::new().fg(Color::DarkGray)))),
         mit_area,
+        &mut ParagraphState::new(),
     );
 
     // Right: context-sensitive hints
@@ -538,9 +551,10 @@ fn render_footer(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
             width: hints_w,
             height: 1,
         };
-        f.render_widget(
+        f.render_stateful_widget(
             Paragraph::new(Line::from(Span::styled(hint_text, hint_style))),
             hints_area,
+            &mut ParagraphState::new(),
         );
     }
 }

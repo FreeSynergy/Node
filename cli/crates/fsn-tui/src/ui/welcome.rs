@@ -26,8 +26,9 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span, Text},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders},
 };
+use rat_widget::paragraph::{Paragraph, ParagraphState};
 
 use crate::ui::render_ctx::RenderCtx;
 
@@ -66,14 +67,21 @@ fn render_header(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
         Span::styled(build_info,     Style::default().fg(Color::DarkGray)),
     ]);
 
-    let header = Paragraph::new(title)
-        .block(Block::default().borders(Borders::BOTTOM).border_style(Style::default().fg(Color::DarkGray)))
-        .alignment(Alignment::Left);
-    f.render_widget(header, area);
+    f.render_stateful_widget(
+        Paragraph::new(title)
+            .block(Block::default().borders(Borders::BOTTOM).border_style(Style::default().fg(Color::DarkGray)))
+            .alignment(Alignment::Left),
+        area,
+        &mut ParagraphState::new(),
+    );
 
     // Lang button — top right
     let lang_area = Rect { x: area.right().saturating_sub(6), y: area.y + 1, width: 4, height: 1 };
-    f.render_widget(Paragraph::new(Line::from(widgets::lang_button(state))), lang_area);
+    f.render_stateful_widget(
+        Paragraph::new(Line::from(widgets::lang_button(state))),
+        lang_area,
+        &mut ParagraphState::new(),
+    );
 }
 
 // ── Body ──────────────────────────────────────────────────────────────────────
@@ -114,7 +122,7 @@ fn render_title(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
         Line::from(Span::styled(state.t("welcome.title"),    Style::default().fg(Color::White).add_modifier(Modifier::BOLD))),
         Line::from(Span::styled(state.t("welcome.subtitle"), Style::default().fg(Color::DarkGray))),
     ]);
-    f.render_widget(Paragraph::new(text).alignment(Alignment::Center), area);
+    f.render_stateful_widget(Paragraph::new(text).alignment(Alignment::Center), area, &mut ParagraphState::new());
 }
 
 // ── Sysinfo — aligned two-column table inside a bordered box ──────────────────
@@ -144,8 +152,7 @@ fn render_sysinfo(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
         .border_style(Style::default().fg(Color::DarkGray))
         .title(Span::styled(" System ", Style::default().fg(Color::DarkGray)));
 
-    let p = Paragraph::new(Text::from(rows)).block(block);
-    f.render_widget(p, area);
+    f.render_stateful_widget(Paragraph::new(Text::from(rows)).block(block), area, &mut ParagraphState::new());
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -190,27 +197,36 @@ fn render_buttons(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
         .split(area);
 
     let btn1_focused = state.welcome_focus == 0;
-    let btn1 = Paragraph::new(widgets::button_line(btn1_text, btn1_focused, false))
-        .block(Block::default().borders(Borders::ALL).border_style(
-            if btn1_focused { Style::default().fg(Color::Cyan) } else { Style::default().fg(Color::DarkGray) }
-        ))
-        .alignment(Alignment::Center);
-    f.render_widget(btn1, cols[1]);
+    f.render_stateful_widget(
+        Paragraph::new(widgets::button_line(btn1_text, btn1_focused, false))
+            .block(Block::default().borders(Borders::ALL).border_style(
+                if btn1_focused { Style::default().fg(Color::Cyan) } else { Style::default().fg(Color::DarkGray) }
+            ))
+            .alignment(Alignment::Center),
+        cols[1],
+        &mut ParagraphState::new(),
+    );
 
     let btn2_focused = state.welcome_focus == 1;
-    let btn2 = Paragraph::new(widgets::button_line(&btn2_text, btn2_focused, true))
-        .block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::DarkGray)))
-        .alignment(Alignment::Center);
-    f.render_widget(btn2, cols[3]);
+    f.render_stateful_widget(
+        Paragraph::new(widgets::button_line(&btn2_text, btn2_focused, true))
+            .block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::DarkGray)))
+            .alignment(Alignment::Center),
+        cols[3],
+        &mut ParagraphState::new(),
+    );
 }
 
 // ── Hint bar ──────────────────────────────────────────────────────────────────
 
 fn render_hint(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
-    let hint = Paragraph::new(Line::from(Span::styled(
-        state.t("welcome.hint"),
-        Style::default().fg(Color::DarkGray),
-    )))
-    .alignment(Alignment::Center);
-    f.render_widget(hint, area);
+    f.render_stateful_widget(
+        Paragraph::new(Line::from(Span::styled(
+            state.t("welcome.hint"),
+            Style::default().fg(Color::DarkGray),
+        )))
+        .alignment(Alignment::Center),
+        area,
+        &mut ParagraphState::new(),
+    );
 }

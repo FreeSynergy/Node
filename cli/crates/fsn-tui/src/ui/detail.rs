@@ -11,8 +11,9 @@ use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders},
 };
+use rat_widget::paragraph::{Paragraph, ParagraphState};
 
 use crate::ui::render_ctx::RenderCtx;
 
@@ -24,7 +25,7 @@ use crate::ui::widgets;
 
 pub fn render_project_detail(f: &mut RenderCtx<'_>, state: &AppState, area: Rect, slug: &str) {
     let Some(proj) = state.projects.iter().find(|p| p.slug == slug) else {
-        f.render_widget(Paragraph::new("—"), area);
+        f.render_stateful_widget(Paragraph::new("—"), area, &mut ParagraphState::new());
         return;
     };
 
@@ -104,14 +105,14 @@ pub fn render_project_detail(f: &mut RenderCtx<'_>, state: &AppState, area: Rect
     let h_status = health::check_project(&proj.config, &host_projects);
     push_health_lines(&mut lines, &h_status);
 
-    f.render_widget(Paragraph::new(lines), inner);
+    f.render_stateful_widget(Paragraph::new(lines), inner, &mut ParagraphState::new());
 }
 
 // ── Host detail panel ─────────────────────────────────────────────────────────
 
 pub fn render_host_detail(f: &mut RenderCtx<'_>, state: &AppState, area: Rect, slug: &str) {
     let Some(host) = state.hosts.iter().find(|h| h.slug == slug) else {
-        f.render_widget(Paragraph::new("—"), area);
+        f.render_stateful_widget(Paragraph::new("—"), area, &mut ParagraphState::new());
         return;
     };
 
@@ -154,18 +155,18 @@ pub fn render_host_detail(f: &mut RenderCtx<'_>, state: &AppState, area: Rect, s
         ]),
     ];
     lines.extend(health_lines);
-    f.render_widget(Paragraph::new(lines), inner);
+    f.render_stateful_widget(Paragraph::new(lines), inner, &mut ParagraphState::new());
 }
 
 // ── Service detail panel ──────────────────────────────────────────────────────
 
 pub fn render_service_detail(f: &mut RenderCtx<'_>, state: &AppState, area: Rect, svc_name: &str) {
     let Some(proj) = state.projects.get(state.selected_project) else {
-        f.render_widget(Paragraph::new("—"), area);
+        f.render_stateful_widget(Paragraph::new("—"), area, &mut ParagraphState::new());
         return;
     };
     let Some(entry) = proj.config.load.services.get(svc_name) else {
-        f.render_widget(Paragraph::new("—"), area);
+        f.render_stateful_widget(Paragraph::new("—"), area, &mut ParagraphState::new());
         return;
     };
 
@@ -223,7 +224,7 @@ pub fn render_service_detail(f: &mut RenderCtx<'_>, state: &AppState, area: Rect
             Span::styled(env_count.to_string(), Style::default().fg(Color::White)),
         ]),
     ];
-    f.render_widget(Paragraph::new(lines), inner);
+    f.render_stateful_widget(Paragraph::new(lines), inner, &mut ParagraphState::new());
 }
 
 // ── Shared health helpers ──────────────────────────────────────────────────────

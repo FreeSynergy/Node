@@ -100,8 +100,9 @@ fn render_notifications(f: &mut RenderCtx<'_>, state: &AppState) {
         layout::Rect,
         style::{Color, Style},
         text::{Line, Span},
-        widgets::{Clear, Paragraph},
+        widgets::Clear,
     };
+    use rat_widget::paragraph::{Paragraph, ParagraphState};
     use crate::app::NotifKind;
 
     if state.notifications.is_empty() { return; }
@@ -126,12 +127,13 @@ fn render_notifications(f: &mut RenderCtx<'_>, state: &AppState) {
         let toast_area = Rect { x, y, width, height: 1 };
 
         f.render_widget(Clear, toast_area);
-        f.render_widget(
+        f.render_stateful_widget(
             Paragraph::new(Line::from(Span::styled(
                 body,
                 Style::default().fg(Color::Black).bg(color),
             ))),
             toast_area,
+            &mut ParagraphState::new(),
         );
     }
 }
@@ -141,8 +143,9 @@ fn render_new_resource(f: &mut RenderCtx<'_>, state: &AppState) {
         layout::{Alignment, Rect},
         style::{Color, Modifier, Style},
         text::{Line, Span},
-        widgets::{Block, BorderType, Borders, Clear, Paragraph},
+        widgets::{Block, BorderType, Borders, Clear},
     };
+    use rat_widget::paragraph::{Paragraph, ParagraphState};
     use crate::app::{NEW_RESOURCE_ITEMS, OverlayLayer};
 
     let selected = match state.top_overlay() {
@@ -199,9 +202,10 @@ fn render_new_resource(f: &mut RenderCtx<'_>, state: &AppState) {
         Style::default().fg(Color::DarkGray),
     )));
 
-    f.render_widget(
+    f.render_stateful_widget(
         Paragraph::new(lines).alignment(Alignment::Left),
         inner,
+        &mut ParagraphState::new(),
     );
 }
 
@@ -210,8 +214,9 @@ fn render_confirm(f: &mut RenderCtx<'_>, state: &AppState) {
         layout::{Alignment, Rect},
         style::{Color, Modifier, Style},
         text::{Line, Span},
-        widgets::{Block, Borders, Clear, Paragraph},
+        widgets::{Block, Borders, Clear},
     };
+    use rat_widget::paragraph::{Paragraph, ParagraphState};
 
     let Some((msg_key, data, _)) = state.confirm_overlay() else { return };
     // If `data` is present (e.g. service name for delete), show it in the message.
@@ -229,7 +234,7 @@ fn render_confirm(f: &mut RenderCtx<'_>, state: &AppState) {
     };
 
     f.render_widget(Clear, popup);
-    f.render_widget(
+    f.render_stateful_widget(
         Paragraph::new(Line::from(Span::styled(
             display_msg,
             Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
@@ -238,6 +243,7 @@ fn render_confirm(f: &mut RenderCtx<'_>, state: &AppState) {
             .border_style(Style::default().fg(Color::Yellow)))
         .alignment(Alignment::Center),
         popup,
+        &mut ParagraphState::new(),
     );
 }
 
@@ -246,8 +252,9 @@ fn render_deploy(f: &mut RenderCtx<'_>, state: &AppState) {
         layout::{Alignment, Rect},
         style::{Color, Modifier, Style},
         text::{Line, Span},
-        widgets::{Block, Borders, Clear, Paragraph},
+        widgets::{Block, Borders, Clear},
     };
+    use rat_widget::paragraph::{Paragraph, ParagraphState};
 
     let ds = state.overlay_stack.iter().rev().find_map(|o| {
         if let OverlayLayer::Deploy(ref d) = o { Some(d) } else { None }
@@ -291,14 +298,15 @@ fn render_deploy(f: &mut RenderCtx<'_>, state: &AppState) {
                     else { Color::White };
         Line::from(Span::styled(l.as_str(), Style::default().fg(color)))
     }).collect();
-    f.render_widget(Paragraph::new(lines), log_area);
+    f.render_stateful_widget(Paragraph::new(lines), log_area, &mut ParagraphState::new());
 
     // Hint bar at bottom
     let hint_text = if ds.done { state.t("deploy.hint") } else { state.t("deploy.running") };
     let hint_area = Rect { x: inner_area.x, y: inner_area.bottom().saturating_sub(1), width: inner_area.width, height: 1 };
-    f.render_widget(
+    f.render_stateful_widget(
         Paragraph::new(Line::from(Span::styled(hint_text, Style::default().fg(Color::DarkGray))))
             .alignment(Alignment::Center),
         hint_area,
+        &mut ParagraphState::new(),
     );
 }

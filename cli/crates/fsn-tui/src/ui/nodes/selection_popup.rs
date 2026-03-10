@@ -21,8 +21,9 @@ use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Clear, Paragraph},
+    widgets::{Block, BorderType, Borders, Clear},
 };
+use rat_widget::paragraph::{Paragraph, ParagraphState};
 
 use crate::app::Lang;
 use crate::ui::render_ctx::RenderCtx;
@@ -190,9 +191,10 @@ impl SelectionPopup {
             SelectionMode::Multi  => render_checkboxes(f, items_area, options, display_fn, self.pending_idx, &self.multi_checked),
         }
 
-        f.render_widget(
+        f.render_stateful_widget(
             Paragraph::new(Line::from(Span::styled(hint_line, Style::default().fg(Color::DarkGray)))),
             hint_area,
+            &mut ParagraphState::new(),
         );
     }
 }
@@ -238,7 +240,7 @@ fn render_radio(
         Line::from(Span::styled(format!("  {}{}", marker, label), style))
     }).collect();
 
-    f.render_widget(Paragraph::new(lines), area);
+    f.render_stateful_widget(Paragraph::new(lines), area, &mut ParagraphState::new());
 }
 
 // ── Checkbox rendering (multi select) ────────────────────────────────────────
@@ -272,7 +274,7 @@ fn render_checkboxes(
         Line::from(Span::styled(format!("  {}{} {}", prefix, checkbox, label), style))
     }).collect();
 
-    f.render_widget(Paragraph::new(lines), area);
+    f.render_stateful_widget(Paragraph::new(lines), area, &mut ParagraphState::new());
 }
 
 // ── Hint text ─────────────────────────────────────────────────────────────────

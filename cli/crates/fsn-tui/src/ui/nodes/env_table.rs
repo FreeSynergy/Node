@@ -23,8 +23,9 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders},
 };
+use rat_widget::paragraph::{Paragraph, ParagraphState};
 
 use crate::ui::render_ctx::RenderCtx;
 
@@ -254,9 +255,10 @@ impl FormNode for EnvTableNode {
                 } else {
                     Style::default().fg(Color::DarkGray).add_modifier(Modifier::BOLD)
                 };
-                f.render_widget(
+                f.render_stateful_widget(
                     Paragraph::new(Line::from(Span::styled(header_names[ci], style))),
                     Rect { x: col_starts[ci], y: header_y, width: col_widths[ci], height: 1 },
+                    &mut ParagraphState::new(),
                 );
             }
         }
@@ -298,18 +300,19 @@ impl FormNode for EnvTableNode {
                     };
                     Line::from(Span::styled(cell_val.to_string(), style))
                 };
-                f.render_widget(Paragraph::new(line), cell_rect);
+                f.render_stateful_widget(Paragraph::new(line), cell_rect, &mut ParagraphState::new());
             }
         }
 
         // Hint
         if let Some(hk) = self.hint_key {
-            f.render_widget(
+            f.render_stateful_widget(
                 Paragraph::new(Line::from(Span::styled(
                     crate::i18n::t(lang, hk),
                     Style::default().fg(Color::DarkGray),
                 ))),
                 hint_area,
+                &mut ParagraphState::new(),
             );
         }
     }

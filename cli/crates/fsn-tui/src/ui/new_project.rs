@@ -8,8 +8,9 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Tabs},
+    widgets::{Block, Borders},
 };
+use rat_widget::paragraph::{Paragraph, ParagraphState};
 
 use crate::ui::render_ctx::RenderCtx;
 
@@ -58,49 +59,59 @@ fn render_header(f: &mut RenderCtx<'_>, lang: crate::app::Lang, form: &ResourceF
         Span::styled(crate::i18n::t(lang, title_key),
             Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
     ]);
-    let header = Paragraph::new(title)
-        .block(Block::default().borders(Borders::BOTTOM)
-            .border_style(Style::default().fg(Color::DarkGray)));
-    f.render_widget(header, area);
+    f.render_stateful_widget(
+        Paragraph::new(title)
+            .block(Block::default().borders(Borders::BOTTOM)
+                .border_style(Style::default().fg(Color::DarkGray))),
+        area,
+        &mut ParagraphState::new(),
+    );
 
     // Language button top-right
     let lang_area = Rect { x: area.right().saturating_sub(6), y: area.y + 1, width: 4, height: 1 };
-    f.render_widget(
+    f.render_stateful_widget(
         Paragraph::new(Line::from(widgets::lang_button_raw(lang))),
         lang_area,
+        &mut ParagraphState::new(),
     );
 }
 
 // ── Tab bar ───────────────────────────────────────────────────────────────────
 
 pub(crate) fn render_tabs(f: &mut RenderCtx<'_>, lang: crate::app::Lang, form: &ResourceForm, area: Rect) {
-    let tab_titles: Vec<Line> = form.tab_keys.iter().enumerate().map(|(i, &key)| {
+    // Replaced ratatui Tabs with manual span-based rendering.
+    let mut spans: Vec<Span> = vec![];
+    for (i, &key) in form.tab_keys.iter().enumerate() {
         let label       = crate::i18n::t(lang, key);
         let has_missing = form.tab_missing_count(i) > 0;
         let is_active   = i == form.active_tab;
-
+        if i > 0 {
+            spans.push(Span::styled("  ", Style::default().fg(Color::DarkGray)));
+        }
         let text = if has_missing && !is_active {
             format!(" {} ⚠ ", label)
         } else {
             format!(" {} ", label)
         };
-
-        if is_active {
-            Line::from(Span::styled(text,
-                Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD)))
+        let span = if is_active {
+            Span::styled(text, Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD))
         } else if has_missing {
-            Line::from(Span::styled(text, Style::default().fg(Color::Yellow)))
+            Span::styled(text, Style::default().fg(Color::Yellow))
         } else {
-            Line::from(Span::styled(text, Style::default().fg(Color::DarkGray)))
-        }
-    }).collect();
-
-    let tabs = Tabs::new(tab_titles)
-        .block(Block::default().borders(Borders::BOTTOM)
-            .border_style(Style::default().fg(Color::DarkGray)))
-        .select(form.active_tab)
-        .divider(Span::styled("  ", Style::default()));
-    f.render_widget(tabs, area);
+            Span::styled(text, Style::default().fg(Color::DarkGray))
+        };
+        spans.push(span);
+    }
+    let block = Block::default()
+        .borders(Borders::BOTTOM)
+        .border_style(Style::default().fg(Color::DarkGray));
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+    f.render_stateful_widget(
+        Paragraph::new(Line::from(spans)),
+        inner,
+        &mut ParagraphState::new(),
+    );
 }
 
 // ── Form fields ───────────────────────────────────────────────────────────────
@@ -132,13 +143,16 @@ pub(crate) fn render_fields(f: &mut RenderCtx<'_>, form: &mut ResourceForm, inne
             let missing  = form.missing_required();
             let disabled = !missing.is_empty();
             let submit_key = if form.edit_id.is_some() { "form.submit.edit" } else { form.kind.submit_key() };
-            let btn = Paragraph::new(widgets::button_line(crate::i18n::t(lang, submit_key), true, disabled))
-                .block(Block::default().borders(Borders::ALL).border_style(
-                    if disabled { Style::default().fg(Color::DarkGray) }
-                    else        { Style::default().fg(Color::Green) }
-                ))
-                .alignment(Alignment::Center);
-            f.render_widget(btn, btn_area);
+            f.render_stateful_widget(
+                Paragraph::new(widgets::button_line(crate::i18n::t(lang, submit_key), true, disabled))
+                    .block(Block::default().borders(Borders::ALL).border_style(
+                        if disabled { Style::default().fg(Color::DarkGray) }
+                        else        { Style::default().fg(Color::Green) }
+                    ))
+                    .alignment(Alignment::Center),
+                btn_area,
+                &mut ParagraphState::new(),
+            );
         }
     }
 
@@ -165,20 +179,21 @@ pub(crate) fn render_error(f: &mut RenderCtx<'_>, lang: crate::app::Lang, form: 
             ),
             Span::styled(err.as_str(), Style::default().fg(color)),
         ]);
-        f.render_widget(Paragraph::new(line), area);
+        f.render_stateful_widget(Paragraph::new(line), area, &mut ParagraphState::new());
     } else if form.touched {
         // Live validation hint: show remaining required fields count.
         let missing = form.missing_required();
         if missing.is_empty() {
-            f.render_widget(
+            f.render_stateful_widget(
                 Paragraph::new(Line::from(Span::styled(
                     format!("  {}", crate::i18n::t(lang, "form.all_required_filled")),
                     Style::default().fg(Color::Green),
                 ))),
                 area,
+                &mut ParagraphState::new(),
             );
         } else {
-            f.render_widget(
+            f.render_stateful_widget(
                 Paragraph::new(Line::from(vec![
                     Span::styled("  ⚠ ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
                     Span::styled(
@@ -187,15 +202,17 @@ pub(crate) fn render_error(f: &mut RenderCtx<'_>, lang: crate::app::Lang, form: 
                     ),
                 ])),
                 area,
+                &mut ParagraphState::new(),
             );
         }
     } else {
-        f.render_widget(
+        f.render_stateful_widget(
             Paragraph::new(Line::from(Span::styled(
                 crate::i18n::t(lang, "form.required"),
                 Style::default().fg(Color::DarkGray),
             ))),
             area,
+            &mut ParagraphState::new(),
         );
     }
 }
@@ -215,5 +232,5 @@ fn render_hint(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
             Style::default().fg(if state.help_visible { Color::Cyan } else { Color::DarkGray }),
         ),
     ]);
-    f.render_widget(Paragraph::new(line).alignment(Alignment::Center), area);
+    f.render_stateful_widget(Paragraph::new(line).alignment(Alignment::Center), area, &mut ParagraphState::new());
 }

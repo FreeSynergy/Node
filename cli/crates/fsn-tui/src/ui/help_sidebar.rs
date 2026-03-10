@@ -13,8 +13,9 @@ use ratatui::{
     layout::{Alignment, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Paragraph, Wrap},
+    widgets::{Block, BorderType, Borders, Wrap},
 };
+use rat_widget::paragraph::{Paragraph, ParagraphState};
 
 use crate::ui::render_ctx::RenderCtx;
 
@@ -216,10 +217,11 @@ pub fn render_help_sidebar(f: &mut RenderCtx<'_>, area: Rect, sections: &[HelpSe
         Style::default().fg(Color::DarkGray),
     )));
 
-    f.render_widget(
+    f.render_stateful_widget(
         Paragraph::new(lines)
             .wrap(Wrap { trim: true })
             .alignment(Alignment::Left),
         inner,
+        &mut ParagraphState::new(),
     );
 }

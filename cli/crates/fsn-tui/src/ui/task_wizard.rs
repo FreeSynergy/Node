@@ -18,8 +18,9 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders},
 };
+use rat_widget::paragraph::{Paragraph, ParagraphState};
 
 use crate::ui::render_ctx::RenderCtx;
 
@@ -86,15 +87,19 @@ fn render_header(f: &mut RenderCtx<'_>, lang: Lang, area: Rect) {
         Span::styled(crate::i18n::t(lang, "wizard.title"),
             Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
     ]);
-    let header = Paragraph::new(title)
-        .block(Block::default().borders(Borders::BOTTOM)
-            .border_style(Style::default().fg(Color::DarkGray)));
-    f.render_widget(header, area);
+    f.render_stateful_widget(
+        Paragraph::new(title)
+            .block(Block::default().borders(Borders::BOTTOM)
+                .border_style(Style::default().fg(Color::DarkGray))),
+        area,
+        &mut ParagraphState::new(),
+    );
 
     let lang_area = Rect { x: area.right().saturating_sub(6), y: area.y + 1, width: 4, height: 1 };
-    f.render_widget(
+    f.render_stateful_widget(
         Paragraph::new(Line::from(widgets::lang_button_raw(lang))),
         lang_area,
+        &mut ParagraphState::new(),
     );
 }
 
@@ -136,7 +141,7 @@ fn render_task_bar(f: &mut RenderCtx<'_>, queue: &crate::task_queue::TaskQueue, 
         spans.push(Span::styled("  ", Style::default())); // gap between tabs
     }
 
-    f.render_widget(Paragraph::new(Line::from(spans)), inner);
+    f.render_stateful_widget(Paragraph::new(Line::from(spans)), inner, &mut ParagraphState::new());
 }
 
 // ── Hint bar ──────────────────────────────────────────────────────────────────
@@ -151,5 +156,5 @@ fn render_hint(f: &mut RenderCtx<'_>, ctrl_hint: bool, help_visible: bool, lang:
             Style::default().fg(if help_visible { Color::Cyan } else { Color::DarkGray }),
         ),
     ]);
-    f.render_widget(Paragraph::new(line).alignment(Alignment::Center), area);
+    f.render_stateful_widget(Paragraph::new(line).alignment(Alignment::Center), area, &mut ParagraphState::new());
 }
