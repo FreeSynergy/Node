@@ -9,14 +9,15 @@ use ratatui::{
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Tabs},
-    Frame,
 };
+
+use crate::ui::render_ctx::RenderCtx;
 
 use crate::app::{AppState, ResourceForm};
 use crate::resource_form::FormErrorKind;
 use crate::ui::widgets;
 
-pub fn render(f: &mut Frame, state: &mut AppState, area: Rect) {
+pub fn render(f: &mut RenderCtx<'_>, state: &mut AppState, area: Rect) {
     let Some(ref mut form) = state.current_form else { return };
 
     let outer = Layout::default()
@@ -47,7 +48,7 @@ pub fn render(f: &mut Frame, state: &mut AppState, area: Rect) {
 
 // ── Header ────────────────────────────────────────────────────────────────────
 
-fn render_header(f: &mut Frame, lang: crate::app::Lang, form: &ResourceForm, area: Rect) {
+fn render_header(f: &mut RenderCtx<'_>, lang: crate::app::Lang, form: &ResourceForm, area: Rect) {
     let title_key = form.title_key();
 
     let title = Line::from(vec![
@@ -72,7 +73,7 @@ fn render_header(f: &mut Frame, lang: crate::app::Lang, form: &ResourceForm, are
 
 // ── Tab bar ───────────────────────────────────────────────────────────────────
 
-pub(crate) fn render_tabs(f: &mut Frame, lang: crate::app::Lang, form: &ResourceForm, area: Rect) {
+pub(crate) fn render_tabs(f: &mut RenderCtx<'_>, lang: crate::app::Lang, form: &ResourceForm, area: Rect) {
     let tab_titles: Vec<Line> = form.tab_keys.iter().enumerate().map(|(i, &key)| {
         let label       = crate::i18n::t(lang, key);
         let has_missing = form.tab_missing_count(i) > 0;
@@ -104,7 +105,7 @@ pub(crate) fn render_tabs(f: &mut Frame, lang: crate::app::Lang, form: &Resource
 
 // ── Form fields ───────────────────────────────────────────────────────────────
 
-pub(crate) fn render_fields(f: &mut Frame, form: &mut ResourceForm, inner: Rect, lang: crate::app::Lang) {
+pub(crate) fn render_fields(f: &mut RenderCtx<'_>, form: &mut ResourceForm, inner: Rect, lang: crate::app::Lang) {
     let tab_indices = form.current_tab_indices();
     
 
@@ -155,7 +156,7 @@ pub(crate) fn render_fields(f: &mut Frame, form: &mut ResourceForm, inner: Rect,
 
 // ── Error line ────────────────────────────────────────────────────────────────
 
-pub(crate) fn render_error(f: &mut Frame, lang: crate::app::Lang, form: &ResourceForm, area: Rect) {
+pub(crate) fn render_error(f: &mut RenderCtx<'_>, lang: crate::app::Lang, form: &ResourceForm, area: Rect) {
     if let Some(ref err) = form.error {
         let (icon, color) = match form.error_kind {
             FormErrorKind::Validation => ("⚠ ", Color::Yellow),
@@ -205,7 +206,7 @@ pub(crate) fn render_error(f: &mut Frame, lang: crate::app::Lang, form: &Resourc
 
 // ── Hint bar ──────────────────────────────────────────────────────────────────
 
-fn render_hint(f: &mut Frame, state: &AppState, area: Rect) {
+fn render_hint(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
     let key = if state.ctrl_hint { "form.hint.ctrl" } else { "form.hint" };
     let hint_text = state.t(key);
     let _f1_label = state.t("help.title");

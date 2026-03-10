@@ -14,8 +14,9 @@ use ratatui::{
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, Paragraph, Wrap},
-    Frame,
 };
+
+use crate::ui::render_ctx::RenderCtx;
 
 use crate::app::{Lang, ResourceKind, Screen};
 
@@ -152,7 +153,7 @@ pub fn build_help(
 /// Render the help sidebar into `area`.
 ///
 /// Called after the main content is rendered so the sidebar appears to the right.
-pub fn render_help_sidebar(f: &mut Frame, area: Rect, sections: &[HelpSection], lang: Lang) {
+pub fn render_help_sidebar(f: &mut RenderCtx<'_>, area: Rect, sections: &[HelpSection], lang: Lang) {
     let title = format!(" {} ", crate::i18n::t(lang, "help.title"));
 
     let block = Block::default()

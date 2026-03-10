@@ -9,8 +9,9 @@ use ratatui::{
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear},
-    Frame,
 };
+
+use crate::ui::render_ctx::RenderCtx;
 
 use crate::app::{run_state_i18n, AppState, RunState};
 
@@ -64,7 +65,7 @@ pub fn popup_area(percent_x: u16, percent_y: u16, area: Rect) -> Rect {
 }
 
 /// Draw a clear + bordered block at `area` (used for overlays).
-pub fn clear_block(f: &mut Frame, area: Rect, title: &str) {
+pub fn clear_block(f: &mut RenderCtx<'_>, area: Rect, title: &str) {
     f.render_widget(Clear, area);
     let block = Block::default()
         .borders(Borders::ALL)

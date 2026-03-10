@@ -24,8 +24,9 @@ use ratatui::{
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
-    Frame,
 };
+
+use crate::ui::render_ctx::RenderCtx;
 
 use crate::app::Lang;
 use crate::ui::form_node::{handle_form_nav, FormAction, FormNode};
@@ -203,7 +204,7 @@ impl FormNode for EnvTableNode {
     /// Block(borders=2 + header=1 + rows=N) + hint=1.
     fn preferred_height(&self) -> u16 { self.visible_rows + 4 }
 
-    fn render(&mut self, f: &mut Frame, area: Rect, focused: bool, lang: Lang) {
+    fn render(&mut self, f: &mut RenderCtx<'_>, area: Rect, focused: bool, lang: Lang) {
         self.set_rect(area);
         if focused { self.update_scroll(); }
 

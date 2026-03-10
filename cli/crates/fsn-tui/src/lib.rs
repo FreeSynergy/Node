@@ -28,18 +28,11 @@ pub mod task_queue;
 pub mod ui;
 
 use std::collections::HashMap;
-use std::io;
 use std::path::Path;
 use std::sync::mpsc;
 use std::time::Duration;
 
 use anyhow::Result;
-use crossterm::{
-    event::{DisableMouseCapture, EnableMouseCapture},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-};
-use ratatui::{backend::CrosstermBackend, Terminal};
 
 use app::AppState;
 use handles::{HostHandle, ProjectHandle, RunState, ServiceHandle};
@@ -111,6 +104,7 @@ fn podman_container_statuses() -> HashMap<String, RunState> {
 }
 
 /// Start the TUI. Blocks until the user quits.
+/// Terminal setup (raw mode, alternate screen, mouse capture) is managed by rat-salsa.
 pub fn run(root: &Path) -> Result<()> {
     let sysinfo  = SysInfo::collect();
     let projects = load_projects(root);
@@ -120,7 +114,7 @@ pub fn run(root: &Path) -> Result<()> {
     let store_index = fsn_engine::store::StoreClient::load_bundled(&root.join("modules"));
     state.store_entries = store_index.modules;
 
-    // Load hosts for the first selected project
+    // Load hosts for the first selected project.
     if let Some(proj) = state.projects.first() {
         let project_dir = root.join("projects").join(&proj.slug);
         state.hosts = load_hosts(&project_dir);
@@ -136,7 +130,6 @@ pub fn run(root: &Path) -> Result<()> {
     }
 
     // Fetch fresh store index from HTTP in the background.
-    // Updates store_entries when done so the wizard has up-to-date options.
     let store_fetcher_rx = if state.settings.stores.iter().any(|s| s.enabled) {
         Some(spawn_store_fetcher(state.settings.clone()))
     } else {
@@ -145,21 +138,10 @@ pub fn run(root: &Path) -> Result<()> {
     state.store_rx = store_fetcher_rx;
 
     // Start background reconciler (polls Podman every 5 seconds).
-    let reconcile_rx = spawn_reconciler(Duration::from_secs(5));
+    // The receiver lives in AppState so the rat-salsa Tick handler can drain it.
+    state.reconcile_rx = Some(spawn_reconciler(Duration::from_secs(5)));
 
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-
-    let result = app::run_loop(&mut terminal, &mut state, root, reconcile_rx);
-
-    disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen, DisableMouseCapture)?;
-    terminal.show_cursor()?;
-
-    result
+    app::run_salsa(root.to_path_buf(), &mut state)
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

@@ -18,12 +18,13 @@ use ratatui::{
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, Paragraph},
-    Frame,
 };
+
+use crate::ui::render_ctx::RenderCtx;
 
 use crate::app::AppState;
 
-pub fn render(f: &mut Frame, state: &AppState, area: Rect) {
+pub fn render(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
     // Outer block
     let block = Block::default()
         .title(Span::styled(
@@ -47,7 +48,7 @@ pub fn render(f: &mut Frame, state: &AppState, area: Rect) {
     render_hint(f, state, chunks[1]);
 }
 
-fn render_store_list(f: &mut Frame, state: &AppState, area: Rect) {
+fn render_store_list(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
     let stores = &state.settings.stores;
 
     if stores.is_empty() {
@@ -99,7 +100,7 @@ fn render_store_list(f: &mut Frame, state: &AppState, area: Rect) {
     f.render_widget(Paragraph::new(lines), area);
 }
 
-fn render_hint(f: &mut Frame, state: &AppState, area: Rect) {
+fn render_hint(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
     f.render_widget(
         Paragraph::new(Line::from(Span::styled(
             state.t("settings.hint"),

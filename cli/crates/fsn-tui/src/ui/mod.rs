@@ -16,21 +16,22 @@ pub mod help_sidebar;
 pub mod logs;
 pub mod new_project;
 pub mod nodes;
+pub mod render_ctx;
 pub mod settings_screen;
 pub mod task_wizard;
 pub mod welcome;
 pub mod widgets;
 
-use ratatui::layout::{Constraint, Direction, Layout};
-use ratatui::Frame;
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use crate::app::{AppState, OverlayLayer, Screen};
+use render_ctx::RenderCtx;
 
 // ── OverlayLayer rendering — each variant renders itself ──────────────────────
 
 impl OverlayLayer {
     /// Render this overlay layer on top of the main content.
     /// Analogous to `Element::render()` — the caller just iterates the stack.
-    fn render(&self, f: &mut Frame, state: &AppState) {
+    fn render(&self, f: &mut RenderCtx<'_>, state: &AppState) {
         match self {
             OverlayLayer::Logs(_)            => logs::render(f, state),
             OverlayLayer::Confirm { .. }     => render_confirm(f, state),
@@ -40,43 +41,20 @@ impl OverlayLayer {
     }
 }
 
-pub fn render(f: &mut Frame, state: &mut AppState) {
+pub fn render(f: &mut RenderCtx<'_>, state: &mut AppState) {
     let full = f.area();
 
-    // Horizontal split: main content | help sidebar (when visible)
-    let (main_area, help_area) = if state.help_visible && full.width > help_sidebar::SIDEBAR_WIDTH + 20 {
-        let chunks = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([
-                Constraint::Min(20),
-                Constraint::Length(help_sidebar::SIDEBAR_WIDTH),
-            ])
-            .split(full);
-        (chunks[0], Some(chunks[1]))
-    } else {
-        (full, None)
-    };
-
+    // Dashboard handles F1 help panel internally (body-area only).
+    // All other screens use a full-screen horizontal split when help is visible.
     match state.screen {
-        Screen::Welcome    => welcome::render(f, state, main_area),
-        Screen::Dashboard  => dashboard::render(f, state, main_area),
-        Screen::NewProject => new_project::render(f, state, main_area),
-        Screen::TaskWizard => task_wizard::render(f, state, main_area),
-        Screen::Settings   => settings_screen::render(f, state, main_area),
-    }
-
-    // Help sidebar rendered after main content so it appears on top at the border
-    if let Some(area) = help_area {
-        let kind     = state.current_form.as_ref().map(|f| f.kind);
-        let foc_key  = state.current_form.as_ref()
-            .and_then(|f| f.focused_node())
-            .map(|n| n.key());
-        let sections = help_sidebar::build_help(state.screen, kind, foc_key, state.lang);
-        help_sidebar::render_help_sidebar(f, area, &sections, state.lang);
+        Screen::Dashboard  => dashboard::render(f, state, full),
+        Screen::Welcome    => render_with_help(f, state, full, |f, s, a| welcome::render(f, s, a)),
+        Screen::NewProject => render_with_help(f, state, full, |f, s, a| new_project::render(f, s, a)),
+        Screen::TaskWizard => render_with_help(f, state, full, |f, s, a| task_wizard::render(f, s, a)),
+        Screen::Settings   => render_with_help(f, state, full, |f, s, a| settings_screen::render(f, s, a)),
     }
 
     // Overlay layers drawn on top (Ebene system).
-    // Each layer renders itself — no external dispatch needed.
     for layer in &state.overlay_stack {
         layer.render(f, state);
     }
@@ -85,9 +63,39 @@ pub fn render(f: &mut Frame, state: &mut AppState) {
     render_notifications(f, state);
 }
 
+/// Renders a non-dashboard screen with the optional full-screen help sidebar.
+fn render_with_help<R>(f: &mut RenderCtx<'_>, state: &mut AppState, area: Rect, render_fn: R)
+where
+    R: FnOnce(&mut RenderCtx<'_>, &mut AppState, Rect),
+{
+    let (main_area, help_area) = if state.help_visible && area.width > help_sidebar::SIDEBAR_WIDTH + 20 {
+        let chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Min(20),
+                Constraint::Length(help_sidebar::SIDEBAR_WIDTH),
+            ])
+            .split(area);
+        (chunks[0], Some(chunks[1]))
+    } else {
+        (area, None)
+    };
+
+    render_fn(f, state, main_area);
+
+    if let Some(help_area) = help_area {
+        let kind    = state.current_form.as_ref().map(|f| f.kind);
+        let foc_key = state.current_form.as_ref()
+            .and_then(|f| f.focused_node())
+            .map(|n| n.key());
+        let sections = help_sidebar::build_help(state.screen, kind, foc_key, state.lang);
+        help_sidebar::render_help_sidebar(f, help_area, &sections, state.lang);
+    }
+}
+
 // ── Toast notifications ───────────────────────────────────────────────────────
 
-fn render_notifications(f: &mut Frame, state: &AppState) {
+fn render_notifications(f: &mut RenderCtx<'_>, state: &AppState) {
     use ratatui::{
         layout::Rect,
         style::{Color, Style},
@@ -128,7 +136,7 @@ fn render_notifications(f: &mut Frame, state: &AppState) {
     }
 }
 
-fn render_new_resource(f: &mut Frame, state: &AppState) {
+fn render_new_resource(f: &mut RenderCtx<'_>, state: &AppState) {
     use ratatui::{
         layout::{Alignment, Rect},
         style::{Color, Modifier, Style},
@@ -197,7 +205,7 @@ fn render_new_resource(f: &mut Frame, state: &AppState) {
     );
 }
 
-fn render_confirm(f: &mut Frame, state: &AppState) {
+fn render_confirm(f: &mut RenderCtx<'_>, state: &AppState) {
     use ratatui::{
         layout::{Alignment, Rect},
         style::{Color, Modifier, Style},
@@ -233,7 +241,7 @@ fn render_confirm(f: &mut Frame, state: &AppState) {
     );
 }
 
-fn render_deploy(f: &mut Frame, state: &AppState) {
+fn render_deploy(f: &mut RenderCtx<'_>, state: &AppState) {
     use ratatui::{
         layout::{Alignment, Rect},
         style::{Color, Modifier, Style},

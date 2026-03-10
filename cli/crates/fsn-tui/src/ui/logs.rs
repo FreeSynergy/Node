@@ -5,13 +5,14 @@ use ratatui::{
     style::{Color, Style},
     text::{Line, Span},
     widgets::Paragraph,
-    Frame,
 };
+
+use crate::ui::render_ctx::RenderCtx;
 
 use crate::app::AppState;
 use crate::ui::widgets;
 
-pub fn render(f: &mut Frame, state: &AppState) {
+pub fn render(f: &mut RenderCtx<'_>, state: &AppState) {
     let Some(ref logs) = state.logs_overlay() else { return };
 
     let area = f.area();

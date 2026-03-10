@@ -19,9 +19,10 @@
 //   fn to_json(&self, lang: Lang) -> serde_json::Value
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use ratatui::{layout::Rect, Frame};
+use ratatui::layout::Rect;
 
 use crate::app::Lang;
+use crate::ui::render_ctx::RenderCtx;
 
 // ── Common navigation helper ──────────────────────────────────────────────────
 
@@ -122,12 +123,12 @@ pub trait FormNode: std::fmt::Debug {
 
     /// Render the field (label-in-title + input box + hint) into `area`.
     /// Must call `self.set_rect(area)` so hit-testing works.
-    fn render(&mut self, f: &mut Frame, area: Rect, focused: bool, lang: Lang);
+    fn render(&mut self, f: &mut RenderCtx<'_>, area: Rect, focused: bool, lang: Lang);
 
     /// Render a floating overlay (e.g., dropdown list) below the input box.
     /// Called *after* all fields are rendered so the overlay appears on top.
     /// Default: no-op (text inputs have no overlay).
-    fn render_overlay(&mut self, _f: &mut Frame, _available: Rect, _lang: Lang) {}
+    fn render_overlay(&mut self, _f: &mut RenderCtx<'_>, _available: Rect, _lang: Lang) {}
 
     /// Handle a mouse click that may land on this field's overlay (e.g., dropdown).
     /// Returns `true` when the click was consumed.

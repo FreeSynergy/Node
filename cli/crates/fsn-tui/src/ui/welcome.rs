@@ -27,13 +27,14 @@ use ratatui::{
     style::{Color, Modifier, Style},
     text::{Line, Span, Text},
     widgets::{Block, Borders, Paragraph},
-    Frame,
 };
+
+use crate::ui::render_ctx::RenderCtx;
 
 use crate::app::AppState;
 use crate::ui::widgets;
 
-pub fn render(f: &mut Frame, state: &mut AppState, area: ratatui::layout::Rect) {
+pub fn render(f: &mut RenderCtx<'_>, state: &mut AppState, area: ratatui::layout::Rect) {
 
     let outer = Layout::default()
         .direction(Direction::Vertical)
@@ -51,7 +52,7 @@ pub fn render(f: &mut Frame, state: &mut AppState, area: ratatui::layout::Rect) 
 
 // ── Header ────────────────────────────────────────────────────────────────────
 
-fn render_header(f: &mut Frame, state: &AppState, area: Rect) {
+fn render_header(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
     let build_info = format!(
         " v{} · {} ({})",
         env!("CARGO_PKG_VERSION"),
@@ -77,7 +78,7 @@ fn render_header(f: &mut Frame, state: &AppState, area: Rect) {
 
 // ── Body ──────────────────────────────────────────────────────────────────────
 
-fn render_body(f: &mut Frame, state: &AppState, area: Rect) {
+fn render_body(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
     // Center the content at a fixed max width so it doesn't stretch across the full screen
     let cols = Layout::default()
         .direction(Direction::Horizontal)
@@ -108,7 +109,7 @@ fn render_body(f: &mut Frame, state: &AppState, area: Rect) {
     render_buttons(f, state, rows[5]);
 }
 
-fn render_title(f: &mut Frame, state: &AppState, area: Rect) {
+fn render_title(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
     let text = Text::from(vec![
         Line::from(Span::styled(state.t("welcome.title"),    Style::default().fg(Color::White).add_modifier(Modifier::BOLD))),
         Line::from(Span::styled(state.t("welcome.subtitle"), Style::default().fg(Color::DarkGray))),
@@ -118,7 +119,7 @@ fn render_title(f: &mut Frame, state: &AppState, area: Rect) {
 
 // ── Sysinfo — aligned two-column table inside a bordered box ──────────────────
 
-fn render_sysinfo(f: &mut Frame, state: &AppState, area: Rect) {
+fn render_sysinfo(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
     let s = &state.sysinfo;
 
     // Fixed column widths for perfect alignment:
@@ -166,7 +167,7 @@ fn sysinfo_row(
 
 // ── Buttons ───────────────────────────────────────────────────────────────────
 
-fn render_buttons(f: &mut Frame, state: &AppState, area: Rect) {
+fn render_buttons(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
     let btn1_text = state.t("welcome.new_project");
     let btn2_text = format!("{} {}", state.t("welcome.open_project"), state.t("welcome.open_disabled"));
 
@@ -205,7 +206,7 @@ fn render_buttons(f: &mut Frame, state: &AppState, area: Rect) {
 
 // ── Hint bar ──────────────────────────────────────────────────────────────────
 
-fn render_hint(f: &mut Frame, state: &AppState, area: Rect) {
+fn render_hint(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
     let hint = Paragraph::new(Line::from(Span::styled(
         state.t("welcome.hint"),
         Style::default().fg(Color::DarkGray),

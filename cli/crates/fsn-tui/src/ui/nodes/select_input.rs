@@ -13,8 +13,9 @@ use ratatui::{
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, List, ListItem, Paragraph},
-    Frame,
 };
+
+use crate::ui::render_ctx::RenderCtx;
 
 use crate::app::Lang;
 use crate::ui::form_node::{handle_form_nav, FormAction, FormNode};
@@ -133,7 +134,7 @@ impl FormNode for SelectInputNode {
 
     fn preferred_height(&self) -> u16 { 4 }
 
-    fn render(&mut self, f: &mut Frame, area: Rect, focused: bool, lang: Lang) {
+    fn render(&mut self, f: &mut RenderCtx<'_>, area: Rect, focused: bool, lang: Lang) {
         self.set_rect(area);
 
         let rows = Layout::default()
@@ -191,7 +192,7 @@ impl FormNode for SelectInputNode {
     }
 
     /// Render the dropdown — only when `is_open`.
-    fn render_overlay(&mut self, f: &mut Frame, available: Rect, _lang: Lang) {
+    fn render_overlay(&mut self, f: &mut RenderCtx<'_>, available: Rect, _lang: Lang) {
         if !self.is_open { return; }
         let Some(dropdown) = self.dropdown_rect(available) else { return };
 

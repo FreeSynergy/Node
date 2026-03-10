@@ -19,14 +19,15 @@ use ratatui::{
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
-    Frame,
 };
+
+use crate::ui::render_ctx::RenderCtx;
 
 use crate::app::{AppState, Lang};
 use crate::task_queue::TaskState;
 use crate::ui::widgets;
 
-pub fn render(f: &mut Frame, state: &mut AppState, area: Rect) {
+pub fn render(f: &mut RenderCtx<'_>, state: &mut AppState, area: Rect) {
     let Some(ref _queue) = state.task_queue else { return };
 
     let outer = Layout::default()
@@ -77,7 +78,7 @@ pub fn render(f: &mut Frame, state: &mut AppState, area: Rect) {
 
 // ── Header ────────────────────────────────────────────────────────────────────
 
-fn render_header(f: &mut Frame, lang: Lang, area: Rect) {
+fn render_header(f: &mut RenderCtx<'_>, lang: Lang, area: Rect) {
     let title = Line::from(vec![
         Span::styled(" FreeSynergy.Node ",
             Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
@@ -99,7 +100,7 @@ fn render_header(f: &mut Frame, lang: Lang, area: Rect) {
 
 // ── Task tab bar ──────────────────────────────────────────────────────────────
 
-fn render_task_bar(f: &mut Frame, queue: &crate::task_queue::TaskQueue, lang: Lang, area: Rect) {
+fn render_task_bar(f: &mut RenderCtx<'_>, queue: &crate::task_queue::TaskQueue, lang: Lang, area: Rect) {
     let inner = Block::default()
         .borders(Borders::BOTTOM)
         .border_style(Style::default().fg(Color::DarkGray))
@@ -140,7 +141,7 @@ fn render_task_bar(f: &mut Frame, queue: &crate::task_queue::TaskQueue, lang: La
 
 // ── Hint bar ──────────────────────────────────────────────────────────────────
 
-fn render_hint(f: &mut Frame, ctrl_hint: bool, help_visible: bool, lang: Lang, area: Rect) {
+fn render_hint(f: &mut RenderCtx<'_>, ctrl_hint: bool, help_visible: bool, lang: Lang, area: Rect) {
     let key = if ctrl_hint { "form.hint.ctrl" } else { "wizard.hint" };
     let line = Line::from(vec![
         Span::styled(crate::i18n::t(lang, key), Style::default().fg(Color::DarkGray)),

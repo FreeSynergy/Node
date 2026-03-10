@@ -10,8 +10,13 @@ fsn-form   = { workspace = true }
 fsn-core   = { workspace = true }
 fsn-engine = { workspace = true }
 fsn-podman = { workspace = true }
-ratatui    = { workspace = true }
-crossterm  = { workspace = true }
+ratatui       = { workspace = true }
+crossterm     = { workspace = true }
+rat-salsa     = { workspace = true }
+rat-widget    = { workspace = true }
+rat-menu      = { workspace = true }
+rat-theme4    = { workspace = true }
+tui-big-text  = { workspace = true }
 sysinfo    = { workspace = true }
 anyhow     = { workspace = true }
 tokio      = { workspace = true }

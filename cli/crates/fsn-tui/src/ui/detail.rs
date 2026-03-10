@@ -12,8 +12,9 @@ use ratatui::{
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
-    Frame,
 };
+
+use crate::ui::render_ctx::RenderCtx;
 
 use fsn_core::health::{self, HealthLevel};
 use crate::app::{AppState, RunState};
@@ -21,7 +22,7 @@ use crate::ui::widgets;
 
 // ── Project detail panel ──────────────────────────────────────────────────────
 
-pub fn render_project_detail(f: &mut Frame, state: &AppState, area: Rect, slug: &str) {
+pub fn render_project_detail(f: &mut RenderCtx<'_>, state: &AppState, area: Rect, slug: &str) {
     let Some(proj) = state.projects.iter().find(|p| p.slug == slug) else {
         f.render_widget(Paragraph::new("—"), area);
         return;
@@ -108,7 +109,7 @@ pub fn render_project_detail(f: &mut Frame, state: &AppState, area: Rect, slug: 
 
 // ── Host detail panel ─────────────────────────────────────────────────────────
 
-pub fn render_host_detail(f: &mut Frame, state: &AppState, area: Rect, slug: &str) {
+pub fn render_host_detail(f: &mut RenderCtx<'_>, state: &AppState, area: Rect, slug: &str) {
     let Some(host) = state.hosts.iter().find(|h| h.slug == slug) else {
         f.render_widget(Paragraph::new("—"), area);
         return;
@@ -158,7 +159,7 @@ pub fn render_host_detail(f: &mut Frame, state: &AppState, area: Rect, slug: &st
 
 // ── Service detail panel ──────────────────────────────────────────────────────
 
-pub fn render_service_detail(f: &mut Frame, state: &AppState, area: Rect, svc_name: &str) {
+pub fn render_service_detail(f: &mut RenderCtx<'_>, state: &AppState, area: Rect, svc_name: &str) {
     let Some(proj) = state.projects.get(state.selected_project) else {
         f.render_widget(Paragraph::new("—"), area);
         return;

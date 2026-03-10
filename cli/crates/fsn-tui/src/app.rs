@@ -1,14 +1,8 @@
 // Application state and main event loop.
 
 use std::collections::{HashMap, HashSet};
-use std::path::Path;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
-
-use anyhow::Result;
-use crossterm::event::{self, Event};
-use ratatui::Terminal;
-use ratatui::backend::CrosstermBackend;
 
 use fsn_core::config::AppSettings;
 use fsn_core::health::{self, HealthLevel};
@@ -16,7 +10,6 @@ use fsn_core::resource::Resource;
 use fsn_core::store::StoreEntry;
 
 use crate::sysinfo::SysInfo;
-use crate::ui;
 
 // Re-export all handle and form types so existing `use crate::app::*` imports keep working.
 pub use crate::handles::{HostHandle, ProjectHandle, RunState, ServiceHandle, ServiceRow, run_state_i18n};
@@ -213,6 +206,8 @@ pub struct AppState {
     last_refresh:             Instant,
     pub last_podman_statuses: HashMap<String, RunState>,
     pub deploy_rx:            Option<mpsc::Receiver<DeployMsg>>,
+    /// Background reconciler — receives Podman container status maps every ~5 s.
+    pub reconcile_rx:         Option<mpsc::Receiver<HashMap<String, RunState>>>,
     /// Background store fetcher — receives fresh entries after HTTP fetch completes.
     pub store_rx:             Option<mpsc::Receiver<Vec<fsn_core::store::StoreEntry>>>,
     pub task_queue:           Option<crate::task_queue::TaskQueue>,
@@ -241,6 +236,7 @@ impl AppState {
             last_refresh: Instant::now(),
             last_podman_statuses: HashMap::new(),
             deploy_rx: None,
+            reconcile_rx: None,
             store_rx: None,
             task_queue: None,
             settings: AppSettings::load().unwrap_or_default(),
@@ -432,63 +428,151 @@ impl AppState {
     }
 }
 
-// ── Main loop ─────────────────────────────────────────────────────────────────
+// ── rat-salsa event loop ──────────────────────────────────────────────────────
+//
+// Design: thin wrappers that forward to the existing event/render modules.
+// AppGlobal carries root path so fn-pointer callbacks can access it.
+// AppEvent wraps crossterm events + a periodic tick for channel polling.
 
-pub fn run_loop(
-    terminal:     &mut Terminal<CrosstermBackend<std::io::Stdout>>,
-    state:        &mut AppState,
-    root:         &Path,
-    reconcile_rx: mpsc::Receiver<HashMap<String, RunState>>,
-) -> Result<()> {
-    const POLL_MS:      u64 = 250;
-    const REFRESH_SECS: u64 = 5;
+use std::path::PathBuf;
 
-    loop {
-        terminal.draw(|f| ui::render(f, state))?;
+use rat_salsa::{Control, RunConfig, SalsaAppContext, SalsaContext, run_tui};
+use rat_salsa::poll::{PollCrossterm, PollTimers};
+use rat_salsa::timer::{TimeOut, TimerDef};
 
-        if event::poll(Duration::from_millis(POLL_MS))? {
-            match event::read()? {
-                Event::Key(key)     => crate::events::handle(key, state, root)?,
-                Event::Mouse(mouse) => crate::mouse::handle_mouse(mouse, state, root)?,
+/// Events dispatched by rat-salsa to the application.
+#[derive(Debug)]
+pub enum AppEvent {
+    /// Raw crossterm event (keyboard, mouse, resize).
+    Crossterm(crossterm::event::Event),
+    /// Periodic tick — polls background channels and refreshes sysinfo.
+    Tick(TimeOut),
+}
+
+impl From<crossterm::event::Event> for AppEvent {
+    fn from(e: crossterm::event::Event) -> Self { AppEvent::Crossterm(e) }
+}
+
+impl From<TimeOut> for AppEvent {
+    fn from(t: TimeOut) -> Self { AppEvent::Tick(t) }
+}
+
+/// Global state accessible from all rat-salsa callbacks (init/render/event/error).
+pub struct AppGlobal {
+    ctx:  SalsaAppContext<AppEvent, anyhow::Error>,
+    /// Root path of the FSN workspace — forwarded to events::handle / mouse::handle_mouse.
+    pub root: PathBuf,
+}
+
+impl SalsaContext<AppEvent, anyhow::Error> for AppGlobal {
+    fn set_salsa_ctx(&mut self, app_ctx: SalsaAppContext<AppEvent, anyhow::Error>) {
+        self.ctx = app_ctx;
+    }
+    fn salsa_ctx(&self) -> &SalsaAppContext<AppEvent, anyhow::Error> { &self.ctx }
+}
+
+/// Entry point for the rat-salsa event loop. Called from `lib.rs::run()`.
+/// Terminal setup (raw mode, alternate screen, mouse capture) is handled by rat-salsa.
+pub fn run_salsa(root: PathBuf, state: &mut AppState) -> anyhow::Result<()> {
+    let mut global = AppGlobal { ctx: Default::default(), root };
+    run_tui(
+        fsn_init,
+        fsn_render,
+        fsn_event,
+        fsn_error,
+        &mut global,
+        state,
+        RunConfig::default()?.poll(PollCrossterm).poll(PollTimers::new()),
+    )?;
+    Ok(())
+}
+
+fn fsn_init(state: &mut AppState, ctx: &mut AppGlobal) -> anyhow::Result<()> {
+    // Repeating 250 ms tick — used to drain background mpsc channels.
+    ctx.add_timer(TimerDef::new().repeat_forever().timer(Duration::from_millis(250)));
+    // Force an immediate render so the screen isn't blank before the first event.
+    let _ = state;
+    Ok(())
+}
+
+fn fsn_render(
+    area:  ratatui::layout::Rect,
+    buf:   &mut ratatui::buffer::Buffer,
+    state: &mut AppState,
+    _ctx:  &mut AppGlobal,
+) -> anyhow::Result<()> {
+    let mut rctx = crate::ui::render_ctx::RenderCtx::new(area, buf);
+    crate::ui::render(&mut rctx, state);
+    Ok(())
+}
+
+fn fsn_event(
+    event: &AppEvent,
+    state: &mut AppState,
+    ctx:   &mut AppGlobal,
+) -> anyhow::Result<Control<AppEvent>> {
+    match event {
+        AppEvent::Crossterm(e) => {
+            match e {
+                crossterm::event::Event::Key(key) => {
+                    crate::events::handle(*key, state, ctx.root.as_path())?;
+                }
+                crossterm::event::Event::Mouse(mouse) => {
+                    crate::mouse::handle_mouse(*mouse, state, ctx.root.as_path())?;
+                }
                 _ => {}
             }
+            if state.should_quit { return Ok(Control::Quit); }
+            Ok(Control::Changed)
         }
 
-        if state.should_quit { break; }
+        AppEvent::Tick(_) => {
+            // Drain reconciler channel — collect first to avoid simultaneous borrow.
+            let reconcile_msgs: Vec<HashMap<String, RunState>> = state.reconcile_rx
+                .as_ref()
+                .map(|rx| std::iter::from_fn(|| rx.try_recv().ok()).collect())
+                .unwrap_or_default();
+            for statuses in reconcile_msgs { state.apply_podman_status(statuses); }
 
-        while let Ok(statuses) = reconcile_rx.try_recv() {
-            state.apply_podman_status(statuses);
-        }
+            // Drain deploy channel.
+            let deploy_msgs: Vec<DeployMsg> = state.deploy_rx
+                .as_ref()
+                .map(|rx| std::iter::from_fn(|| rx.try_recv().ok()).collect())
+                .unwrap_or_default();
+            for msg in deploy_msgs { state.apply_deploy_msg(msg); }
 
-        if let Some(ref rx) = state.deploy_rx {
-            let msgs: Vec<DeployMsg> = std::iter::from_fn(|| rx.try_recv().ok()).collect();
-            for msg in msgs { state.apply_deploy_msg(msg); }
-        }
-
-        // Pick up fresh store entries when the background fetcher completes.
-        if let Some(ref rx) = state.store_rx {
-            if let Ok(entries) = rx.try_recv() {
+            // Drain store fetcher channel (one-shot).
+            let store_result: Option<Vec<StoreEntry>> = state.store_rx
+                .as_ref()
+                .and_then(|rx| rx.try_recv().ok());
+            if let Some(entries) = store_result {
                 let count = entries.len();
                 state.store_entries = entries;
-                state.store_rx = None; // one-shot channel
+                state.store_rx = None;
                 if count > 0 {
-                    state.push_notif(
-                        crate::app::NotifKind::Info,
-                        format!("Store: {count} Module geladen"),
-                    );
+                    state.push_notif(NotifKind::Info, format!("Store: {count} Module geladen"));
                 }
             }
-        }
 
-        if state.last_refresh.elapsed() >= Duration::from_secs(REFRESH_SECS) {
-            state.sysinfo = SysInfo::collect();
-            state.last_refresh = Instant::now();
-        }
+            // Refresh sysinfo every 5 s.
+            if state.last_refresh.elapsed() >= Duration::from_secs(5) {
+                state.sysinfo = crate::sysinfo::SysInfo::collect();
+                state.last_refresh = Instant::now();
+            }
 
-        state.expire_notifications(Duration::from_secs(4));
+            state.expire_notifications(Duration::from_secs(4));
+            Ok(Control::Changed)
+        }
     }
+}
 
-    Ok(())
+fn fsn_error(
+    err:    anyhow::Error,
+    _state: &mut AppState,
+    _ctx:   &mut AppGlobal,
+) -> anyhow::Result<Control<AppEvent>> {
+    tracing::error!("{:#}", err);
+    Ok(Control::Changed)
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
