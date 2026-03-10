@@ -1,12 +1,14 @@
-// Select input node — single-choice field with popup dialog.
+// Multi-select input node — checkbox popup for multiple choices.
 //
 // Design Pattern: Bridge — delegates all selection UI to SelectionPopup (Strategy).
-// Rendering the popup (radio-style) is isolated in selection_popup.rs.
-// This node only owns the field identity/value and wires FormNode to the popup.
+// Rendering the popup (checkbox-style) is isolated in selection_popup.rs.
 //
-// UX: focused field shows current value + "▼" hint.
-//     ↓/↑/Enter opens a centered popup with radio-style items.
-//     Inside popup: ↑↓=navigate, Enter/→=confirm, Esc/←=cancel.
+// Value is stored as a comma-separated list of selected option codes.
+// Example: options = ["nginx", "caddy", "haproxy"], value = "nginx,haproxy"
+//
+// UX: closed field shows selected count or comma list.
+//     ↓/↑/Enter opens centered popup with checkbox items.
+//     Space=toggle, Enter/→=confirm, Esc/←=cancel.
 
 use std::collections::HashSet;
 
@@ -24,22 +26,23 @@ use crate::ui::nodes::selection_popup::{SelectionPopup, SelectionResult};
 use crate::ui::render_ctx::RenderCtx;
 
 #[derive(Debug)]
-pub struct SelectInputNode {
+pub struct MultiSelectInputNode {
     pub key:        &'static str,
     pub label_key:  &'static str,
     pub hint_key:   Option<&'static str>,
     pub tab:        usize,
     pub required:   bool,
+    /// Comma-separated selected option codes, e.g. "nginx,haproxy".
     pub value:      String,
-    /// Available choices. `Vec<String>` supports static and runtime-computed options.
+    /// All available choices.
     pub options:    Vec<String>,
-    /// Maps an option code to a human-readable label for display.
+    /// Maps an option code to a human-readable label.
     pub display_fn: Option<fn(&str) -> &'static str>,
     /// Popup state (Strategy).
     popup: SelectionPopup,
 }
 
-impl SelectInputNode {
+impl MultiSelectInputNode {
     pub fn new(
         key:       &'static str,
         label_key: &'static str,
@@ -47,11 +50,10 @@ impl SelectInputNode {
         required:  bool,
         options:   Vec<String>,
     ) -> Self {
-        let value = options.first().cloned().unwrap_or_default();
         Self {
             key, label_key, hint_key: None, tab, required,
-            value, options, display_fn: None,
-            popup: SelectionPopup::single(),
+            value: String::new(), options, display_fn: None,
+            popup: SelectionPopup::multi(),
         }
     }
 
@@ -71,20 +73,31 @@ impl SelectInputNode {
 
     // ── Internal ───────────────────────────────────────────────────────────
 
-    fn current_idx(&self) -> usize {
-        self.options.iter().position(|o| o == &self.value).unwrap_or(0)
+    /// Parse `self.value` into a set of indices into `self.options`.
+    fn checked_indices(&self) -> HashSet<usize> {
+        self.value.split(',')
+            .filter(|s| !s.is_empty())
+            .filter_map(|code| self.options.iter().position(|o| o == code))
+            .collect()
     }
 
-    fn human_label(&self) -> &str {
-        if let Some(f) = self.display_fn {
-            let s = f(&self.value);
-            if !s.is_empty() { return s; }
+    /// Display string: shows human labels of selected items, or placeholder.
+    fn display_value(&self, lang: Lang) -> String {
+        let selected: Vec<&str> = self.value.split(',')
+            .filter(|s| !s.is_empty())
+            .map(|code| {
+                if let Some(f) = self.display_fn { f(code) } else { code }
+            })
+            .collect();
+        if selected.is_empty() {
+            crate::i18n::t(lang, "form.multiselect.none").to_string()
+        } else {
+            selected.join(", ")
         }
-        &self.value
     }
 }
 
-impl FormNode for SelectInputNode {
+impl FormNode for MultiSelectInputNode {
     fn key(&self)       -> &'static str         { self.key }
     fn label_key(&self) -> &'static str         { self.label_key }
     fn hint_key(&self)  -> Option<&'static str> { self.hint_key }
@@ -123,14 +136,14 @@ impl FormNode for SelectInputNode {
             Style::default().fg(Color::DarkGray)
         };
 
-        let display = self.human_label();
+        let display = self.display_value(lang);
         let input_line = if focused {
             Line::from(vec![
-                Span::styled(display.to_string(), Style::default().fg(Color::White)),
+                Span::styled(display, Style::default().fg(Color::White)),
                 Span::styled(" ▼", Style::default().fg(Color::Cyan)),
             ])
         } else {
-            Line::from(Span::styled(display.to_string(), Style::default().fg(Color::White)))
+            Line::from(Span::styled(display, Style::default().fg(Color::White)))
         };
         f.render_widget(
             Paragraph::new(input_line)
@@ -138,7 +151,6 @@ impl FormNode for SelectInputNode {
             rows[0],
         );
 
-        // Hint line below (always shown — popup appears above content, not in this space)
         if let Some(hk) = self.hint_key {
             f.render_widget(
                 Paragraph::new(Line::from(Span::styled(
@@ -150,29 +162,28 @@ impl FormNode for SelectInputNode {
         }
     }
 
-    /// Render the popup — centered on the full terminal. Called after all fields are rendered.
     fn render_overlay(&mut self, f: &mut RenderCtx<'_>, _available: Rect, lang: Lang) {
         self.popup.render(f, &self.options, self.display_fn, self.label_key, lang);
     }
 
     fn handle_key(&mut self, key: KeyEvent) -> FormAction {
-        // Popup swallows all keys while open — global nav (Ctrl+S etc.) is bypassed too.
         if self.popup.is_open {
             return match self.popup.handle_key(key, &self.options) {
-                SelectionResult::Accepted(v) => { self.value = v; FormAction::ValueChanged }
-                SelectionResult::Rejected    => FormAction::Consumed,
-                SelectionResult::Consumed    => FormAction::Consumed,
-                _                            => FormAction::Consumed,
+                SelectionResult::AcceptedMulti(values) => {
+                    self.value = values.join(",");
+                    FormAction::ValueChanged
+                }
+                SelectionResult::Rejected | SelectionResult::Consumed => FormAction::Consumed,
+                _ => FormAction::Consumed,
             };
         }
 
-        // When closed: check global nav first.
         if let Some(nav) = handle_form_nav(key) { return nav; }
 
         match key.code {
             KeyCode::Down | KeyCode::Up | KeyCode::Enter => {
-                let idx = self.current_idx();
-                self.popup.open(idx, HashSet::new());
+                let checked = self.checked_indices();
+                self.popup.open(0, checked);
                 FormAction::Consumed
             }
             KeyCode::Tab     => FormAction::TabNext,
