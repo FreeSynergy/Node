@@ -22,7 +22,7 @@ use ratatui::{
 use rat_widget::paragraph::{Paragraph, ParagraphState};
 
 use crate::app::Lang;
-use crate::ui::form_node::{handle_form_nav, FormAction, FormNode};
+use crate::ui::form_node::{handle_selection_nav, FormAction, FormNode};
 use crate::ui::nodes::selection_popup::{SelectionPopup, SelectionResult};
 use crate::ui::render_ctx::RenderCtx;
 
@@ -185,7 +185,8 @@ impl FormNode for MultiSelectInputNode {
         match self.popup.handle_mouse(event, &self.options)? {
             SelectionResult::AcceptedMulti(values) => {
                 self.value = values.join(",");
-                Some(FormAction::ValueChanged)
+                // AcceptAndNext — same as keyboard path: on_change fires and focus advances.
+                Some(FormAction::AcceptAndNext)
             }
             SelectionResult::Rejected => Some(FormAction::Consumed),
             SelectionResult::Consumed => Some(FormAction::Consumed),
@@ -215,7 +216,8 @@ impl FormNode for MultiSelectInputNode {
             };
         }
 
-        if let Some(nav) = handle_form_nav(key) { return nav; }
+        // Shared nav for selection nodes: Ctrl+S/←/→, Tab, BackTab, Esc, L/l.
+        if let Some(nav) = handle_selection_nav(key) { return nav; }
 
         match key.code {
             KeyCode::Down | KeyCode::Up | KeyCode::Enter => {
@@ -223,10 +225,6 @@ impl FormNode for MultiSelectInputNode {
                 self.popup.open(0, checked);
                 FormAction::Consumed
             }
-            KeyCode::Tab     => FormAction::FocusNext,
-            KeyCode::BackTab => FormAction::FocusPrev,
-            KeyCode::Esc     => FormAction::Cancel,
-            KeyCode::Char('l') | KeyCode::Char('L') => FormAction::LangToggle,
             _ => FormAction::Unhandled,
         }
     }

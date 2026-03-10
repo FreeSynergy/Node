@@ -20,7 +20,7 @@ use ratatui::{
 use rat_widget::paragraph::{Paragraph, ParagraphState};
 
 use crate::app::Lang;
-use crate::ui::form_node::{handle_form_nav, FormAction, FormNode};
+use crate::ui::form_node::{handle_selection_nav, FormAction, FormNode};
 use crate::ui::nodes::selection_popup::{SelectionPopup, SelectionResult};
 use crate::ui::render_ctx::RenderCtx;
 
@@ -200,8 +200,8 @@ impl FormNode for SelectInputNode {
             };
         }
 
-        // When closed: check global nav first.
-        if let Some(nav) = handle_form_nav(key) { return nav; }
+        // Shared nav for selection nodes: Ctrl+S/←/→, Tab, BackTab, Esc, L/l.
+        if let Some(nav) = handle_selection_nav(key) { return nav; }
 
         match key.code {
             KeyCode::Down | KeyCode::Up | KeyCode::Enter => {
@@ -209,10 +209,6 @@ impl FormNode for SelectInputNode {
                 self.popup.open(idx, HashSet::new());
                 FormAction::Consumed
             }
-            KeyCode::Tab     => FormAction::FocusNext,
-            KeyCode::BackTab => FormAction::FocusPrev,
-            KeyCode::Esc     => FormAction::Cancel,
-            KeyCode::Char('l') | KeyCode::Char('L') => FormAction::LangToggle,
             _ => FormAction::Unhandled,
         }
     }

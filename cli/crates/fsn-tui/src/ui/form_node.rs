@@ -45,6 +45,32 @@ pub fn handle_form_nav(key: KeyEvent) -> Option<FormAction> {
     }
 }
 
+/// Handle navigation shortcuts for selection-type nodes (Select, MultiSelect, ServiceSlot).
+///
+/// Design Pattern: Utility Library — Single Source of Truth for shared shortcuts.
+///
+/// These nodes do NOT accept free-text input, so Tab / BackTab / Esc / L / l can be
+/// handled uniformly here instead of being duplicated in each node's `handle_key`.
+///
+/// Extends `handle_form_nav` with:
+///   Tab              → FocusNext
+///   BackTab          → FocusPrev
+///   Esc              → Cancel
+///   l / L            → LangToggle  (safe because no text entry here)
+///
+/// Text-accepting nodes (TextInput, TextArea, EnvTable) must NOT call this — they
+/// handle Tab and character keys differently, and L should type the letter L.
+pub fn handle_selection_nav(key: KeyEvent) -> Option<FormAction> {
+    if let Some(nav) = handle_form_nav(key) { return Some(nav); }
+    match key.code {
+        KeyCode::Tab                                => Some(FormAction::FocusNext),
+        KeyCode::BackTab                            => Some(FormAction::FocusPrev),
+        KeyCode::Esc                                => Some(FormAction::Cancel),
+        KeyCode::Char('l') | KeyCode::Char('L')    => Some(FormAction::LangToggle),
+        _                                           => None,
+    }
+}
+
 // ── FormAction ────────────────────────────────────────────────────────────────
 
 /// What a form node returns after handling a keyboard event.

@@ -6,6 +6,11 @@
 //   • Undo / redo via Ctrl+Z / Ctrl+Y built into TextAreaState
 //   • Mouse click-to-position, drag-selection via rat-widget event handling
 //
+// Design Pattern: Delegation — rat-widget is the single source of truth for
+// all keyboard and mouse events on text widgets.  Both handle_key() and
+// handle_mouse() delegate to the same `handle_events()` fn from rat-widget,
+// ensuring parity: any event the widget understands works in both input modes.
+//
 // FormNode wrapper:
 //   • Tab=FocusNext (not TabNext) so the user stays on the same form-tab
 //     and reaches fields below the textarea.
@@ -166,6 +171,22 @@ impl FormNode for TextAreaNode {
             rows[1],
             &mut ParagraphState::new(),
         );
+    }
+
+    /// Delegate mouse events to rat-widget — same source of truth as handle_key().
+    ///
+    /// rat-widget's TextAreaState handles click-to-position, drag-selection and
+    /// scroll out of the box.  Returning `FormAction::Consumed` (not Unhandled)
+    /// prevents the outer handler from re-interpreting the event.
+    fn handle_mouse(&mut self, event: crossterm::event::MouseEvent, _area: Rect) -> FormAction {
+        match handle_events(&mut self.state, true, &Event::Mouse(event)) {
+            TextOutcome::TextChanged => {
+                self.cache = self.state.value();
+                self.dirty = true;
+                FormAction::ValueChanged
+            }
+            _ => FormAction::Consumed,
+        }
     }
 
     fn handle_key(&mut self, key: KeyEvent) -> FormAction {
