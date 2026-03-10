@@ -179,6 +179,18 @@ impl FormNode for TextInputNode {
         }
     }
 
+    fn handle_mouse(&mut self, event: crossterm::event::MouseEvent, _area: Rect) -> FormAction {
+        use crossterm::event::Event;
+        match handle_events(&mut self.state, true, &Event::Mouse(event)) {
+            TextOutcome::TextChanged => {
+                self.cache = self.state.value::<String>();
+                self.dirty = true;
+                FormAction::ValueChanged
+            }
+            _ => FormAction::Consumed,
+        }
+    }
+
     fn handle_key(&mut self, key: KeyEvent) -> FormAction {
         // Ctrl+S=Submit, Ctrl+←=TabPrev, Ctrl+→=TabNext — handled before TextInputState
         // so our tab navigation is not consumed as "move cursor word left/right".

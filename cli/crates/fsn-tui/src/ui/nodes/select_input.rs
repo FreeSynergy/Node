@@ -167,6 +167,16 @@ impl FormNode for SelectInputNode {
         self.popup.render(f, &self.options, self.display_fn, self.label_key, lang);
     }
 
+    fn handle_mouse(&mut self, event: crossterm::event::MouseEvent, _area: Rect) -> FormAction {
+        use crossterm::event::{MouseButton, MouseEventKind};
+        if event.kind == MouseEventKind::Down(MouseButton::Left) {
+            let idx = self.current_idx();
+            self.popup.open(idx, HashSet::new());
+            return FormAction::Consumed;
+        }
+        FormAction::Unhandled
+    }
+
     fn handle_key(&mut self, key: KeyEvent) -> FormAction {
         // Popup swallows all keys while open — global nav (Ctrl+S etc.) is bypassed too.
         if self.popup.is_open {

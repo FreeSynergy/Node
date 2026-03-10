@@ -178,6 +178,16 @@ impl FormNode for MultiSelectInputNode {
         self.popup.render(f, &self.options, self.display_fn, self.label_key, lang);
     }
 
+    fn handle_mouse(&mut self, event: crossterm::event::MouseEvent, _area: Rect) -> FormAction {
+        use crossterm::event::{MouseButton, MouseEventKind};
+        if event.kind == MouseEventKind::Down(MouseButton::Left) {
+            let checked = self.checked_indices();
+            self.popup.open(0, checked);
+            return FormAction::Consumed;
+        }
+        FormAction::Unhandled
+    }
+
     fn handle_key(&mut self, key: KeyEvent) -> FormAction {
         if self.popup.is_open {
             return match self.popup.handle_key(key, &self.options) {

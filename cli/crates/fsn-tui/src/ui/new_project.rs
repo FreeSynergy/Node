@@ -127,6 +127,9 @@ pub(crate) fn render_fields(f: &mut RenderCtx<'_>, form: &mut ResourceForm, inne
     let mut y = inner.y;
     let mut overlay_slot: Option<usize> = None; // which slot needs render_overlay
 
+    // Clear hit-test table — rebuilt every frame.
+    form.field_rects.clear();
+
     // ── 12-column row grouping ─────────────────────────────────────────────
     //
     // Strategy: pack consecutive nodes into a row as long as col_span sum ≤ 12
@@ -189,6 +192,7 @@ pub(crate) fn render_fields(f: &mut RenderCtx<'_>, form: &mut ResourceForm, inne
             let (slot, node_idx) = row[0];
             let focused = form.active_field == slot;
             form.nodes[node_idx].render(f, row_rect, focused, lang);
+            form.field_rects.push((slot, node_idx, row_rect));
             if focused { overlay_slot = Some(slot); }
         } else {
             // Split the row proportionally by col_span.
@@ -206,6 +210,7 @@ pub(crate) fn render_fields(f: &mut RenderCtx<'_>, form: &mut ResourceForm, inne
             for (i, &(slot, node_idx)) in row.iter().enumerate() {
                 let focused = form.active_field == slot;
                 form.nodes[node_idx].render(f, cols[i], focused, lang);
+                form.field_rects.push((slot, node_idx, cols[i]));
                 if focused { overlay_slot = Some(slot); }
             }
         }

@@ -42,6 +42,11 @@ pub fn handle_mouse(event: MouseEvent, state: &mut AppState, root: &Path) -> Res
         return handle_overlay_mouse(event, state);
     }
 
+    // Form screen — delegate entirely to the form handler.
+    if state.current_form.is_some() {
+        return handle_mouse_form(event, state);
+    }
+
     match event.kind {
         MouseEventKind::Down(MouseButton::Left)  => handle_left_click(event.column, event.row, state, root)?,
         MouseEventKind::Down(MouseButton::Right) => handle_right_click(event.column, event.row, state),
@@ -74,6 +79,41 @@ fn handle_overlay_mouse(event: MouseEvent, state: &mut AppState) -> Result<()> {
             }
         }
         _ => {}
+    }
+    Ok(())
+}
+
+// ── Form mouse handling ───────────────────────────────────────────────────────
+//
+// Called when `state.current_form.is_some()` and no overlay is open.
+// Strategy:
+//   1. Hit-test `form.field_rects` — find which node the cursor is over.
+//   2. Focus that node (update active_field).
+//   3. Delegate the raw event to the node's `handle_mouse()`.
+//      TextInputNode → rat-widget places cursor at click position.
+//      SelectInputNode / MultiSelectInputNode → opens popup.
+
+fn handle_mouse_form(event: MouseEvent, state: &mut AppState) -> Result<()> {
+    use crate::ui::form_node::FormAction;
+
+    let col = event.column;
+    let row = event.row;
+
+    let form = match state.current_form.as_mut() { Some(f) => f, None => return Ok(()) };
+
+    // Hit-test: find (slot_in_tab, global_node_idx, rect) for the clicked position.
+    let hit = form.field_rects.iter()
+        .find(|&&(_, _, rect)| col >= rect.x && col < rect.right() && row >= rect.y && row < rect.bottom())
+        .copied();
+
+    if let Some((slot, idx, rect)) = hit {
+        form.active_field = slot;
+        form.touched = true;
+        let action = form.nodes[idx].handle_mouse(event, rect);
+        if action == FormAction::ValueChanged {
+            let key = form.nodes[idx].key();
+            (form.on_change)(&mut form.nodes, key);
+        }
     }
     Ok(())
 }

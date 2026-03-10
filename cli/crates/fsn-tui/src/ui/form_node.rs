@@ -153,6 +153,14 @@ pub trait FormNode: std::fmt::Debug {
     /// Handle a keyboard event. Returns the action for the outer handler.
     fn handle_key(&mut self, key: KeyEvent) -> FormAction;
 
+    /// Handle a mouse event inside this node's rendered area.
+    ///
+    /// `area` is the full Rect that `render()` was called with (stored in
+    /// `ResourceForm::field_rects` after each frame).  The default is a no-op.
+    fn handle_mouse(&mut self, _event: crossterm::event::MouseEvent, _area: Rect) -> FormAction {
+        FormAction::Unhandled
+    }
+
     // ── Validation ─────────────────────────────────────────────────────────
 
     fn is_filled(&self) -> bool {
