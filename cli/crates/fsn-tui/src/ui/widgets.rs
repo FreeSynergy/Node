@@ -136,6 +136,16 @@ pub fn button_line(label: &str, focused: bool, disabled: bool) -> Line<'static> 
     ))
 }
 
+/// Style for a HealthLevel indicator — single source of truth.
+pub fn health_color(level: fsn_core::health::HealthLevel) -> ratatui::style::Style {
+    use fsn_core::health::HealthLevel;
+    match level {
+        HealthLevel::Ok      => Style::new().fg(Color::Green),
+        HealthLevel::Warning => Style::new().fg(Color::Yellow),
+        HealthLevel::Error   => Style::new().fg(Color::Red).add_modifier(Modifier::BOLD),
+    }
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]

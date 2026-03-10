@@ -10,6 +10,7 @@
 // When help_visible=false the sidebar column is omitted.
 
 pub mod anim;
+pub mod components;
 pub mod dashboard;
 pub mod detail;
 pub mod form_node;
@@ -27,6 +28,7 @@ pub mod widgets;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use crate::app::{AppState, OverlayLayer, Screen};
 use render_ctx::RenderCtx;
+use components::{Component, NotifStack};
 
 // ── OverlayLayer rendering — each variant renders itself ──────────────────────
 
@@ -67,7 +69,7 @@ pub fn render(f: &mut RenderCtx<'_>, state: &mut AppState) {
     }
 
     // Toast notifications — always on top, top-right corner.
-    render_notifications(f, state);
+    NotifStack.render(f, full, state);
 }
 
 /// Renders a non-dashboard screen with the optional full-screen help sidebar.
@@ -97,91 +99,6 @@ where
             .map(|n| n.key());
         let sections = help_sidebar::build_help(state.screen, kind, foc_key, state.lang);
         help_sidebar::render_help_sidebar(f, help_area, &sections, state.lang);
-    }
-}
-
-// ── Toast notifications ───────────────────────────────────────────────────────
-//
-// Design: 2-row toast style.
-//   Row 0: " ICON  Message text here               "  (fg=color, bold icon)
-//   Row 1: " ▓▓▓▓▓▓▓▓▓░░░░░  (TTL bar, 4s max)    "  (fg=DarkGray)
-//
-// Slide-in: width grows from 0 to full_width over ~1s (via Anim::notif_width).
-// To change the look: edit only this function.
-// To change timing/characters: edit ui/anim.rs.
-
-const NOTIF_TTL_SECS: f32 = 4.0;
-const NOTIF_FULL_WIDTH: u16 = 52;
-const NOTIF_HEIGHT: u16 = 2; // rows per notification
-
-fn render_notifications(f: &mut RenderCtx<'_>, state: &AppState) {
-    use std::time::Duration;
-    use ratatui::{
-        layout::Rect,
-        style::{Color, Modifier, Style},
-        text::{Line, Span},
-        widgets::Clear,
-    };
-    use rat_widget::paragraph::{Paragraph, ParagraphState};
-    use crate::app::NotifKind;
-    use crate::ui::anim::Anim;
-
-    if state.notifications.is_empty() { return; }
-
-    let area  = f.area();
-    let max_w = NOTIF_FULL_WIDTH.min(area.width.saturating_sub(2));
-
-    for (i, notif) in state.notifications.iter().enumerate() {
-        let base_y = area.y + (i as u16) * NOTIF_HEIGHT;
-        if base_y + NOTIF_HEIGHT > area.bottom() { break; }
-
-        let (color, icon) = match notif.kind {
-            NotifKind::Success => (Color::Green,  "✓"),
-            NotifKind::Warning => (Color::Yellow, "!"),
-            NotifKind::Error   => (Color::Red,    "✗"),
-            NotifKind::Info    => (Color::Cyan,   "i"),
-        };
-
-        // Slide-in width
-        let full_w = (notif.message.chars().count() as u16 + 6).min(max_w);
-        let width  = state.anim.notif_width(notif.born_tick, full_w).max(3);
-        let x      = area.right().saturating_sub(width + 1);
-
-        // Row 0: icon + message
-        let msg_text = format!(" {}  {} ", icon, notif.message);
-        let msg_line = Line::from(vec![
-            Span::styled(
-                msg_text.chars().take(width as usize).collect::<String>(),
-                Style::default().fg(color).add_modifier(Modifier::BOLD),
-            ),
-        ]);
-
-        let row0 = Rect { x, y: base_y, width, height: 1 };
-        f.render_widget(Clear, row0);
-        f.render_stateful_widget(
-            Paragraph::new(msg_line),
-            row0,
-            &mut ParagraphState::new(),
-        );
-
-        // Row 1: TTL progress bar
-        let bar_w = (width as usize).saturating_sub(2);
-        let bar   = Anim::ttl_bar(
-            notif.born.elapsed(),
-            Duration::from_secs_f32(NOTIF_TTL_SECS),
-            bar_w,
-        );
-        let bar_text = format!(" {}", bar);
-        let row1 = Rect { x, y: base_y + 1, width, height: 1 };
-        f.render_widget(Clear, row1);
-        f.render_stateful_widget(
-            Paragraph::new(Line::from(Span::styled(
-                bar_text,
-                Style::default().fg(Color::DarkGray),
-            ))),
-            row1,
-            &mut ParagraphState::new(),
-        );
     }
 }
 
@@ -228,16 +145,15 @@ fn render_new_resource(f: &mut RenderCtx<'_>, state: &AppState) {
     // Option rows
     let mut lines: Vec<Line> = vec![Line::from("")];
     for (i, &(key, _)) in NEW_RESOURCE_ITEMS.iter().enumerate() {
-        let is_sel   = i == selected;
-        let marker   = if is_sel { "▶ " } else { "  " };
-        let label    = state.t(key);
+        let is_sel    = i == selected;
+        let marker    = if is_sel { "▶ " } else { "  " };
+        let label     = state.t(key);
         let row_style = if is_sel {
             Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(Color::White)
         };
-        let text = format!("{}{}", marker, label);
-        // Pad to full width for highlight bar
+        let text   = format!("{}{}", marker, label);
         let padded = format!("{:<w$}", text, w = (inner.width as usize).saturating_sub(0));
         lines.push(Line::from(Span::styled(padded, row_style)));
     }
@@ -266,7 +182,6 @@ fn render_confirm(f: &mut RenderCtx<'_>, state: &AppState) {
     use rat_widget::paragraph::{Paragraph, ParagraphState};
 
     let Some((msg_key, data, _)) = state.confirm_overlay() else { return };
-    // If `data` is present (e.g. service name for delete), show it in the message.
     let display_msg = if let Some(d) = data {
         format!("{} '{}'", state.t(msg_key), d)
     } else {
@@ -274,9 +189,9 @@ fn render_confirm(f: &mut RenderCtx<'_>, state: &AppState) {
     };
     let area = f.area();
     let popup = Rect {
-        x: area.width / 4,
-        y: area.height / 2 - 2,
-        width: area.width / 2,
+        x:      area.width / 4,
+        y:      area.height / 2 - 2,
+        width:  area.width / 2,
         height: 3,
     };
 
@@ -308,10 +223,10 @@ fn render_deploy(f: &mut RenderCtx<'_>, state: &AppState) {
     });
     let Some(ds) = ds else { return };
 
-    let area  = f.area();
-    let width = (area.width * 2 / 3).max(50).min(area.width.saturating_sub(4));
+    let area      = f.area();
+    let width     = (area.width * 2 / 3).max(50).min(area.width.saturating_sub(4));
     let log_lines = ds.log.len() as u16;
-    let height = (log_lines + 4).max(6).min(area.height.saturating_sub(4));
+    let height    = (log_lines + 4).max(6).min(area.height.saturating_sub(4));
     let popup = Rect {
         x:      area.width.saturating_sub(width) / 2,
         y:      area.height.saturating_sub(height) / 2,
@@ -325,7 +240,6 @@ fn render_deploy(f: &mut RenderCtx<'_>, state: &AppState) {
         Color::Cyan
     };
 
-    // Spinner in title while running, ✓/✗ when done
     let status_icon = if ds.done {
         if ds.success { "✓" } else { "✗" }
     } else {
@@ -335,16 +249,21 @@ fn render_deploy(f: &mut RenderCtx<'_>, state: &AppState) {
 
     f.render_widget(Clear, popup);
 
-    let inner = Block::default()
+    let block = Block::default()
         .title(Span::styled(&title, Style::default().fg(border_color).add_modifier(Modifier::BOLD)))
         .borders(Borders::ALL)
         .border_style(Style::default().fg(border_color));
 
-    let inner_area = inner.inner(popup);
-    f.render_widget(inner, popup);
+    let inner_area = block.inner(popup);
+    f.render_widget(block, popup);
 
     // Log lines
-    let log_area = Rect { x: inner_area.x, y: inner_area.y, width: inner_area.width, height: inner_area.height.saturating_sub(1) };
+    let log_area = Rect {
+        x:      inner_area.x,
+        y:      inner_area.y,
+        width:  inner_area.width,
+        height: inner_area.height.saturating_sub(1),
+    };
     let lines: Vec<Line> = ds.log.iter().map(|l| {
         let color = if l.starts_with('✓') { Color::Green }
                     else if l.starts_with('✗') { Color::Red }
@@ -355,7 +274,12 @@ fn render_deploy(f: &mut RenderCtx<'_>, state: &AppState) {
 
     // Hint bar at bottom
     let hint_text = if ds.done { state.t("deploy.hint") } else { state.t("deploy.running") };
-    let hint_area = Rect { x: inner_area.x, y: inner_area.bottom().saturating_sub(1), width: inner_area.width, height: 1 };
+    let hint_area = Rect {
+        x:      inner_area.x,
+        y:      inner_area.bottom().saturating_sub(1),
+        width:  inner_area.width,
+        height: 1,
+    };
     f.render_stateful_widget(
         Paragraph::new(Line::from(Span::styled(hint_text, Style::default().fg(Color::DarkGray))))
             .alignment(Alignment::Center),
@@ -387,17 +311,14 @@ fn render_context_menu(f: &mut RenderCtx<'_>, state: &AppState) {
 
     if items.is_empty() { return; }
 
-    let area   = f.area();
-    // width = longest label + 4 padding
+    let area      = f.area();
     let max_label = items.iter()
         .map(|a| state.t(a.label_key()).chars().count())
         .max()
         .unwrap_or(8);
     let width  = (max_label as u16 + 4).min(area.width);
-    // height = border(1) + items + border(1)
     let height = items.len() as u16 + 2;
 
-    // Clamp so the menu stays on screen
     let x = cx.min(area.right().saturating_sub(width));
     let y = cy.min(area.bottom().saturating_sub(height));
     let popup = Rect { x, y, width, height };
@@ -413,9 +334,9 @@ fn render_context_menu(f: &mut RenderCtx<'_>, state: &AppState) {
     f.render_widget(block, popup);
 
     let lines: Vec<Line> = items.iter().enumerate().map(|(i, action)| {
-        let label = state.t(action.label_key());
+        let label  = state.t(action.label_key());
         let is_sel = i == selected;
-        let style = if is_sel {
+        let style  = if is_sel {
             Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD)
         } else if action.is_danger() {
             Style::default().fg(Color::Red)
