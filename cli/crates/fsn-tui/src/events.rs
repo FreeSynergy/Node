@@ -11,7 +11,7 @@
 //   - submit.rs           — form validation and config persistence
 //   - actions.rs          — CRUD operations (delete, stop, reload)
 //   - deploy_thread.rs    — background deploy/export thread
-//   - mouse.rs            — mouse events
+//   - mouse.rs            — mouse click / scroll / context menu
 
 use std::path::Path;
 
@@ -110,6 +110,9 @@ fn handle_overlay(key: KeyEvent, state: &mut AppState, root: &Path) -> Result<()
         }
         Some(OverlayKind::NewResource) => {
             handle_new_resource_overlay(key, state, root)?;
+        }
+        Some(OverlayKind::ContextMenu) => {
+            crate::mouse::handle_context_menu_key(key, state, root)?;
         }
         None => { state.pop_overlay(); }
     }

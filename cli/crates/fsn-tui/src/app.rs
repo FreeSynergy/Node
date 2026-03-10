@@ -4,6 +4,8 @@ use std::collections::{HashMap, HashSet};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
+use ratatui::layout::Rect;
+
 use fsn_core::config::AppSettings;
 use fsn_core::health::{self, HealthLevel};
 use fsn_core::resource::Resource;
@@ -24,9 +26,11 @@ pub enum NotifKind { Success, Warning, Error, Info }
 
 #[derive(Debug, Clone)]
 pub struct Notification {
-    pub message: String,
-    pub kind:    NotifKind,
-    pub born:    Instant,
+    pub message:   String,
+    pub kind:      NotifKind,
+    pub born:      Instant,
+    /// Tick at creation — used by Anim::notif_width() for slide-in effect.
+    pub born_tick: u32,
 }
 
 // ── Screens ───────────────────────────────────────────────────────────────────
@@ -140,6 +144,7 @@ pub enum OverlayKind {
     Confirm,
     Deploy,
     NewResource,
+    ContextMenu,
 }
 
 #[derive(Debug, Clone)]
@@ -148,16 +153,19 @@ pub enum OverlayLayer {
     Confirm { message: String, data: Option<String>, yes_action: ConfirmAction },
     Deploy(DeployState),
     NewResource { selected: usize },
+    /// Right-click context menu — rendered at (x, y), navigated with ↑↓/Enter/Esc.
+    ContextMenu { x: u16, y: u16, items: Vec<ContextAction>, selected: usize },
 }
 
 impl OverlayLayer {
     /// Returns the discriminant without borrowing the inner data.
     pub fn kind(&self) -> OverlayKind {
         match self {
-            OverlayLayer::Logs(_)          => OverlayKind::Logs,
-            OverlayLayer::Confirm { .. }   => OverlayKind::Confirm,
-            OverlayLayer::Deploy(_)        => OverlayKind::Deploy,
+            OverlayLayer::Logs(_)            => OverlayKind::Logs,
+            OverlayLayer::Confirm { .. }     => OverlayKind::Confirm,
+            OverlayLayer::Deploy(_)          => OverlayKind::Deploy,
             OverlayLayer::NewResource { .. } => OverlayKind::NewResource,
+            OverlayLayer::ContextMenu { .. } => OverlayKind::ContextMenu,
         }
     }
 }
@@ -171,6 +179,34 @@ pub enum ConfirmAction {
     LeaveForm,
     LeaveWizard,
     Quit,
+}
+
+// ── Context menu actions — right-click menu ───────────────────────────────────
+//
+// Design: ContextAction is the single source for which actions exist and what
+// they're called. mouse.rs decides which actions apply per item type.
+// events.rs executes the selected action. i18n keys follow "ctx.*" prefix.
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ContextAction { Edit, Delete, Deploy, Start, Stop, Logs }
+
+impl ContextAction {
+    /// i18n key for this action's label.
+    pub fn label_key(self) -> &'static str {
+        match self {
+            ContextAction::Edit   => "ctx.edit",
+            ContextAction::Delete => "ctx.delete",
+            ContextAction::Deploy => "ctx.deploy",
+            ContextAction::Start  => "ctx.start",
+            ContextAction::Stop   => "ctx.stop",
+            ContextAction::Logs   => "ctx.logs",
+        }
+    }
+
+    /// Danger actions render in red.
+    pub fn is_danger(self) -> bool {
+        matches!(self, ContextAction::Delete | ContextAction::Stop)
+    }
 }
 
 /// Options shown in the new-resource selector popup (label key + kind).
@@ -221,6 +257,18 @@ pub struct AppState {
     /// Indices of services currently selected for batch operations.
     /// Empty = no multi-select mode active.
     pub selected_services:    HashSet<usize>,
+
+    // ── Animation ─────────────────────────────────────────────────────────────
+    /// Tick-driven animation state — advanced once per 250ms tick.
+    pub anim: crate::ui::anim::Anim,
+
+    // ── Mouse support ─────────────────────────────────────────────────────────
+    /// Last left-click position + time — used for double-click detection.
+    pub last_click: Option<(u16, u16, Instant)>,
+    /// Cached sidebar list area (set during render) — used for mouse hit-testing.
+    pub sidebar_list_area: Option<Rect>,
+    /// Cached services table area (set during render) — used for mouse hit-testing.
+    pub services_table_area: Option<Rect>,
 }
 
 impl AppState {
@@ -245,6 +293,10 @@ impl AppState {
             notifications: Vec::new(),
             sidebar_filter: None,
             selected_services: HashSet::new(),
+            anim: crate::ui::anim::Anim::new(),
+            last_click: None,
+            sidebar_list_area: None,
+            services_table_area: None,
         };
         s.rebuild_sidebar();
         s
@@ -387,7 +439,13 @@ impl AppState {
     // ── Notification helpers ───────────────────────────────────────────────
 
     pub fn push_notif(&mut self, kind: NotifKind, message: impl Into<String>) {
-        self.notifications.push(Notification { message: message.into(), kind, born: Instant::now() });
+        let born_tick = self.anim.tick();
+        self.notifications.push(Notification {
+            message: message.into(),
+            kind,
+            born: Instant::now(),
+            born_tick,
+        });
     }
 
     /// Remove notifications older than `max_age`. Called each loop tick.
@@ -513,10 +571,14 @@ fn fsn_event(
 ) -> anyhow::Result<Control<AppEvent>> {
     match event {
         AppEvent::Crossterm(e) => {
-            // Mouse events are handled natively by rat-widget widgets.
-            // Keyboard events route through the existing event chain.
-            if let crossterm::event::Event::Key(key) = e {
-                crate::events::handle(*key, state, ctx.root.as_path())?;
+            match e {
+                crossterm::event::Event::Key(key) => {
+                    crate::events::handle(*key, state, ctx.root.as_path())?;
+                }
+                crossterm::event::Event::Mouse(mouse) => {
+                    crate::mouse::handle_mouse(*mouse, state, ctx.root.as_path())?;
+                }
+                _ => {}
             }
             if state.should_quit { return Ok(Control::Quit); }
             Ok(Control::Changed)
@@ -557,6 +619,7 @@ fn fsn_event(
             }
 
             state.expire_notifications(Duration::from_secs(4));
+            state.anim.advance();
             Ok(Control::Changed)
         }
     }

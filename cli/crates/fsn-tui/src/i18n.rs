@@ -254,6 +254,13 @@ fn de(key: &str) -> Option<&'static str> {
         // ── Host form – proxy field ───────────────────────────────────────
         "form.host.proxy"            => "Proxy-Instanz",
         "form.host.proxy.hint"       => "Name der Zentinel-Instanz auf diesem Host (Standard: zentinel)",
+        // ── Context menu (right-click) ────────────────────────────────────
+        "ctx.edit"   => "Bearbeiten",
+        "ctx.delete" => "Löschen",
+        "ctx.deploy" => "Deployen",
+        "ctx.start"  => "Starten",
+        "ctx.stop"   => "Stoppen",
+        "ctx.logs"   => "Logs anzeigen",
         _ => return None,
     })
 }
@@ -466,7 +473,14 @@ fn en(key: &str) -> Option<&'static str> {
         // ── Host form – proxy field ───────────────────────────────────────
         "form.host.proxy"              => "Proxy instance",
         "form.host.proxy.hint"         => "Zentinel instance name on this host (default: zentinel)",
-                _ => return None,
+        // ── Context menu (right-click) ────────────────────────────────────
+        "ctx.edit"   => "Edit",
+        "ctx.delete" => "Delete",
+        "ctx.deploy" => "Deploy",
+        "ctx.start"  => "Start",
+        "ctx.stop"   => "Stop",
+        "ctx.logs"   => "View Logs",
+        _ => return None,
     })
 }
 

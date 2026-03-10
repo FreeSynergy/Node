@@ -292,6 +292,11 @@ fn handle_dashboard_services(key: KeyEvent, state: &mut AppState, root: &Path) -
 
 /// Open the edit form for an existing resource (Project, Host, or Service).
 /// Does nothing for Section and Action items — they have no edit form.
+/// `pub(crate)` so mouse.rs can call it without duplicating the logic.
+pub(crate) fn open_edit_form_for_item_pub(item: &SidebarItem, state: &mut AppState) {
+    open_edit_form_for_item(item, state);
+}
+
 fn open_edit_form_for_item(item: &SidebarItem, state: &mut AppState) {
     match item {
         SidebarItem::Project { slug, .. } => {

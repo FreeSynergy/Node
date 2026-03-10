@@ -94,6 +94,21 @@ pub fn run_state_char(state: RunState) -> &'static str {
     }
 }
 
+/// Animated (char, color) for a RunState.
+/// Running pulses ●/◉ and Green/LightGreen via Anim; all others are static.
+/// Use this wherever a running indicator should animate.
+pub fn run_state_char_anim(
+    state: RunState,
+    anim: &crate::ui::anim::Anim,
+) -> (&'static str, Color) {
+    match state {
+        RunState::Running => (anim.running_char(), anim.running_color()),
+        RunState::Stopped => ("○",  Color::DarkGray),
+        RunState::Failed  => ("✕",  Color::Red),
+        RunState::Missing => ("·",  Color::DarkGray),
+    }
+}
+
 /// Truncate a "prefix + name" string to fit within `max_w` characters.
 /// Appends "…" when the text must be cut. Used by sidebar and detail renderers.
 pub fn truncate(prefix: &str, name: &str, max_w: usize) -> String {

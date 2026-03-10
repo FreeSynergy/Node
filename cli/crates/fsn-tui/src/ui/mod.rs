@@ -9,6 +9,7 @@
 //   └─────────────────────────┴──────────────────────────────┘
 // When help_visible=false the sidebar column is omitted.
 
+pub mod anim;
 pub mod dashboard;
 pub mod detail;
 pub mod form_node;
@@ -37,6 +38,7 @@ impl OverlayLayer {
             OverlayLayer::Confirm { .. }     => render_confirm(f, state),
             OverlayLayer::Deploy(_)          => render_deploy(f, state),
             OverlayLayer::NewResource { .. } => render_new_resource(f, state),
+            OverlayLayer::ContextMenu { .. } => render_context_menu(f, state),
         }
     }
 }
@@ -55,7 +57,11 @@ pub fn render(f: &mut RenderCtx<'_>, state: &mut AppState) {
     }
 
     // Overlay layers drawn on top (Ebene system).
-    for layer in &state.overlay_stack {
+    // Collect indices first to avoid borrow conflict (render borrows state immutably).
+    let layer_count = state.overlay_stack.len();
+    for i in 0..layer_count {
+        // SAFETY: index is valid, no mutation during iteration
+        let layer = &state.overlay_stack[i];
         layer.render(f, state);
     }
 
@@ -94,45 +100,85 @@ where
 }
 
 // ── Toast notifications ───────────────────────────────────────────────────────
+//
+// Design: 2-row toast style.
+//   Row 0: " ICON  Message text here               "  (fg=color, bold icon)
+//   Row 1: " ▓▓▓▓▓▓▓▓▓░░░░░  (TTL bar, 4s max)    "  (fg=DarkGray)
+//
+// Slide-in: width grows from 0 to full_width over ~1s (via Anim::notif_width).
+// To change the look: edit only this function.
+// To change timing/characters: edit ui/anim.rs.
+
+const NOTIF_TTL_SECS: f32 = 4.0;
+const NOTIF_FULL_WIDTH: u16 = 52;
+const NOTIF_HEIGHT: u16 = 2; // rows per notification
 
 fn render_notifications(f: &mut RenderCtx<'_>, state: &AppState) {
+    use std::time::Duration;
     use ratatui::{
         layout::Rect,
-        style::{Color, Style},
+        style::{Color, Modifier, Style},
         text::{Line, Span},
         widgets::Clear,
     };
     use rat_widget::paragraph::{Paragraph, ParagraphState};
     use crate::app::NotifKind;
+    use crate::ui::anim::Anim;
 
     if state.notifications.is_empty() { return; }
 
-    let area     = f.area();
-    let max_w    = 52u16.min(area.width.saturating_sub(2));
+    let area  = f.area();
+    let max_w = NOTIF_FULL_WIDTH.min(area.width.saturating_sub(2));
 
     for (i, notif) in state.notifications.iter().enumerate() {
-        let y = area.y + i as u16;
-        if y >= area.bottom() { break; }
+        let base_y = area.y + (i as u16) * NOTIF_HEIGHT;
+        if base_y + NOTIF_HEIGHT > area.bottom() { break; }
 
-        let (color, prefix) = match notif.kind {
-            NotifKind::Success => (Color::Green,  " ✓ "),
-            NotifKind::Warning => (Color::Yellow, " ! "),
-            NotifKind::Error   => (Color::Red,    " ✗ "),
-            NotifKind::Info    => (Color::Cyan,   " i "),
+        let (color, icon) = match notif.kind {
+            NotifKind::Success => (Color::Green,  "✓"),
+            NotifKind::Warning => (Color::Yellow, "!"),
+            NotifKind::Error   => (Color::Red,    "✗"),
+            NotifKind::Info    => (Color::Cyan,   "i"),
         };
 
-        let body    = format!("{}{} ", prefix, notif.message);
-        let width   = (body.chars().count() as u16).min(max_w);
-        let x       = area.right().saturating_sub(width + 1);
-        let toast_area = Rect { x, y, width, height: 1 };
+        // Slide-in width
+        let full_w = (notif.message.chars().count() as u16 + 6).min(max_w);
+        let width  = state.anim.notif_width(notif.born_tick, full_w).max(3);
+        let x      = area.right().saturating_sub(width + 1);
 
-        f.render_widget(Clear, toast_area);
+        // Row 0: icon + message
+        let msg_text = format!(" {}  {} ", icon, notif.message);
+        let msg_line = Line::from(vec![
+            Span::styled(
+                msg_text.chars().take(width as usize).collect::<String>(),
+                Style::default().fg(color).add_modifier(Modifier::BOLD),
+            ),
+        ]);
+
+        let row0 = Rect { x, y: base_y, width, height: 1 };
+        f.render_widget(Clear, row0);
+        f.render_stateful_widget(
+            Paragraph::new(msg_line),
+            row0,
+            &mut ParagraphState::new(),
+        );
+
+        // Row 1: TTL progress bar
+        let bar_w = (width as usize).saturating_sub(2);
+        let bar   = Anim::ttl_bar(
+            notif.born.elapsed(),
+            Duration::from_secs_f32(NOTIF_TTL_SECS),
+            bar_w,
+        );
+        let bar_text = format!(" {}", bar);
+        let row1 = Rect { x, y: base_y + 1, width, height: 1 };
+        f.render_widget(Clear, row1);
         f.render_stateful_widget(
             Paragraph::new(Line::from(Span::styled(
-                body,
-                Style::default().fg(Color::Black).bg(color),
+                bar_text,
+                Style::default().fg(Color::DarkGray),
             ))),
-            toast_area,
+            row1,
             &mut ParagraphState::new(),
         );
     }
@@ -278,7 +324,13 @@ fn render_deploy(f: &mut RenderCtx<'_>, state: &AppState) {
         Color::Cyan
     };
 
-    let title = format!(" {} — {} ", state.t("deploy.title"), ds.target);
+    // Spinner in title while running, ✓/✗ when done
+    let status_icon = if ds.done {
+        if ds.success { "✓" } else { "✗" }
+    } else {
+        state.anim.spinner()
+    };
+    let title = format!(" {} {} — {} ", state.t("deploy.title"), status_icon, ds.target);
 
     f.render_widget(Clear, popup);
 
@@ -307,6 +359,77 @@ fn render_deploy(f: &mut RenderCtx<'_>, state: &AppState) {
         Paragraph::new(Line::from(Span::styled(hint_text, Style::default().fg(Color::DarkGray))))
             .alignment(Alignment::Center),
         hint_area,
+        &mut ParagraphState::new(),
+    );
+}
+
+// ── Context menu ──────────────────────────────────────────────────────────────
+//
+// Floating popup rendered at the right-click position (clamped to screen).
+// To change the visual style: edit only this function.
+// To change which items appear: edit mouse::context_items_for().
+
+fn render_context_menu(f: &mut RenderCtx<'_>, state: &AppState) {
+    use ratatui::{
+        layout::{Alignment, Rect},
+        style::{Color, Modifier, Style},
+        text::{Line, Span},
+        widgets::{Block, BorderType, Borders, Clear},
+    };
+    use rat_widget::paragraph::{Paragraph, ParagraphState};
+    use crate::app::OverlayLayer;
+
+    let (cx, cy, items, selected) = match state.top_overlay() {
+        Some(OverlayLayer::ContextMenu { x, y, items, selected }) => (*x, *y, items, *selected),
+        _ => return,
+    };
+
+    if items.is_empty() { return; }
+
+    let area   = f.area();
+    // width = longest label + 4 padding
+    let max_label = items.iter()
+        .map(|a| state.t(a.label_key()).chars().count())
+        .max()
+        .unwrap_or(8);
+    let width  = (max_label as u16 + 4).min(area.width);
+    // height = border(1) + items + border(1)
+    let height = items.len() as u16 + 2;
+
+    // Clamp so the menu stays on screen
+    let x = cx.min(area.right().saturating_sub(width));
+    let y = cy.min(area.bottom().saturating_sub(height));
+    let popup = Rect { x, y, width, height };
+
+    f.render_widget(Clear, popup);
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(Color::DarkGray));
+
+    let inner = block.inner(popup);
+    f.render_widget(block, popup);
+
+    let lines: Vec<Line> = items.iter().enumerate().map(|(i, action)| {
+        let label = state.t(action.label_key());
+        let is_sel = i == selected;
+        let style = if is_sel {
+            Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD)
+        } else if action.is_danger() {
+            Style::default().fg(Color::Red)
+        } else {
+            Style::default().fg(Color::White)
+        };
+        let prefix = if is_sel { "▶ " } else { "  " };
+        let text   = format!("{}{}", prefix, label);
+        let padded = format!("{:<w$}", text, w = inner.width as usize);
+        Line::from(Span::styled(padded, style))
+    }).collect();
+
+    f.render_stateful_widget(
+        Paragraph::new(lines).alignment(Alignment::Left),
+        inner,
         &mut ParagraphState::new(),
     );
 }

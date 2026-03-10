@@ -50,6 +50,11 @@ const TAB_KEYS: &[&str] = &[
 
 // ── Main render ───────────────────────────────────────────────────────────────
 
+/// Sidebar column width — keep in sync with the Layout constraint below.
+/// Also used by mouse.rs for hit-test approximation.
+#[allow(dead_code)]
+pub(crate) const SIDEBAR_COL_WIDTH: u16 = 28;
+
 pub fn render(f: &mut RenderCtx<'_>, state: &mut AppState, area: Rect) {
     let zones = Layout::vertical([
         Constraint::Length(5), // header: 4 logo rows + 1 tab bar
@@ -210,7 +215,7 @@ fn active_tab_index(state: &AppState) -> usize {
 
 // ── Body ──────────────────────────────────────────────────────────────────────
 
-fn render_body(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
+fn render_body(f: &mut RenderCtx<'_>, state: &mut AppState, area: Rect) {
     // F1 help panel slides in from the right — header and footer stay untouched.
     let (main_area, help_opt) =
         if state.help_visible && area.width > help_sidebar::SIDEBAR_WIDTH + 40 {
@@ -249,7 +254,7 @@ fn render_body(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
 
 // ── Sidebar ───────────────────────────────────────────────────────────────────
 
-fn render_sidebar(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
+fn render_sidebar(f: &mut RenderCtx<'_>, state: &mut AppState, area: Rect) {
     let focused = state.dash_focus == DashFocus::Sidebar;
 
     let border_style = if focused {
@@ -295,13 +300,15 @@ fn render_sidebar(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
         );
     }
 
-    let visible: Vec<(usize, &SidebarItem)> = if state.sidebar_filter.is_some() {
-        state.visible_sidebar_items()
+    // Collect visible item indices before any mutation (borrow-checker: collect indices
+    // separately so we can later write to state.sidebar_list_area).
+    let visible_indices: Vec<usize> = if state.sidebar_filter.is_some() {
+        state.visible_sidebar_items().into_iter().map(|(i, _)| i).collect()
     } else {
-        state.sidebar_items.iter().enumerate().collect()
+        (0..state.sidebar_items.len()).collect()
     };
 
-    if visible.is_empty() {
+    if visible_indices.is_empty() {
         let msg = if state.sidebar_filter.as_deref().is_some_and(|f| !f.is_empty()) {
             state.t("dash.filter.empty")
         } else {
@@ -315,17 +322,26 @@ fn render_sidebar(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
         return;
     }
 
-    let max_w = list_area.width.saturating_sub(2) as usize;
-    let lines: Vec<Line> = visible
+    // Store the list area for mouse hit-testing (mouse.rs::sidebar_hit).
+    state.sidebar_list_area = Some(list_area);
+
+    let max_w      = list_area.width.saturating_sub(2) as usize;
+    let cursor     = state.sidebar_cursor;
+    let lang       = state.lang;
+    let lines: Vec<Line> = visible_indices
         .iter()
-        .map(|(i, item)| item.sidebar_line(*i == state.sidebar_cursor, focused, max_w, state.lang))
+        .map(|&i| {
+            // SAFETY: index came from sidebar_items length check above
+            let item = &state.sidebar_items[i];
+            item.sidebar_line(i == cursor, focused, max_w, lang, &state.anim)
+        })
         .collect();
     f.render_stateful_widget(Paragraph::new(lines), list_area, &mut ParagraphState::new());
 }
 
 // ── Detail panel ──────────────────────────────────────────────────────────────
 
-fn render_detail_panel(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
+fn render_detail_panel(f: &mut RenderCtx<'_>, state: &mut AppState, area: Rect) {
     // Stats cards (top, fixed 3 rows) + content (flexible)
     let rows = Layout::vertical([
         Constraint::Length(3),
@@ -399,8 +415,8 @@ fn render_stat_card(f: &mut RenderCtx<'_>, area: Rect, label: &str, value: &str,
 
 // ── Center panel ──────────────────────────────────────────────────────────────
 
-fn render_center(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
-    match state.current_sidebar_item() {
+fn render_center(f: &mut RenderCtx<'_>, state: &mut AppState, area: Rect) {
+    match state.current_sidebar_item().cloned() {
         Some(item) => item.render_center(f, state, area),
         None       => render_services(f, state, area),
     }
@@ -408,7 +424,7 @@ fn render_center(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
 
 // ── Services table ────────────────────────────────────────────────────────────
 
-fn render_services(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
+fn render_services(f: &mut RenderCtx<'_>, state: &mut AppState, area: Rect) {
     let services_focused = state.dash_focus == DashFocus::Services;
 
     let block = Block::default()
@@ -494,6 +510,9 @@ fn render_services(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
     .block(block)
     .select_row_style(Some(Style::new().bg(Color::DarkGray)));
 
+    // Store area for mouse hit-testing (mouse.rs::services_hit). +1 = skip header row.
+    state.services_table_area = Some(area);
+
     let mut table_state = TableState::default();
     if services_focused { table_state.select(Some(state.selected)); }
     f.render_stateful_widget(table, area, &mut table_state);
@@ -566,12 +585,14 @@ fn render_footer(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
 
 impl SidebarItem {
     /// Produce the sidebar row line for this item.
+    /// `anim` drives the pulsing Running indicator — pass `&state.anim`.
     pub(crate) fn sidebar_line(
         &self,
         is_cursor: bool,
         focused: bool,
         max_w: usize,
         lang: Lang,
+        anim: &crate::ui::anim::Anim,
     ) -> Line<'static> {
         let t = |key| crate::i18n::t(lang, key);
         match self {
@@ -609,8 +630,8 @@ impl SidebarItem {
             }
 
             SidebarItem::Service { name, status, .. } => {
-                let status_char  = widgets::run_state_char(*status);
-                let status_color = widgets::run_state_color(*status);
+                // Running services get an animated pulsing indicator; others are static.
+                let (status_char, status_color) = widgets::run_state_char_anim(*status, anim);
                 let (prefix, name_style) = if is_cursor {
                     ("  ▶ ", Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD))
                 } else {
@@ -637,7 +658,7 @@ impl SidebarItem {
     }
 
     /// Render the center detail panel for this item's type.
-    pub(crate) fn render_center(&self, f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
+    pub(crate) fn render_center(&self, f: &mut RenderCtx<'_>, state: &mut AppState, area: Rect) {
         match self {
             SidebarItem::Project { slug, .. } => detail::render_project_detail(f, state, area, slug),
             SidebarItem::Host    { slug, .. } => detail::render_host_detail(f, state, area, slug),
