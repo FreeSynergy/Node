@@ -8,10 +8,10 @@ use crate::ui::form_node::{FormAction, FormNode};
 
 // ── Tab key constants ─────────────────────────────────────────────────────────
 
-pub const PROJECT_TABS: &[&str] = &["form.tab.project", "form.tab.options", "form.tab.services"];
-pub const SERVICE_TABS: &[&str] = &["form.tab.service", "form.tab.network", "form.tab.env"];
-pub const HOST_TABS:    &[&str] = &["form.tab.host", "form.tab.system", "form.tab.dns"];
-pub const BOT_TABS:     &[&str] = &["form.tab.bot", "form.tab.options"];
+pub const PROJECT_TABS: &[&str] = &["form.tab.project"];
+pub const SERVICE_TABS: &[&str] = &["form.tab.service"];
+pub const HOST_TABS:    &[&str] = &["form.tab.host"];
+pub const BOT_TABS:     &[&str] = &["form.tab.bot"];
 
 // ── Resource kind ─────────────────────────────────────────────────────────────
 

@@ -36,17 +36,17 @@ pub struct ServiceFormData {
     pub tags: String,
 
     // ── Tab 1: Network ────────────────────────────────────────────────────
-    #[form(label = "form.service.subdomain", tab = 1, hint = "form.service.subdomain.hint")]
+    #[form(label = "form.service.subdomain", tab = 0, hint = "form.service.subdomain.hint")]
     pub subdomain: String,
 
-    #[form(label = "form.service.alias", tab = 1, hint = "form.service.alias.hint")]
+    #[form(label = "form.service.alias", tab = 0, hint = "form.service.alias.hint")]
     pub alias: String,
 
-    #[form(label = "form.service.port", tab = 1)]
+    #[form(label = "form.service.port", tab = 0)]
     pub port: String,
 
     // ── Tab 2: Env ────────────────────────────────────────────────────────
-    #[form(label = "form.service.env", widget = "env_table", tab = 2, rows = 4,
+    #[form(label = "form.service.env", widget = "env_table", tab = 0, rows = 4,
            hint = "form.service.env.hint")]
     pub env: String,
 }

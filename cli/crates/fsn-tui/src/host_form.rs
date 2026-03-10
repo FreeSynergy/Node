@@ -41,25 +41,25 @@ pub struct HostFormData {
     pub proxy_name: String,
 
     // ── Tab 1: System ─────────────────────────────────────────────────────
-    #[form(label = "form.host.ssh_user", tab = 1, default = "root")]
+    #[form(label = "form.host.ssh_user", tab = 0, default = "root")]
     pub ssh_user: String,
 
-    #[form(label = "form.host.ssh_port", tab = 1, default = "22")]
+    #[form(label = "form.host.ssh_port", tab = 0, default = "22")]
     pub ssh_port: String,
 
-    #[form(label = "form.host.install_dir", tab = 1, hint = "form.host.install_dir.hint", default = "/opt/fsn")]
+    #[form(label = "form.host.install_dir", tab = 0, hint = "form.host.install_dir.hint", default = "/opt/fsn")]
     pub install_dir: String,
 
     // ── Tab 2: DNS / TLS ──────────────────────────────────────────────────
-    #[form(label = "form.host.dns_provider", widget = "select", tab = 2,
+    #[form(label = "form.host.dns_provider", widget = "select", tab = 0,
            options = "hetzner,cloudflare,manual,none", default = "hetzner")]
     pub dns_provider: String,
 
-    #[form(label = "form.host.acme_provider", widget = "select", tab = 2,
+    #[form(label = "form.host.acme_provider", widget = "select", tab = 0,
            options = "letsencrypt,zerossl,buypass,none", default = "letsencrypt")]
     pub acme_provider: String,
 
-    #[form(label = "form.host.acme_email", tab = 2, widget = "email", hint = "form.host.acme_email.hint")]
+    #[form(label = "form.host.acme_email", tab = 0, widget = "email", hint = "form.host.acme_email.hint")]
     pub acme_email: String,
 }
 

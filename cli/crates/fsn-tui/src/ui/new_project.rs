@@ -21,19 +21,22 @@ use crate::ui::widgets;
 pub fn render(f: &mut RenderCtx<'_>, state: &mut AppState, area: Rect) {
     let Some(ref mut form) = state.current_form else { return };
 
+    let tab_bar_h = if form.tab_keys.len() > 1 { 3 } else { 0 };
     let outer = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3), // header
-            Constraint::Length(3), // tab bar
-            Constraint::Min(1),    // form fields
-            Constraint::Length(1), // error line
-            Constraint::Length(1), // hint bar
+            Constraint::Length(3),          // header
+            Constraint::Length(tab_bar_h),  // tab bar (hidden when single tab)
+            Constraint::Min(1),             // form fields
+            Constraint::Length(1),          // error line
+            Constraint::Length(1),          // hint bar
         ])
         .split(area);
 
     render_header(f, state.lang, form, outer[0]);
-    render_tabs(f, state.lang, form, outer[1]);
+    if tab_bar_h > 0 {
+        render_tabs(f, state.lang, form, outer[1]);
+    }
 
     // Build inner area with horizontal padding (5% each side)
     let padding = Layout::default()

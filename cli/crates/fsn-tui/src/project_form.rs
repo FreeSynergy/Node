@@ -39,36 +39,36 @@ pub struct ProjectFormData {
     #[form(label = "form.project.email", required, tab = 0, widget = "email", hint = "form.project.email.hint")]
     pub contact_email: String,
 
-    #[form(label = "form.options.language", widget = "select", tab = 1,
+    #[form(label = "form.options.language", widget = "select", tab = 0,
            options = "de,en,fr,es,it,pt", default = "de")]
     pub language: String,
 
-    #[form(label = "form.project.path", required, tab = 1, hint = "form.project.path.hint")]
+    #[form(label = "form.project.path", required, tab = 0, hint = "form.project.path.hint")]
     pub install_dir: String,
 
-    #[form(label = "form.options.version", tab = 1, default = "0.1.0")]
+    #[form(label = "form.options.version", tab = 0, default = "0.1.0")]
     pub version: String,
 
-    #[form(label = "form.project.tags", tab = 1, hint = "form.project.tags.hint")]
+    #[form(label = "form.project.tags", tab = 0, hint = "form.project.tags.hint")]
     pub tags: String,
 
     // ── Tab 2: Service slots ──────────────────────────────────────────────
     // Each field references the instance name (slug) that fills the role.
     // Options are populated dynamically at form-build time from loaded service instances.
 
-    #[form(label = "form.project.iam", widget = "select", tab = 2, hint = "form.project.iam.hint")]
+    #[form(label = "form.project.iam", widget = "select", tab = 0, hint = "form.project.iam.hint")]
     pub iam: String,
 
-    #[form(label = "form.project.wiki", widget = "select", tab = 2, hint = "form.project.wiki.hint")]
+    #[form(label = "form.project.wiki", widget = "select", tab = 0, hint = "form.project.wiki.hint")]
     pub wiki: String,
 
-    #[form(label = "form.project.mail", widget = "select", tab = 2, hint = "form.project.mail.hint")]
+    #[form(label = "form.project.mail", widget = "select", tab = 0, hint = "form.project.mail.hint")]
     pub mail: String,
 
-    #[form(label = "form.project.monitoring", widget = "select", tab = 2, hint = "form.project.monitoring.hint")]
+    #[form(label = "form.project.monitoring", widget = "select", tab = 0, hint = "form.project.monitoring.hint")]
     pub monitoring: String,
 
-    #[form(label = "form.project.git", widget = "select", tab = 2, hint = "form.project.git.hint")]
+    #[form(label = "form.project.git", widget = "select", tab = 0, hint = "form.project.git.hint")]
     pub git: String,
 }
 
