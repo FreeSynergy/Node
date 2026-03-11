@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use fsn_core::{
-    config::{HostConfig, ServiceRegistry, ProjectConfig, VaultConfig},
+    config::{HostConfig, ServiceRegistry, ProjectConfig, VaultConfig, resolve_plugins_dir},
 };
 use fsn_engine::{
     deploy::{DeployOpts, deploy_all},
@@ -35,7 +35,7 @@ pub async fn run(
         vault_pass.as_deref(),
     )?;
 
-    let registry = ServiceRegistry::load(&root.join("modules"))?;
+    let registry = ServiceRegistry::load(&resolve_plugins_dir(root))?;
 
     // ── Resolve desired state ─────────────────────────────────────────────────
     let data_root = project_path.parent()

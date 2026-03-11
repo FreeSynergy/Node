@@ -109,3 +109,30 @@ fn settings_path() -> PathBuf {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
     PathBuf::from(home).join(".config").join("fsn").join("settings.toml")
 }
+
+// ── Container Plugins directory ────────────────────────────────────────────────
+
+/// Resolve the directory that holds container plugin definitions (formerly "modules/").
+///
+/// Priority (first match wins):
+///   1. `FSN_PLUGINS_DIR` environment variable — explicit override.
+///   2. First enabled store with a `local_path` set → `{local_path}/Node/`.
+///   3. Legacy fallback: `{node_root}/modules/`.
+///
+/// Callers pass the FSN workspace root so the legacy path always resolves
+/// even when no settings file or env var is present.
+pub fn resolve_plugins_dir(node_root: &std::path::Path) -> PathBuf {
+    // 1. Explicit environment override.
+    if let Ok(dir) = std::env::var("FSN_PLUGINS_DIR") {
+        return PathBuf::from(dir);
+    }
+    // 2. First enabled store with a local_path.
+    if let Ok(settings) = AppSettings::load() {
+        if let Some(store) = settings.stores.iter().find(|s| s.enabled && s.local_path.is_some()) {
+            let base = PathBuf::from(store.local_path.as_deref().unwrap());
+            return base.join("Node");
+        }
+    }
+    // 3. Legacy bundled modules directory.
+    node_root.join("modules")
+}

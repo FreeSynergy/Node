@@ -12,7 +12,7 @@
 
 pub mod types;
 
-pub use types::{ServiceType, de_service_types};
+pub use types::{Capability, ExportedVarContract, ServiceType, de_service_types};
 
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};

@@ -200,14 +200,14 @@ async fn load_project_services(s: &AppState) -> (String, String, Vec<ServiceInfo
 async fn try_load_project_config(
     root: &std::path::Path,
 ) -> Option<((String, String), Vec<ServiceInfo>)> {
-    use fsn_core::config::{HostConfig, ServiceRegistry, ProjectConfig, VaultConfig};
+    use fsn_core::config::{HostConfig, ServiceRegistry, ProjectConfig, VaultConfig, resolve_plugins_dir};
     use fsn_engine::{observe::observe, resolve::resolve_desired};
 
     let proj_path = super::find_project_file(root)?;
     let host_path = super::find_host_file(root)?;
     let proj      = ProjectConfig::load(&proj_path).ok()?;
     let host      = HostConfig::load(&host_path).ok()?;
-    let registry  = ServiceRegistry::load(&root.join("modules")).ok()?;
+    let registry  = ServiceRegistry::load(&resolve_plugins_dir(root)).ok()?;
     let vault_pass = std::env::var("FSN_VAULT_PASS").ok();
     let vault = VaultConfig::load(
         proj_path.parent().unwrap_or(root),
@@ -253,7 +253,7 @@ fn load_hosts(s: &AppState) -> Vec<HostInfo> {
 }
 
 async fn load_setup_requirements(s: &AppState) -> Vec<SetupRequirementJson> {
-    use fsn_core::config::{HostConfig, ServiceRegistry, ProjectConfig, VaultConfig};
+    use fsn_core::config::{HostConfig, ServiceRegistry, ProjectConfig, VaultConfig, resolve_plugins_dir};
     use fsn_engine::{resolve::resolve_desired, setup::collect_requirements};
 
     let root = s.fsn_root.as_ref();
@@ -261,7 +261,7 @@ async fn load_setup_requirements(s: &AppState) -> Vec<SetupRequirementJson> {
     let Some(host_path) = super::find_host_file(root)    else { return Vec::new() };
     let Ok(proj)     = ProjectConfig::load(&proj_path)               else { return Vec::new() };
     let Ok(host)     = HostConfig::load(&host_path)                  else { return Vec::new() };
-    let Ok(registry) = ServiceRegistry::load(&root.join("modules"))   else { return Vec::new() };
+    let Ok(registry) = ServiceRegistry::load(&resolve_plugins_dir(root)) else { return Vec::new() };
     let vault_pass = std::env::var("FSN_VAULT_PASS").ok();
     let vault = VaultConfig::load(
         proj_path.parent().unwrap_or(root),

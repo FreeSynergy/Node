@@ -54,31 +54,22 @@ pub struct ServiceInstance {
 impl VarProvider for ServiceInstance {
     /// Exports cross-service variables based on service types.
     ///
-    /// Internal services (Database, Cache, Proxy, Bot) export nothing —
-    /// they are not consumed directly by user-facing services via template vars.
-    /// For multi-type services, vars are exported for every applicable type.
+    /// Delegates to `ServiceType::exported_contract()` — the type itself is
+    /// the single source of truth for which variables it exports and with
+    /// which prefix. This eliminates the match block that previously lived here.
+    ///
+    /// Internal services (Database, Cache, Proxy, Bot) have no contract and
+    /// export nothing — they are not consumed via template variables by peers.
     fn exported_vars(&self) -> HashMap<String, String> {
         let mut vars = HashMap::new();
         for t in &self.service_types {
-            let prefix = match t {
-                ServiceType::Mail             => "MAIL",
-                ServiceType::Iam
-                | ServiceType::IamProvider
-                | ServiceType::IamBroker      => "IAM",
-                ServiceType::Git              => "GIT",
-                ServiceType::Chat             => "CHAT",
-                ServiceType::Wiki             => "WIKI",
-                ServiceType::Tasks            => "TASKS",
-                ServiceType::Collab           => "COLLAB",
-                ServiceType::Monitoring       => "MONITORING",
-                ServiceType::Tickets          => "TICKETS",
-                ServiceType::Maps             => "MAPS",
-                _ => continue,
-            };
-            vars.insert(format!("{prefix}_HOST"),   self.name.clone());
-            vars.insert(format!("{prefix}_DOMAIN"), self.service_domain.clone());
-            vars.insert(format!("{prefix}_URL"),    format!("https://{}", self.service_domain));
-            vars.insert(format!("{prefix}_PORT"),   self.class.meta.port.to_string());
+            if let Some(contract) = t.exported_contract() {
+                vars.extend(contract.resolve(
+                    &self.name,
+                    &self.service_domain,
+                    self.class.meta.port,
+                ));
+            }
         }
         vars
     }

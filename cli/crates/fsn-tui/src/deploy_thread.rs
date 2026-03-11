@@ -8,7 +8,7 @@
 
 use std::path::Path;
 
-use fsn_core::config::HostConfig;
+use fsn_core::config::{HostConfig, resolve_plugins_dir};
 
 use crate::app::{AppState, DeployMsg, DeployState, OverlayLayer};
 use crate::handles::ProjectHandle;
@@ -34,7 +34,7 @@ pub fn trigger_deploy(
     }));
 
     let project_dir = root.join("projects").join(&project.slug);
-    let modules_dir = root.join("modules");
+    let modules_dir = resolve_plugins_dir(root);
     let project_cfg = project.config;
 
     std::thread::spawn(move || {

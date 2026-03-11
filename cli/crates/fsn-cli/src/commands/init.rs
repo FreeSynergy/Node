@@ -12,6 +12,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use fsn_core::config::{
+    resolve_plugins_dir,
     service::FieldType,
     registry::ServiceRegistry,
     vault::VaultConfig,
@@ -23,7 +24,7 @@ pub async fn run(root: &Path) -> Result<()> {
 
     let (slug, proj_dir) = ensure_project_skeleton(root)?;
 
-    let modules_dir = root.join("modules");
+    let modules_dir = resolve_plugins_dir(root);
     if modules_dir.exists() {
         select_modules(root, &proj_dir, &slug, &modules_dir)?;
     }

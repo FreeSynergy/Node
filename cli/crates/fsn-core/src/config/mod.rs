@@ -16,6 +16,7 @@ pub use manifest::{
     PluginResponse, OutputFile, ShellCommand, LogLine, LogLevel,
 };
 pub use service::{
+    Capability, ExportedVarContract,
     Constraints, ContainerDef, Locality,
     ServiceClass, ServiceMeta, ServiceType,
     ServiceLoad, ServiceSetup, SetupField, FieldType,
@@ -30,7 +31,7 @@ pub use project::{
 };
 pub use plugin::{PluginConfig, PluginMeta};
 pub use registry::ServiceRegistry;
-pub use settings::{AppSettings, StoreConfig};
+pub use settings::{AppSettings, StoreConfig, resolve_plugins_dir};
 pub use vault::VaultConfig;
 
 // ── Shared TOML loader ────────────────────────────────────────────────────────

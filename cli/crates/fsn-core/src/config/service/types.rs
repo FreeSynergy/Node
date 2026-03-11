@@ -1,8 +1,14 @@
-// ServiceType enum — functional role classification for service modules.
+// ServiceType enum — functional role classification for container plugins.
+//
+// Design Pattern: OOP — behavior belongs to the type itself.
+//   ServiceType::exported_contract() → single source of truth for cross-service vars.
+//   ServiceType::capabilities()      → what protocol/feature set a type guarantees.
 //
 // Separated from the class/meta structs so this enum (used everywhere for
 // filtering and slot-matching) can be imported without pulling in the full
-// service definition (ContainerDef, HealthCheck, etc.).
+// container plugin definition (ContainerDef, HealthCheck, etc.).
+
+use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
@@ -166,6 +172,133 @@ impl ServiceType {
             ServiceType::Bot             => "Bot",
             ServiceType::Custom          => "Custom",
         }
+    }
+
+    /// Returns the cross-service variable contract for this type.
+    ///
+    /// `None` for internal/infrastructure types (Database, Cache, Proxy, Bot, Custom)
+    /// that are not consumed directly by peer services via template variables.
+    ///
+    /// OOP principle: the type owns this knowledge, not the caller's match block.
+    pub fn exported_contract(&self) -> Option<ExportedVarContract> {
+        let prefix = match self {
+            ServiceType::Mail                                                 => "MAIL",
+            ServiceType::Iam | ServiceType::IamProvider | ServiceType::IamBroker => "IAM",
+            ServiceType::Git                                                  => "GIT",
+            ServiceType::Chat                                                 => "CHAT",
+            ServiceType::Wiki                                                 => "WIKI",
+            ServiceType::Tasks                                                => "TASKS",
+            ServiceType::Collab                                               => "COLLAB",
+            ServiceType::Monitoring                                           => "MONITORING",
+            ServiceType::Tickets                                              => "TICKETS",
+            ServiceType::Maps                                                 => "MAPS",
+            // Internal / infrastructure: no cross-service export.
+            ServiceType::Database | ServiceType::Cache
+            | ServiceType::Proxy  | ServiceType::WebhosterSimple
+            | ServiceType::Bot    | ServiceType::Custom                       => return None,
+        };
+        Some(ExportedVarContract { prefix })
+    }
+
+    /// Returns the base capability set guaranteed by every service of this type.
+    ///
+    /// Fine-grained capabilities (e.g. `IamScim`, `DatabaseMysql`) are declared
+    /// at the plugin level in the container plugin TOML — these are the minimums
+    /// that any implementation of this type must provide.
+    pub fn capabilities(&self) -> Vec<Capability> {
+        match self {
+            ServiceType::Database | ServiceType::Cache         => vec![Capability::InternalOnly],
+            ServiceType::Proxy | ServiceType::WebhosterSimple  => vec![Capability::InternalOnly, Capability::ProxyTls],
+            ServiceType::IamProvider | ServiceType::Iam        => vec![Capability::IamOidc],
+            ServiceType::IamBroker                             => vec![Capability::IamOidc, Capability::IamFederation],
+            ServiceType::Mail                                   => vec![Capability::MailSmtp, Capability::MailImap],
+            _                                                   => vec![],
+        }
+    }
+}
+
+// ── Capability ────────────────────────────────────────────────────────────────
+
+/// Fine-grained protocol or feature capability.
+///
+/// ServiceType::capabilities() returns the guaranteed minimum for ALL plugins of
+/// that type. Individual container plugins declare additional capabilities in their
+/// TOML (Phase 4/6 work) — e.g. Kanidm adds `IamScim`, Postgres adds `DatabasePostgres`.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Capability {
+    // ── Infrastructure ─────────────────────────────────────────────────────
+    /// Service has no proxy route and is not user-facing (Database, Cache, …)
+    InternalOnly,
+
+    // ── IAM ────────────────────────────────────────────────────────────────
+    /// OpenID Connect / OAuth2 login
+    IamOidc,
+    /// LDAP directory access
+    IamLdap,
+    /// SAML 2.0 assertion
+    IamSaml,
+    /// SCIM 2.0 provisioning (Kanidm yes, Keycloak no)
+    IamScim,
+    /// Identity federation (brokering external IdPs)
+    IamFederation,
+
+    // ── Database ───────────────────────────────────────────────────────────
+    /// PostgreSQL wire protocol
+    DatabasePostgres,
+    /// MySQL/MariaDB wire protocol
+    DatabaseMysql,
+    /// SQLite file-based storage
+    DatabaseSqlite,
+
+    // ── Cache ──────────────────────────────────────────────────────────────
+    /// Redis RESP protocol (Dragonfly, Redis, KeyDB, …)
+    CacheRedis,
+    /// Memcached protocol
+    CacheMemcached,
+
+    // ── Mail ───────────────────────────────────────────────────────────────
+    /// SMTP outbound + inbound
+    MailSmtp,
+    /// IMAP mailbox access
+    MailImap,
+    /// JMAP modern mail protocol
+    MailJmap,
+
+    // ── Proxy ──────────────────────────────────────────────────────────────
+    /// Automatic TLS via ACME
+    ProxyTls,
+    /// DNS-01 ACME challenge support
+    ProxyAcmeDns,
+}
+
+// ── ExportedVarContract ───────────────────────────────────────────────────────
+
+/// Defines what cross-service environment variables a service type exports.
+///
+/// All types that export vars use the same 4-variable pattern:
+///   {PREFIX}_HOST    — container name (for internal DNS)
+///   {PREFIX}_DOMAIN  — public subdomain (e.g. "mail.example.com")
+///   {PREFIX}_URL     — full HTTPS URL (e.g. "https://mail.example.com")
+///   {PREFIX}_PORT    — service port (from ServiceMeta::port)
+///
+/// This struct is the single source of truth — `desired.rs` calls
+/// `contract.resolve(…)` instead of hard-coding prefix strings.
+#[derive(Debug, Clone)]
+pub struct ExportedVarContract {
+    /// Variable prefix without trailing underscore (e.g. "MAIL", "IAM").
+    pub prefix: &'static str,
+}
+
+impl ExportedVarContract {
+    /// Resolve the contract into concrete key-value pairs.
+    pub fn resolve(&self, name: &str, domain: &str, port: u16) -> HashMap<String, String> {
+        let p = self.prefix;
+        HashMap::from([
+            (format!("{p}_HOST"),   name.to_string()),
+            (format!("{p}_DOMAIN"), domain.to_string()),
+            (format!("{p}_URL"),    format!("https://{domain}")),
+            (format!("{p}_PORT"),   port.to_string()),
+        ])
     }
 }
 
