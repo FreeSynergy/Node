@@ -1,7 +1,8 @@
-// EnvTableNode — editable key-value-comment table for environment variables.
+// EnvTableNode — editable environment-variable widget with a 3-field editor row.
 //
-// Analogous to a spreadsheet with 3 fixed columns: Key | Value | Comment.
-// Comments are displayed in the UI but not included in the serialized value.
+// Design Pattern: Editor + List
+//   The active row is always shown at the top as 3 bordered input boxes
+//   (KEY | VALUE | COMMENT).  All other rows are listed compactly below.
 //
 // Navigation:
 //   Tab          — move to next column; at col 2: FocusNext (leave table)
@@ -18,6 +19,13 @@
 //
 // value() serialization: "KEY=value\n..." for each row with a non-empty key.
 // Comments are UI-only and not part of the serialized value.
+//
+// Layout (inside the outer block):
+//   ┌─ KEY ─────────────┐ ┌─ VALUE ──────────────────┐ ┌─ COMMENT ───────┐
+//   │ DATABASE_HOST      │ │ localhost█               │ │ DB hostname     │
+//   └────────────────────┘ └──────────────────────────┘ └─────────────────┘
+//   OTHER_KEY = other_value
+//   ...
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
@@ -197,11 +205,19 @@ impl EnvTableNode {
     }
 
     fn update_scroll(&mut self) {
-        let n = self.visible_rows as usize;
-        if self.cur_row >= self.scroll_offset + n {
-            self.scroll_offset = self.cur_row + 1 - n;
-        } else if self.cur_row < self.scroll_offset {
-            self.scroll_offset = self.cur_row;
+        // In the editor+list layout, scroll_offset controls which other rows
+        // (all rows except cur_row) are visible in the list below the editor.
+        // We ensure the rows adjacent to cur_row remain visible.
+        let n = (self.visible_rows as usize).saturating_sub(1); // rows available below editor
+        if n == 0 { return; }
+
+        // Virtual index: in the "other rows" list (excluding cur_row), the row
+        // just before cur_row is at virtual index max(0, cur_row - 1).
+        let target = if self.cur_row > 0 { self.cur_row - 1 } else { 0 };
+        if target < self.scroll_offset {
+            self.scroll_offset = target;
+        } else if target >= self.scroll_offset + n {
+            self.scroll_offset = target + 1 - n;
         }
     }
 }
@@ -242,132 +258,167 @@ impl FormNode for EnvTableNode {
     fn is_dirty(&self)       -> bool { self.dirty }
     fn set_dirty(&mut self, v: bool) { self.dirty = v; }
 
-    /// Block(borders=2 + header=1 + rows=N) + hint=1.
-    fn preferred_height(&self) -> u16 { self.visible_rows + 4 }
+    /// 3 (editor boxes) + (visible_rows - 1) (other-rows list) + 2 (block borders) + 1 (hint).
+    fn preferred_height(&self) -> u16 { self.visible_rows + 5 }
 
     fn render(&mut self, f: &mut RenderCtx<'_>, area: Rect, focused: bool, lang: Lang) {
         if focused { self.update_scroll(); }
 
-        let [block_area, hint_area] = {
-            let chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Min(0), Constraint::Length(1)])
-                .split(area);
-            [chunks[0], chunks[1]]
-        };
+        // Split into block area and hint line.
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Min(0), Constraint::Length(1)])
+            .split(area);
+        let [block_area, hint_area] = [chunks[0], chunks[1]];
 
-        // Outer block
+        // ── Outer block ──────────────────────────────────────────────────────
         let label_text   = crate::i18n::t(lang, self.label_key);
         let label_style  = if focused {
             Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(Color::White)
         };
-        let border_style = if focused {
+        let outer_border = if focused {
             Style::default().fg(Color::Cyan)
         } else {
             Style::default().fg(Color::DarkGray)
         };
 
         let block = Block::default()
-            .title(Line::from(vec![
-                Span::styled(format!(" {} ", label_text), label_style),
-            ]))
+            .title(Line::from(Span::styled(format!(" {} ", label_text), label_style)))
             .borders(Borders::ALL)
-            .border_style(border_style);
+            .border_style(outer_border);
 
         let inner = block.inner(block_area);
         f.render_widget(block, block_area);
 
         if inner.height == 0 { return; }
 
-        // Column proportions: Key(30%) | Value(35%) | Comment(35%)
-        let key_w  = (inner.width * 30 / 100).max(6);
-        let val_w  = (inner.width * 35 / 100).max(8);
-        let com_w  = inner.width.saturating_sub(key_w).saturating_sub(val_w);
+        // ── Editor section — 3 bordered input boxes for the current row ──────
+        //
+        // Always rendered at the top; takes exactly 3 rows (top border + content + bottom border).
+        const EDITOR_H: u16 = 3;
 
-        let col_starts = [inner.x, inner.x + key_w, inner.x + key_w + val_w];
-        let col_widths = [key_w, val_w, com_w];
+        // Column widths: KEY(28%) | VALUE(40%) | COMMENT(rest)
+        let key_w = (inner.width * 28 / 100).max(5);
+        let val_w = (inner.width * 40 / 100).max(8);
+        let com_w = inner.width.saturating_sub(key_w).saturating_sub(val_w);
 
-        let header_names = ["KEY", "VALUE", "COMMENT"];
+        let col_rects = [
+            Rect { x: inner.x,                  y: inner.y, width: key_w, height: EDITOR_H.min(inner.height) },
+            Rect { x: inner.x + key_w,           y: inner.y, width: val_w, height: EDITOR_H.min(inner.height) },
+            Rect { x: inner.x + key_w + val_w,   y: inner.y, width: com_w, height: EDITOR_H.min(inner.height) },
+        ];
+        let col_names = ["KEY", "VALUE", "COMMENT"];
 
-        // Header row
-        let header_y = inner.y;
-        if header_y < inner.bottom() {
-            for ci in 0..3 {
-                let style = if focused && ci == self.cur_col {
-                    Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
-                } else {
-                    Style::default().fg(Color::DarkGray).add_modifier(Modifier::BOLD)
-                };
-                f.render_stateful_widget(
-                    Paragraph::new(Line::from(Span::styled(header_names[ci], style))),
-                    Rect { x: col_starts[ci], y: header_y, width: col_widths[ci], height: 1 },
-                    &mut ParagraphState::new(),
-                );
-            }
-        }
+        for (ci, &col_rect) in col_rects.iter().enumerate() {
+            if col_rect.width == 0 { continue; }
 
-        // Data rows
-        let n_visible = self.visible_rows as usize;
-        for slot in 0..n_visible {
-            let row_idx = self.scroll_offset + slot;
-            let row_y   = inner.y + 1 + slot as u16;
-            if row_y >= inner.bottom() { break; }
+            let cell_val  = self.rows.get(self.cur_row).map(|r| r[ci].as_str()).unwrap_or("");
+            let is_active = focused && ci == self.cur_col;
 
-            let is_active_row = focused && row_idx == self.cur_row;
-            let row_data = self.rows.get(row_idx);
-
-            for ci in 0..3usize {
-                let cell_rect = Rect {
-                    x: col_starts[ci], y: row_y,
-                    width: col_widths[ci], height: 1,
-                };
-                let cell_val  = row_data.map(|r| r[ci].as_str()).unwrap_or("");
-                let is_active = is_active_row && ci == self.cur_col;
-
-                let line = if is_active {
-                    let pos    = self.cur_pos.min(cell_val.len());
-                    let before = &cell_val[..pos];
-                    let after  = &cell_val[pos..];
-                    Line::from(vec![
-                        Span::styled(before.to_string(), Style::default().fg(Color::White)),
-                        Span::styled("█",               Style::default().fg(Color::Cyan)),
-                        Span::styled(after.to_string(),  Style::default().fg(Color::White)),
-                    ])
-                } else {
-                    let style = if is_active_row {
-                        Style::default().fg(Color::White)
-                    } else if cell_val.is_empty() {
-                        Style::default().fg(Color::DarkGray)
-                    } else {
-                        Style::default().fg(Color::White)
-                    };
-                    Line::from(Span::styled(cell_val.to_string(), style))
-                };
-                f.render_stateful_widget(Paragraph::new(line), cell_rect, &mut ParagraphState::new());
-            }
-        }
-
-        // Hint: when focused show shortcut bar; otherwise show the configured hint.
-        {
-            let hint_text = if focused {
-                "Enter: new row   Ctrl+N: add at end   Ctrl+D: delete row   ↑/↓: navigate".to_string()
-            } else if let Some(hk) = self.hint_key {
-                crate::i18n::t(lang, hk).to_string()
+            let (border_style, title_style) = if is_active {
+                (
+                    Style::default().fg(Color::Cyan),
+                    Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                )
+            } else if focused {
+                (
+                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(Color::DarkGray).add_modifier(Modifier::BOLD),
+                )
             } else {
-                String::new()
+                (
+                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(Color::DarkGray),
+                )
             };
-            if !hint_text.is_empty() {
+
+            let cell_block = Block::default()
+                .title(Span::styled(format!(" {} ", col_names[ci]), title_style))
+                .borders(Borders::ALL)
+                .border_style(border_style);
+            let cell_inner = cell_block.inner(col_rect);
+            f.render_widget(cell_block, col_rect);
+
+            if cell_inner.height == 0 { continue; }
+
+            let line = if is_active {
+                let pos    = self.cur_pos.min(cell_val.len());
+                let before = &cell_val[..pos];
+                let after  = &cell_val[pos..];
+                Line::from(vec![
+                    Span::styled(before.to_string(), Style::default().fg(Color::White)),
+                    Span::styled("█",               Style::default().fg(Color::Cyan)),
+                    Span::styled(after.to_string(),  Style::default().fg(Color::White)),
+                ])
+            } else {
+                let style = if cell_val.is_empty() {
+                    Style::default().fg(Color::DarkGray)
+                } else {
+                    Style::default().fg(Color::White)
+                };
+                Line::from(Span::styled(cell_val.to_string(), style))
+            };
+            f.render_stateful_widget(Paragraph::new(line), cell_inner, &mut ParagraphState::new());
+        }
+
+        // ── Other rows list — all rows except cur_row, shown below the editor ─
+        let list_y = inner.y + EDITOR_H;
+        if list_y < inner.bottom() {
+            let n_slots = (inner.bottom() - list_y) as usize;
+            let mut slot = 0usize;
+
+            for row_idx in 0..self.rows.len() {
+                if row_idx == self.cur_row { continue; } // active row is in the editor
+
+                // Apply scroll offset: skip leading rows.
+                let virtual_idx = if row_idx < self.cur_row { row_idx } else { row_idx - 1 };
+                if virtual_idx < self.scroll_offset { continue; }
+
+                if slot >= n_slots { break; }
+                let row_y = list_y + slot as u16;
+
+                let row   = &self.rows[row_idx];
+                let key   = row[0].as_str();
+                let val   = row[1].as_str();
+
+                let line = if key.is_empty() {
+                    Line::from(Span::styled("  —", Style::default().fg(Color::DarkGray)))
+                } else {
+                    Line::from(vec![
+                        Span::raw("  "),
+                        Span::styled(key.to_string(), Style::default().fg(Color::White)),
+                        Span::styled(" = ", Style::default().fg(Color::DarkGray)),
+                        Span::styled(val.to_string(), Style::default().fg(Color::DarkGray)),
+                    ])
+                };
                 f.render_stateful_widget(
-                    Paragraph::new(Line::from(Span::styled(
-                        hint_text,
-                        Style::default().fg(Color::DarkGray),
-                    ))),
-                    hint_area,
+                    Paragraph::new(line),
+                    Rect { x: inner.x, y: row_y, width: inner.width, height: 1 },
                     &mut ParagraphState::new(),
                 );
+                slot += 1;
             }
+        }
+
+        // ── Hint bar ─────────────────────────────────────────────────────────
+        let hint_text = if focused {
+            "Tab: next col   ↑/↓: rows   Enter: new row   Ctrl+D: delete".to_string()
+        } else if let Some(hk) = self.hint_key {
+            crate::i18n::t(lang, hk).to_string()
+        } else {
+            String::new()
+        };
+        if !hint_text.is_empty() {
+            f.render_stateful_widget(
+                Paragraph::new(Line::from(Span::styled(
+                    hint_text,
+                    Style::default().fg(Color::DarkGray),
+                ))),
+                hint_area,
+                &mut ParagraphState::new(),
+            );
         }
     }
 

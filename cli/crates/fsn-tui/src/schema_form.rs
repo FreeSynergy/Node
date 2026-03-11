@@ -113,7 +113,9 @@ fn build_node(
             let mut node = EnvTableNode::new(field.key, field.label_key, field.tab);
             if let Some(h) = field.hint_key { node = node.hint(h); }
             if let Some(r) = field.rows     { node = node.rows(r); }
-            if let Some(v) = pre_val        { node.set_value(v); }
+            // Priority: prefill (edit mode) > dynamic value > ignored (no schema default for env).
+            if let Some(v) = pre_val { node.set_value(v); }
+            else if let Some(v) = dyn_val { node.set_value(v); }
             Box::new(node)
         }
 

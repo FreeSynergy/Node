@@ -174,6 +174,7 @@ pub fn submit_service(state: &mut AppState, root: &Path) -> Result<()> {
                 let svc_name  = form.field_value("name");
                 let svc_class = form.field_value("class");
                 let slug      = crate::resource_form::slugify(&svc_name);
+                // proj.toml_path is from the pre-reload clone — safe to use here.
                 let mut proj_content = std::fs::read_to_string(&proj.toml_path)?;
                 if !proj_content.contains(&format!("[load.services.{}]", slug)) {
                     let version = form.field_value("version");
@@ -208,6 +209,12 @@ pub fn submit_service(state: &mut AppState, root: &Path) -> Result<()> {
             }
             let svc_name = state.active_form().map(|f| f.field_value("name")).unwrap_or_default();
             state.projects = crate::load_projects(root);
+            // Re-resolve selected_project by slug — filesystem order is non-deterministic
+            // and the index may shift after a reload.  proj.slug comes from the pre-reload
+            // clone captured at the top of submit_service.
+            if let Some(idx) = state.projects.iter().position(|p| p.slug == proj.slug) {
+                state.selected_project = idx;
+            }
             state.rebuild_services();
             state.rebuild_sidebar();
             state.dash_focus = DashFocus::Services;

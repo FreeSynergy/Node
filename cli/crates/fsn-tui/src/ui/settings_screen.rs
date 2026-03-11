@@ -123,8 +123,23 @@ fn render_stores(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
         ]));
         lines.push(Line::from(vec![
             Span::raw("    "),
+            Span::styled("URL:  ", Style::default().fg(Color::DarkGray)),
             Span::styled(store.url.as_str(), Style::default().fg(Color::DarkGray)),
         ]));
+        if let Some(ref lp) = store.local_path {
+            lines.push(Line::from(vec![
+                Span::raw("    "),
+                Span::styled("Path: ", Style::default().fg(Color::DarkGray)),
+                Span::styled(lp.as_str(), Style::default().fg(Color::Yellow)),
+            ]));
+        }
+        if let Some(ref gu) = store.git_url {
+            lines.push(Line::from(vec![
+                Span::raw("    "),
+                Span::styled("Git:  ", Style::default().fg(Color::DarkGray)),
+                Span::styled(gu.as_str(), Style::default().fg(Color::DarkGray)),
+            ]));
+        }
         lines.push(Line::from(""));
     }
 

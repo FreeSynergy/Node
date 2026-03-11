@@ -135,13 +135,16 @@ pub fn load_class_env_defaults(class_key: &str, plugins_dir: &Path) -> String {
 // ── Form builders ─────────────────────────────────────────────────────────────
 
 pub fn new_service_form() -> ResourceForm {
-    let nodes = schema_form::build_nodes(
+    let mut nodes = schema_form::build_nodes(
         ServiceFormData::schema(),
         &HashMap::new(),
         DISPLAY_FNS,
         &[],
         &[],
     );
+    // Seed env defaults for the initial class (proxy/zentinel) immediately —
+    // service_on_change only fires on user interactions, so we trigger it once here.
+    service_on_change(&mut nodes, "class");
     ResourceForm::new(ResourceKind::Service, SERVICE_TABS, nodes, None, service_on_change)
 }
 

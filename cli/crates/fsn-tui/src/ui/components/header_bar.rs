@@ -12,7 +12,8 @@ use ratatui::{
 };
 use rat_widget::paragraph::{Paragraph, ParagraphState};
 
-use crate::app::{AppState, SidebarAction, SidebarItem};
+use crate::app::{AppState, Screen, SidebarAction, SidebarItem};
+use crate::click_map::ClickTarget;
 use crate::ui::{render_ctx::RenderCtx, widgets};
 use super::Component;
 
@@ -39,7 +40,11 @@ impl Component for HeaderBar {
     }
 }
 
-fn render_logo_row(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
+// ClickMap is cleared and rebuilt every frame by the top-level render entry
+// (ui/mod.rs). Both render_logo_row and render_tab_bar push their own
+// clickable regions so mouse.rs can dispatch without screen-specific branches.
+
+fn render_logo_row(f: &mut RenderCtx<'_>, state: &mut AppState, area: Rect) {
     let cols = Layout::horizontal([
         Constraint::Length(18), // "FSN" in Quadrant: 3 chars × 4 cols + padding
         Constraint::Min(1),
@@ -78,6 +83,8 @@ fn render_logo_row(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
         width:  5,
         height: 1,
     };
+    // Register lang button as clickable — mouse.rs handles LangToggle globally.
+    state.click_map.push(lang_area, ClickTarget::LangToggle);
     f.render_stateful_widget(
         Paragraph::new(Line::from(widgets::lang_button(state))),
         lang_area,
@@ -129,12 +136,24 @@ fn render_logo_row(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
     );
 }
 
-fn render_tab_bar(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
+fn render_tab_bar(f: &mut RenderCtx<'_>, state: &mut AppState, area: Rect) {
     let active     = active_tab_index(state);
     let mut spans: Vec<Span> = vec![Span::raw(" ")];
+    // Track x position for click target registration.
+    let mut x = area.x + 1u16; // +1 for the leading space
 
     for (i, &key) in TAB_KEYS.iter().enumerate() {
-        let label = state.t(key);
+        // .to_string() releases the &self borrow before click_map is mutably borrowed.
+        let label  = state.t(key).to_string();
+        let tab_w  = label.chars().count() as u16 + 2; // " label "
+
+        // Register every tab as clickable — mouse.rs dispatches NavTab to navigate_to_tab().
+        state.click_map.push(
+            Rect { x, y: area.y, width: tab_w, height: 1 },
+            ClickTarget::NavTab { index: i },
+        );
+        x += tab_w;
+
         if i == active {
             spans.push(Span::styled(
                 format!(" {} ", label),
@@ -145,6 +164,7 @@ fn render_tab_bar(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
         }
         if i < TAB_KEYS.len() - 1 {
             spans.push(Span::styled(" │ ", Style::new().fg(Color::DarkGray)));
+            x += 3; // " │ "
         }
     }
 
@@ -152,6 +172,10 @@ fn render_tab_bar(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
 }
 
 fn active_tab_index(state: &AppState) -> usize {
+    // Settings screen → always highlight the Settings tab (index 4).
+    if state.screen == Screen::Settings {
+        return 4;
+    }
     match state.current_sidebar_item() {
         Some(SidebarItem::Project { .. }) => 0,
         Some(SidebarItem::Host    { .. }) => 1,

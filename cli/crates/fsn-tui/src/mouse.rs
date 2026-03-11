@@ -20,7 +20,7 @@ use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 
 use crate::app::{
     ActionSource, AppState, ConfirmAction, ContextAction, DashFocus, LogsState,
-    OverlayLayer, RunState, SidebarItem,
+    OverlayLayer, RunState, Screen, SidebarItem,
 };
 use crate::click_map::ClickTarget;
 use crate::actions::{fetch_logs, start_service};
@@ -66,12 +66,16 @@ fn dash_hit(col: u16, row: u16, state: &AppState) -> DashHit {
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 pub fn handle_mouse(event: MouseEvent, state: &mut AppState, root: &Path) -> Result<()> {
-    // LangToggle is global — works on every screen/overlay state.
-    // Checked first so it is never blocked by overlays or form popups.
+    // LangToggle and NavTab are global — work on every screen and overlay state.
+    // Checked first so they are never blocked by overlays or form popups.
     if event.kind == MouseEventKind::Down(MouseButton::Left) {
-        if let Some(ClickTarget::LangToggle) = state.click_map.hit(event.column, event.row) {
-            state.cycle_lang();
-            return Ok(());
+        // Clone target to release the immutable borrow on click_map before any
+        // mutable state changes (cycle_lang / navigate_to_tab).
+        let target = state.click_map.hit(event.column, event.row).cloned();
+        match target {
+            Some(ClickTarget::LangToggle)      => { state.cycle_lang(); return Ok(()); }
+            Some(ClickTarget::NavTab { index }) => { navigate_to_tab(index, state); return Ok(()); }
+            _ => {}
         }
     }
 
@@ -468,6 +472,22 @@ fn is_in_sidebar(col: u16, state: &AppState) -> bool {
     state.sidebar_list_area
         .map(|a| col >= a.x && col < a.right())
         .unwrap_or(false)
+}
+
+/// Navigate to the screen / focus implied by a header tab click.
+///
+/// Tab indices:  0=Projects  1=Hosts  2=Services  3=Store  4=Settings
+/// Tabs 0-2 all map to Dashboard (the sidebar focus is set by the sidebar cursor,
+/// not the tab).  Tab 3 (Store) is not yet implemented.  Tab 4 = Settings.
+fn navigate_to_tab(index: usize, state: &mut AppState) {
+    match index {
+        0..=2 => { state.screen = Screen::Dashboard; }
+        4 => {
+            state.settings_cursor = 0;
+            state.screen = Screen::Settings;
+        }
+        _ => {}
+    }
 }
 
 fn is_double_click(col: u16, row: u16, state: &AppState) -> bool {

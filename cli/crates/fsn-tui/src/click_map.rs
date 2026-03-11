@@ -45,6 +45,10 @@ pub enum ClickTarget {
 
     /// A tab in the queue tab bar — switches the active form to `idx`.
     QueueTab { idx: usize },
+
+    /// A navigation tab in the header bar.
+    /// `index` maps to: 0=Projects, 1=Hosts, 2=Services, 3=Store, 4=Settings.
+    NavTab { index: usize },
 }
 
 // ── ClickMap ──────────────────────────────────────────────────────────────────
