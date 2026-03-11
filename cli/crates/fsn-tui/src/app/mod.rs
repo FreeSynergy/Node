@@ -4,17 +4,21 @@
 // `use crate::app::XYZ` imports continue to work without modification.
 //
 // Sub-modules:
-//   lang.rs    — Lang enum + toggle logic
-//   notif.rs   — Notification, NotifKind (toast system)
-//   overlay.rs — OverlayLayer, OverlayKind, ConfirmAction, ContextAction, ActionSource
-//   screen.rs  — Screen enum, DashFocus enum
-//   sidebar.rs — SidebarItem enum + impl blocks, SidebarAction
+//   event_loop.rs — AppEvent, AppGlobal, run_salsa + rat-salsa callbacks
+//   lang.rs       — Lang enum + toggle logic
+//   notif.rs      — Notification, NotifKind (toast system)
+//   overlay.rs    — OverlayLayer, OverlayKind, ConfirmAction, ContextAction, ActionSource
+//   screen.rs     — Screen enum, DashFocus enum
+//   sidebar.rs    — SidebarItem enum + impl blocks, SidebarAction
 
+pub mod event_loop;
 pub mod lang;
 pub mod notif;
 pub mod overlay;
 pub mod screen;
 pub mod sidebar;
+
+pub use event_loop::{AppEvent, AppGlobal, run_salsa};
 
 // ── Flat re-exports (preserve existing `use crate::app::XYZ` imports) ─────────
 
@@ -343,154 +347,6 @@ impl AppState {
             }
         }
     }
-}
-
-// ── rat-salsa event loop ──────────────────────────────────────────────────────
-//
-// Design: thin wrappers that forward to the existing event/render modules.
-// AppGlobal carries root path so fn-pointer callbacks can access it.
-// AppEvent wraps crossterm events + a periodic tick for channel polling.
-
-use std::path::PathBuf;
-
-use rat_salsa::{Control, RunConfig, SalsaAppContext, SalsaContext, run_tui};
-use rat_salsa::poll::{PollCrossterm, PollTimers};
-use rat_salsa::timer::{TimeOut, TimerDef};
-
-/// Events dispatched by rat-salsa to the application.
-#[derive(Debug)]
-pub enum AppEvent {
-    /// Raw crossterm event (keyboard, resize, etc.).
-    Crossterm(crossterm::event::Event),
-    /// Periodic tick — polls background channels and refreshes sysinfo.
-    Tick(TimeOut),
-}
-
-impl From<crossterm::event::Event> for AppEvent {
-    fn from(e: crossterm::event::Event) -> Self { AppEvent::Crossterm(e) }
-}
-
-impl From<TimeOut> for AppEvent {
-    fn from(t: TimeOut) -> Self { AppEvent::Tick(t) }
-}
-
-/// Global state accessible from all rat-salsa callbacks (init/render/event/error).
-pub struct AppGlobal {
-    ctx:  SalsaAppContext<AppEvent, anyhow::Error>,
-    /// Root path of the FSN workspace — forwarded to events::handle.
-    pub root: PathBuf,
-}
-
-impl SalsaContext<AppEvent, anyhow::Error> for AppGlobal {
-    fn set_salsa_ctx(&mut self, app_ctx: SalsaAppContext<AppEvent, anyhow::Error>) {
-        self.ctx = app_ctx;
-    }
-    fn salsa_ctx(&self) -> &SalsaAppContext<AppEvent, anyhow::Error> { &self.ctx }
-}
-
-/// Entry point for the rat-salsa event loop. Called from `lib.rs::run()`.
-/// Terminal setup (raw mode, alternate screen, mouse capture) is handled by rat-salsa.
-pub fn run_salsa(root: PathBuf, state: &mut AppState) -> anyhow::Result<()> {
-    let mut global = AppGlobal { ctx: Default::default(), root };
-    run_tui(
-        fsn_init,
-        fsn_render,
-        fsn_event,
-        fsn_error,
-        &mut global,
-        state,
-        RunConfig::default()?.poll(PollCrossterm).poll(PollTimers::new()),
-    )?;
-    Ok(())
-}
-
-fn fsn_init(state: &mut AppState, ctx: &mut AppGlobal) -> anyhow::Result<()> {
-    // Repeating 250 ms tick — used to drain background mpsc channels.
-    ctx.add_timer(TimerDef::new().repeat_forever().timer(Duration::from_millis(250)));
-    // Force an immediate render so the screen isn't blank before the first event.
-    let _ = state;
-    Ok(())
-}
-
-fn fsn_render(
-    area:  ratatui::layout::Rect,
-    buf:   &mut ratatui::buffer::Buffer,
-    state: &mut AppState,
-    _ctx:  &mut AppGlobal,
-) -> anyhow::Result<()> {
-    let mut rctx = crate::ui::render_ctx::RenderCtx::new(area, buf);
-    crate::ui::render(&mut rctx, state);
-    Ok(())
-}
-
-fn fsn_event(
-    event: &AppEvent,
-    state: &mut AppState,
-    ctx:   &mut AppGlobal,
-) -> anyhow::Result<Control<AppEvent>> {
-    match event {
-        AppEvent::Crossterm(e) => {
-            match e {
-                crossterm::event::Event::Key(key) => {
-                    crate::events::handle(*key, state, ctx.root.as_path())?;
-                }
-                crossterm::event::Event::Mouse(mouse) => {
-                    crate::mouse::handle_mouse(*mouse, state, ctx.root.as_path())?;
-                }
-                _ => {}
-            }
-            if state.should_quit { return Ok(Control::Quit); }
-            Ok(Control::Changed)
-        }
-
-        AppEvent::Tick(_) => {
-            // Drain reconciler channel — collect first to avoid simultaneous borrow.
-            let reconcile_msgs: Vec<HashMap<String, RunState>> = state.reconcile_rx
-                .as_ref()
-                .map(|rx| std::iter::from_fn(|| rx.try_recv().ok()).collect())
-                .unwrap_or_default();
-            for statuses in reconcile_msgs { state.apply_podman_status(statuses); }
-
-            // Drain deploy channel.
-            let deploy_msgs: Vec<DeployMsg> = state.deploy_rx
-                .as_ref()
-                .map(|rx| std::iter::from_fn(|| rx.try_recv().ok()).collect())
-                .unwrap_or_default();
-            for msg in deploy_msgs { state.apply_deploy_msg(msg); }
-
-            // Drain store fetcher channel (one-shot).
-            let store_result: Option<Vec<StoreEntry>> = state.store_rx
-                .as_ref()
-                .and_then(|rx| rx.try_recv().ok());
-            if let Some(entries) = store_result {
-                let count = entries.len();
-                state.store_entries = entries;
-                state.store_rx = None;
-                if count > 0 {
-                    state.push_notif(NotifKind::Info, format!("Store: {count} modules loaded"));
-                }
-            }
-
-            // Refresh sysinfo every 5 s.
-            if state.last_refresh.elapsed() >= Duration::from_secs(5) {
-                state.sysinfo = crate::sysinfo::SysInfo::collect();
-                state.last_refresh = Instant::now();
-            }
-
-            state.expire_notifications(Duration::from_secs(4));
-            state.anim.advance();
-            Ok(Control::Changed)
-        }
-    }
-}
-
-fn fsn_error(
-    err:    anyhow::Error,
-    _state: &mut AppState,
-    _ctx:   &mut AppGlobal,
-) -> anyhow::Result<Control<AppEvent>> {
-    tracing::error!("{:#}", err);
-    Ok(Control::Changed)
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

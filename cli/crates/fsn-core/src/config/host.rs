@@ -145,13 +145,7 @@ fn default_acme() -> String { "letsencrypt".into() }
 impl HostConfig {
     /// Load a host config from a TOML file.
     pub fn load(path: &Path) -> Result<Self, FsnError> {
-        let content = std::fs::read_to_string(path).map_err(|_| FsnError::ConfigNotFound {
-            path: path.display().to_string(),
-        })?;
-        toml::from_str(&content).map_err(|e| FsnError::ConfigParse {
-            path: path.display().to_string(),
-            source: e,
-        })
+        crate::config::load_toml(path)
     }
 }
 

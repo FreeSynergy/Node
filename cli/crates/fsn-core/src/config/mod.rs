@@ -32,3 +32,23 @@ pub use plugin::{PluginConfig, PluginMeta};
 pub use registry::ServiceRegistry;
 pub use settings::{AppSettings, StoreConfig};
 pub use vault::VaultConfig;
+
+// ── Shared TOML loader ────────────────────────────────────────────────────────
+
+/// Load and deserialize any TOML config file into `T`.
+///
+/// Single source of truth for the read-and-parse pattern used by all config
+/// types (`ProjectConfig`, `HostConfig`, `ServiceInstanceConfig`, …).
+/// Returns typed `FsnError` variants so callers do not need to map manually.
+pub fn load_toml<T>(path: &std::path::Path) -> Result<T, crate::error::FsnError>
+where
+    T: serde::de::DeserializeOwned,
+{
+    let content = std::fs::read_to_string(path).map_err(|_| crate::error::FsnError::ConfigNotFound {
+        path: path.display().to_string(),
+    })?;
+    toml::from_str(&content).map_err(|e| crate::error::FsnError::ConfigParse {
+        path: path.display().to_string(),
+        source: e,
+    })
+}

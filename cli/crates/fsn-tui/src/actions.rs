@@ -9,6 +9,19 @@ use anyhow::Result;
 
 use crate::app::{AppState, NotifKind, RunState, Screen, SidebarItem};
 
+// ── Cursor helpers ────────────────────────────────────────────────────────────
+
+/// Clamp a list cursor downward after an item was removed.
+///
+/// If the cursor now points past the end of the shortened list, it is pulled
+/// back by one — keeping it on the last valid item instead of going out of bounds.
+#[inline]
+fn clamp_cursor_after_remove(cursor: &mut usize, new_len: usize) {
+    if *cursor > 0 && *cursor >= new_len {
+        *cursor -= 1;
+    }
+}
+
 // ── Project / host / service deletion ────────────────────────────────────────
 
 pub fn delete_selected_project(state: &mut AppState, root: &Path) -> Result<()> {
@@ -18,9 +31,7 @@ pub fn delete_selected_project(state: &mut AppState, root: &Path) -> Result<()> 
         state.push_notif(NotifKind::Error, format!("Could not delete directory: {e}"));
     }
     state.projects.remove(state.selected_project);
-    if state.selected_project > 0 && state.selected_project >= state.projects.len() {
-        state.selected_project -= 1;
-    }
+    clamp_cursor_after_remove(&mut state.selected_project, state.projects.len());
     state.hosts.clear();
     state.rebuild_sidebar();
     state.rebuild_services();
@@ -43,9 +54,7 @@ pub fn delete_selected_host(state: &mut AppState, root: &Path) -> Result<()> {
         }
     }
     state.hosts.remove(state.selected_host);
-    if state.selected_host > 0 && state.selected_host >= state.hosts.len() {
-        state.selected_host -= 1;
-    }
+    clamp_cursor_after_remove(&mut state.selected_host, state.hosts.len());
     state.rebuild_sidebar();
     Ok(())
 }

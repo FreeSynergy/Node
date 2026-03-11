@@ -66,6 +66,19 @@ impl ResourceKind {
     }
 }
 
+// ── Shared error helper ───────────────────────────────────────────────────────
+
+/// Write an I/O or system error onto the active form.
+///
+/// Called at the end of every `submit_*` function's `Some(Err(e))` branch so
+/// the 4-line boilerplate is not repeated four times.
+fn apply_submit_error(state: &mut AppState, e: anyhow::Error) {
+    if let Some(f) = state.active_form_mut() {
+        f.error      = Some(format!("{e}"));
+        f.error_kind = FormErrorKind::IoError;
+    }
+}
+
 // ── Queue advancement helper ──────────────────────────────────────────────────
 
 /// Mark the active tab done, advance to next, or close the queue.
@@ -136,12 +149,7 @@ pub fn submit_project(state: &mut AppState, root: &Path) -> Result<()> {
             advance_or_close(state);
             state.push_notif(NotifKind::Success, format!("Project '{}' saved", name));
         }
-        Some(Err(e)) => {
-            if let Some(f) = state.active_form_mut() {
-                f.error = Some(format!("{e}"));
-                f.error_kind = FormErrorKind::IoError;
-            }
-        }
+        Some(Err(e)) => apply_submit_error(state, e),
         None => {}
     }
     Ok(())
@@ -202,12 +210,7 @@ pub fn submit_service(state: &mut AppState, root: &Path) -> Result<()> {
             advance_or_close(state);
             state.push_notif(NotifKind::Success, format!("Service '{}' saved", svc_name));
         }
-        Some(Err(e)) => {
-            if let Some(f) = state.active_form_mut() {
-                f.error = Some(format!("{e}"));
-                f.error_kind = FormErrorKind::IoError;
-            }
-        }
+        Some(Err(e)) => apply_submit_error(state, e),
         None => {}
     }
     Ok(())
@@ -232,12 +235,7 @@ pub fn submit_host(state: &mut AppState, root: &Path) -> Result<()> {
             advance_or_close(state);
             state.push_notif(NotifKind::Success, format!("Host '{}' saved", name));
         }
-        Some(Err(e)) => {
-            if let Some(f) = state.active_form_mut() {
-                f.error = Some(format!("{e}"));
-                f.error_kind = FormErrorKind::IoError;
-            }
-        }
+        Some(Err(e)) => apply_submit_error(state, e),
         None => {}
     }
     Ok(())
@@ -260,12 +258,7 @@ pub fn submit_bot(state: &mut AppState, root: &Path) -> Result<()> {
             advance_or_close(state);
             state.push_notif(NotifKind::Success, format!("Bot '{}' saved", name));
         }
-        Some(Err(e)) => {
-            if let Some(f) = state.active_form_mut() {
-                f.error = Some(format!("{e}"));
-                f.error_kind = FormErrorKind::IoError;
-            }
-        }
+        Some(Err(e)) => apply_submit_error(state, e),
         None => {}
     }
     Ok(())
