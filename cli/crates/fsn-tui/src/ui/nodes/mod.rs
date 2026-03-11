@@ -4,6 +4,7 @@ pub mod section_node;
 pub mod select_input;
 pub mod selection_popup;
 pub mod service_slot;
+pub mod service_slot_popup;
 pub mod text_area;
 pub mod text_input;
 

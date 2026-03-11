@@ -132,6 +132,26 @@ impl ServiceType {
         matches!(self, ServiceType::Proxy)
     }
 
+    /// Logical category this type belongs to.
+    ///
+    /// Used for grouping in the service slot type-filter.
+    /// Multiple types may share the same category (e.g. IamProvider + IamBroker → "iam").
+    pub fn category(&self) -> &'static str {
+        match self {
+            ServiceType::IamProvider | ServiceType::IamBroker | ServiceType::Iam => "iam",
+            ServiceType::Proxy | ServiceType::WebhosterSimple                    => "proxy",
+            ServiceType::Mail  | ServiceType::Chat                               => "communication",
+            ServiceType::Git                                                     => "developer",
+            ServiceType::Wiki  | ServiceType::Collab                             => "knowledge",
+            ServiceType::Tasks | ServiceType::Tickets                            => "project",
+            ServiceType::Maps                                                    => "geo",
+            ServiceType::Monitoring                                              => "monitoring",
+            ServiceType::Database | ServiceType::Cache                          => "infrastructure",
+            ServiceType::Bot                                                     => "automation",
+            ServiceType::Custom                                                  => "custom",
+        }
+    }
+
     /// Human-readable label (English) for TUI display.
     pub fn label(&self) -> &'static str {
         match self {
