@@ -193,17 +193,32 @@ fn handle_resource_form(key: KeyEvent, state: &mut AppState, root: &Path) -> Res
 // ── Settings screen ───────────────────────────────────────────────────────────
 
 fn handle_settings(key: KeyEvent, state: &mut AppState) -> Result<()> {
+    use crate::app::SettingsTab;
+
+    // Tab key always switches between sections.
+    if key.code == KeyCode::Tab {
+        state.settings_tab = state.settings_tab.next();
+        state.settings_cursor = 0;
+        state.lang_cursor = 0;
+        return Ok(());
+    }
+
+    match state.settings_tab {
+        SettingsTab::Stores    => handle_settings_stores(key, state),
+        SettingsTab::Languages => handle_settings_languages(key, state),
+    }
+}
+
+fn handle_settings_stores(key: KeyEvent, state: &mut AppState) -> Result<()> {
     use fsn_core::config::StoreConfig;
 
-    let n_stores = state.settings.stores.len();
+    let n = state.settings.stores.len();
     match key.code {
         KeyCode::Up => {
             if state.settings_cursor > 0 { state.settings_cursor -= 1; }
         }
         KeyCode::Down => {
-            if n_stores > 0 && state.settings_cursor < n_stores - 1 {
-                state.settings_cursor += 1;
-            }
+            if n > 0 && state.settings_cursor < n - 1 { state.settings_cursor += 1; }
         }
         KeyCode::Char(' ') => {
             if let Some(store) = state.settings.stores.get_mut(state.settings_cursor) {
@@ -229,6 +244,57 @@ fn handle_settings(key: KeyEvent, state: &mut AppState) -> Result<()> {
             });
             state.settings_cursor = state.settings.stores.len().saturating_sub(1);
             let _ = state.settings.save();
+        }
+        KeyCode::Esc | KeyCode::Char('q') => {
+            state.screen = Screen::Dashboard;
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+fn handle_settings_languages(key: KeyEvent, state: &mut AppState) -> Result<()> {
+    // Index 0 = English (built-in), 1..=n = available_langs
+    let n_total = 1 + state.available_langs.len();
+
+    match key.code {
+        KeyCode::Up => {
+            if state.lang_cursor > 0 { state.lang_cursor -= 1; }
+        }
+        KeyCode::Down => {
+            if state.lang_cursor + 1 < n_total { state.lang_cursor += 1; }
+        }
+        KeyCode::Enter => {
+            // Activate selected language.
+            if state.lang_cursor == 0 {
+                state.lang = crate::app::Lang::En;
+                state.settings.preferred_lang = None;
+                let _ = state.settings.save();
+            } else if let Some(dl) = state.available_langs.get(state.lang_cursor - 1) {
+                state.lang = crate::app::Lang::Dynamic(dl);
+                state.settings.preferred_lang = Some(dl.code.to_string());
+                let _ = state.settings.save();
+            }
+        }
+        KeyCode::Delete | KeyCode::Char('d') | KeyCode::Char('D') => {
+            // Remove a downloaded language file (built-in English cannot be removed).
+            if state.lang_cursor > 0 {
+                if let Some(dl) = state.available_langs.get(state.lang_cursor - 1) {
+                    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+                    let path = std::path::PathBuf::from(home)
+                        .join(".local/share/fsn/i18n")
+                        .join(format!("{}.toml", dl.code));
+                    let _ = std::fs::remove_file(&path);
+                    // If active language was removed, fall back to English.
+                    if matches!(state.lang, crate::app::Lang::Dynamic(d) if d.code == dl.code) {
+                        state.lang = crate::app::Lang::En;
+                        state.settings.preferred_lang = None;
+                        let _ = state.settings.save();
+                    }
+                    state.reload_langs();
+                    state.lang_cursor = state.lang_cursor.min(state.available_langs.len());
+                }
+            }
         }
         KeyCode::Esc | KeyCode::Char('q') => {
             state.screen = Screen::Dashboard;

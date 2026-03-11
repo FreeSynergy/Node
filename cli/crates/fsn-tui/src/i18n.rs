@@ -371,6 +371,20 @@ fn en(key: &str) -> Option<&'static str> {
         // ── Selection popup hints ─────────────────────────────────────────
         "popup.hint.single" => "↑↓=Navigate  Enter=OK  Esc=Cancel",
         "popup.hint.multi"  => "↑↓=Navigate  Space=Toggle  Enter=OK  Esc=Cancel",
+        // ── Settings tabs ─────────────────────────────────────────────────
+        "settings.tab.stores"    => "Stores",
+        "settings.tab.languages" => "Languages",
+        // ── Settings – Language tab ───────────────────────────────────────
+        "settings.lang.title"    => "Available Languages",
+        "settings.lang.builtin"  => "(built-in)",
+        "settings.lang.active"   => "● active",
+        "settings.lang.inactive" => "  inactive",
+        "settings.lang.complete" => "complete",
+        "settings.lang.api_ok"   => "up to date",
+        "settings.lang.api_warn" => "⚠ version mismatch",
+        "settings.lang.none"     => "(no languages installed — download from Store)",
+        "settings.lang.hint"     => "↑↓=Navigate  Enter=Activate  Del=Remove  Tab=Switch tab  Esc=Back",
+        "settings.stores.hint"   => "A=Add  D=Delete  Space=Enable/Disable  Tab=Switch tab  Esc=Back",
         _ => return None,
     })
 }

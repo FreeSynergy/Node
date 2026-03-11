@@ -28,7 +28,7 @@ pub use overlay::{
     ActionSource, ConfirmAction, ContextAction, DeployMsg, DeployState,
     LogsState, OverlayKind, OverlayLayer,
 };
-pub use screen::{DashFocus, Screen};
+pub use screen::{DashFocus, Screen, SettingsTab};
 pub use sidebar::{NEW_RESOURCE_ITEMS, SidebarAction, SidebarItem};
 
 // Re-export handle and form types so existing `use crate::app::*` imports keep working.
@@ -88,6 +88,9 @@ pub struct AppState {
     pub settings:             AppSettings,
     pub store_entries:        Vec<StoreEntry>,
     pub settings_cursor:      usize,
+    pub settings_tab:         SettingsTab,
+    /// Cursor within the Languages tab.
+    pub lang_cursor:          usize,
     /// Non-blocking feedback banners (auto-expire after a few seconds).
     pub notifications:        Vec<Notification>,
     /// Active sidebar filter query — `None` = closed, `Some("")` = open but empty.
@@ -147,6 +150,8 @@ impl AppState {
             settings,
             store_entries: Vec::new(),
             settings_cursor: 0,
+            settings_tab: SettingsTab::default(),
+            lang_cursor: 0,
             notifications: Vec::new(),
             sidebar_filter: None,
             selected_services: HashSet::new(),

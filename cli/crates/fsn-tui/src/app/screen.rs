@@ -22,3 +22,30 @@ pub enum DashFocus {
     Sidebar,
     Services,
 }
+
+// ── Settings tabs ─────────────────────────────────────────────────────────────
+
+/// Active tab within the Settings screen.
+/// Add new variants here as settings grow — the screen renders the correct
+/// section and the event handler routes keys accordingly.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SettingsTab {
+    #[default]
+    Stores,
+    Languages,
+}
+
+impl SettingsTab {
+    /// Cycle to the next tab (wraps around).
+    pub fn next(self) -> Self {
+        match self { Self::Stores => Self::Languages, Self::Languages => Self::Stores }
+    }
+
+    /// i18n key for the tab label shown in the tab bar.
+    pub fn label_key(self) -> &'static str {
+        match self {
+            Self::Stores    => "settings.tab.stores",
+            Self::Languages => "settings.tab.languages",
+        }
+    }
+}
