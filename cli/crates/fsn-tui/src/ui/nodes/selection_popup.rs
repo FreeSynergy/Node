@@ -359,10 +359,8 @@ fn render_checkboxes(
 // ── Hint text ─────────────────────────────────────────────────────────────────
 
 fn hint_line(mode: SelectionMode, lang: Lang) -> &'static str {
-    match (mode, lang) {
-        (SelectionMode::Single, crate::app::Lang::De) => "↑↓=Wählen  Enter=OK  Esc=Abbrechen",
-        (SelectionMode::Single, crate::app::Lang::En) => "↑↓=Navigate  Enter=OK  Esc=Cancel",
-        (SelectionMode::Multi,  crate::app::Lang::De) => "↑↓=Wählen  Leer=Auswählen  Enter=OK  Esc=Abbrechen",
-        (SelectionMode::Multi,  crate::app::Lang::En) => "↑↓=Navigate  Space=Toggle  Enter=OK  Esc=Cancel",
+    match mode {
+        SelectionMode::Single => crate::i18n::t(lang, "popup.hint.single"),
+        SelectionMode::Multi  => crate::i18n::t(lang, "popup.hint.multi"),
     }
 }

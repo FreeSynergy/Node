@@ -1,269 +1,157 @@
-// Minimal i18n — compile-time static string lookups per language.
+// i18n — translation system.
+//
+// Design Pattern: Strategy — Lang selects which translation table to use.
+// English is the only compile-time built-in and the universal fallback.
+// All other languages (including German) are loaded from TOML files at runtime.
+//
 // Key convention: "section.key" e.g. "welcome.title", "status.running"
-// English is always the fallback for missing keys.
+// All keys and built-in strings are &'static str.
+//
+// DynamicLang uses Box::leak() so that loaded strings are also &'static str —
+// this keeps the return type of t() uniform and the Lang enum Copy.
 
+use std::collections::HashMap;
 use crate::app::Lang;
+
+/// Translation API version.
+/// Increment when keys are added or renamed.
+/// Language files with a different api_version are shown as potentially stale.
+pub const TRANSLATION_API_VERSION: u32 = 1;
+
+// ── DynamicLang ───────────────────────────────────────────────────────────────
+
+/// A language loaded at runtime from a TOML file.
+///
+/// All strings are leaked so they are `'static`, matching the static English
+/// strings and keeping `Lang` (which holds `&'static DynamicLang`) `Copy`.
+#[derive(Debug, PartialEq, Eq)]
+pub struct DynamicLang {
+    pub code:         &'static str,   // e.g. "de"
+    pub code_upper:   &'static str,   // e.g. "DE"
+    pub name:         &'static str,   // e.g. "Deutsch"
+    pub api_version:  u32,
+    pub completeness: u8,
+    map:              HashMap<&'static str, &'static str>,
+    field_map:        HashMap<&'static str, &'static str>,
+}
+
+impl DynamicLang {
+    /// Parse TOML source and leak the result as `&'static DynamicLang`.
+    ///
+    /// Memory is intentionally leaked — translations live for the entire app
+    /// lifetime (a few hundred KB total), so leaking is the right trade-off.
+    pub fn load(content: &str) -> anyhow::Result<&'static Self> {
+        let doc: toml::Value = toml::from_str(content)
+            .map_err(|e| anyhow::anyhow!("TOML parse error: {e}"))?;
+
+        let meta = doc.get("meta")
+            .ok_or_else(|| anyhow::anyhow!("missing [meta] section"))?;
+
+        let code = meta.get("language").and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("missing meta.language"))?.to_owned();
+        let name = meta.get("name").and_then(|v| v.as_str())
+            .unwrap_or(&code).to_owned();
+        let api_version = meta.get("api_version")
+            .and_then(|v| v.as_integer()).unwrap_or(1) as u32;
+        let completeness = meta.get("completeness")
+            .and_then(|v| v.as_integer()).unwrap_or(0).clamp(0, 100) as u8;
+
+        let mut map: HashMap<&'static str, &'static str> = HashMap::new();
+        if let Some(table) = doc.get("keys").and_then(|v| v.as_table()) {
+            for (k, v) in table {
+                if let Some(val) = v.as_str() {
+                    let k: &'static str = Box::leak(k.clone().into_boxed_str());
+                    let v: &'static str = Box::leak(val.to_owned().into_boxed_str());
+                    map.insert(k, v);
+                }
+            }
+        }
+
+        let mut field_map: HashMap<&'static str, &'static str> = HashMap::new();
+        if let Some(table) = doc.get("field_help").and_then(|v| v.as_table()) {
+            for (k, v) in table {
+                if let Some(val) = v.as_str() {
+                    let k: &'static str = Box::leak(k.clone().into_boxed_str());
+                    let v: &'static str = Box::leak(val.to_owned().into_boxed_str());
+                    field_map.insert(k, v);
+                }
+            }
+        }
+
+        let code_upper: &'static str = Box::leak(code.to_uppercase().into_boxed_str());
+        let lang = DynamicLang {
+            code:         Box::leak(code.into_boxed_str()),
+            code_upper,
+            name:         Box::leak(name.into_boxed_str()),
+            api_version,
+            completeness,
+            map,
+            field_map,
+        };
+        Ok(Box::leak(Box::new(lang)))
+    }
+
+    /// Load all `.toml` files from `dir`, silently skipping failures.
+    pub fn load_dir(dir: &std::path::Path) -> Vec<&'static Self> {
+        let Ok(entries) = std::fs::read_dir(dir) else { return vec![] };
+        let mut out = Vec::new();
+        for entry in entries.filter_map(|e| e.ok()) {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) != Some("toml") { continue; }
+            let Ok(content) = std::fs::read_to_string(&path) else { continue; };
+            match DynamicLang::load(&content) {
+                Ok(lang) => out.push(lang),
+                Err(e)   => tracing::warn!("i18n: failed to load {:?}: {e}", path),
+            }
+        }
+        out
+    }
+}
 
 // ── Translate trait ───────────────────────────────────────────────────────────
 
-/// Translation context — abstract over the concrete language implementation.
+/// Translation context — abstract over the concrete language.
 ///
-/// Analogous to React's `t()` from i18next: enables output-agnostic UI components.
-/// Components take `&impl Translate` (or `lang: Lang`) instead of `&AppState`,
-/// making them reusable across TUI, web, and test contexts.
-///
-/// # Example
-/// ```rust,ignore
-/// fn render_hint(t: &impl Translate) -> &'static str {
-///     t.t("welcome.hint")
-/// }
-/// // Works with Lang::De, Lang::En, or any custom Translate impl (e.g. for testing).
-/// ```
+/// Analogous to React's `t()` from i18next. Components take `&impl Translate`
+/// instead of `&AppState`, keeping them reusable across contexts.
 pub trait Translate {
-    /// Returns the translated string for `key`.
-    /// Falls back to English, then to the raw key if no translation is found.
-    ///
-    /// Keys are always compile-time string literals (`&'static str`), ensuring
-    /// the returned string is always `'static`.
     fn t(&self, key: &'static str) -> &'static str;
 }
 
 impl Translate for Lang {
     fn t(&self, key: &'static str) -> &'static str {
         match self {
-            Lang::De => de(key).unwrap_or_else(|| en(key).unwrap_or(key)),
-            Lang::En => en(key).unwrap_or(key),
+            Lang::En         => en(key).unwrap_or(key),
+            Lang::Dynamic(d) => d.map.get(key).copied()
+                                    .unwrap_or_else(|| en(key).unwrap_or(key)),
         }
     }
 }
 
-// ── Translation function ──────────────────────────────────────────────────────
+// ── Free translation functions ────────────────────────────────────────────────
 
+/// Translate `key` for the given `lang`. Falls back to English, then to `key`.
+///
+/// `key` may be any `&str` lifetime; callers typically pass `&'static str`
+/// literals, in which case the return is also effectively `'static`.
 pub fn t<'a>(lang: Lang, key: &'a str) -> &'a str {
     match lang {
-        Lang::De => de(key).unwrap_or_else(|| en(key).unwrap_or(key)),
-        Lang::En => en(key).unwrap_or(key),
+        Lang::En         => en(key).unwrap_or(key),
+        Lang::Dynamic(d) => d.map.get(key).copied()
+                                .unwrap_or_else(|| en(key).unwrap_or(key)),
     }
 }
 
-fn de(key: &str) -> Option<&'static str> {
-    Some(match key {
-        "welcome.title"         => "Willkommen bei FreeSynergy.Node",
-        "welcome.subtitle"      => "Dezentrale Infrastruktur — frei und selbst betrieben",
-        "welcome.new_project"   => "Neues Projekt",
-        "welcome.open_project"  => "Vorhandenes Projekt",
-        "welcome.open_disabled" => "(bald verfügbar)",
-        "welcome.hint"          => "←→=Auswahl  Enter=Bestätigen  L=Sprache  q=Beenden",
-        "sys.host"    => "Host",
-        "sys.user"    => "Benutzer",
-        "sys.ip"      => "IP-Adresse",
-        "sys.ram"     => "Arbeitsspeicher",
-        "sys.cpu"     => "CPU-Kerne",
-        "sys.uptime"  => "Laufzeit",
-        "sys.podman"  => "Podman",
-        "sys.arch"    => "Architektur",
-        "lang.label"  => "Sprache",
-        "lang.de"     => "Deutsch",
-        "lang.en"     => "English",
-        "dash.services"   => "Services",
-        "dash.col.name"   => "Name",
-        "dash.col.type"   => "Typ",
-        "dash.col.domain" => "Domain",
-        "dash.col.status" => "Status",
-        "dash.hint"           => "↑↓=Nav  /=Suche  y=Kop.  n=Neu  e=Bearb.  x=Lösch.  Tab=Serv.  q=Ende",
-        "dash.hint.host"      => "↑↓=Nav  n=Neuer Host  e=Bearbeiten  s=Starten  x=Löschen  Tab=Detail  q=Beenden",
-        "dash.hint.service"   => "↑↓=Nav  n=Neuer Service  e=Bearbeiten  s=Starten  x=Löschen  Tab=Detail  q=Beenden",
-        "dash.hint.services"  => "↑↓=Nav  Leer=Wählen  s=Start  r=Restart  x=Stop  d=Deploy  l=Logs  y=Kop.  q=Ende",
-        "dash.hint.confirm"   => "Projekt wirklich löschen?  J=Ja  N=Abbrechen",
-        "dash.no_projects"         => "(Kein Projekt angelegt)",
-        "dash.no_project_selected" => "Kein Projekt ausgewählt",
-        "dash.no_services"         => "(Keine Services konfiguriert)",
-        "dash.hint.f1"             => "F1=Hilfe",
-        "dash.hint.quit"           => "q=Ende",
-        "dash.new_project"    => "+ Neues Projekt",
-        "dash.new_service"    => "+ Neuer Service",
-        "welcome.edit_project" => "Projekt bearbeiten",
-        "form.submit.edit"    => "Speichern",
-        "sidebar.projects"    => "Projekte",
-        "sidebar.hosts"       => "Hosts",
-        "sidebar.services"    => "Services",
-        "sidebar.system"  => "System",
-        "status.running"  => "● Aktiv",
-        "status.stopped"  => "○ Gestoppt",
-        "status.error"    => "✗ Fehler",
-        "status.unknown"  => "? Unbekannt",
-        "logs.hint"            => "q=Schließen  ↑↓=Scrollen",
-        "form.tab.project"     => "Projekt",
-        "form.tab.options"     => "Optionen",
-        "form.textarea.hint"   => "Tab=Nächstes Feld  Enter=Neue Zeile  Alt+Enter=Senden  Esc=Zurück",
-        "form.confirm.leave"   => "Änderungen verwerfen und schließen?  J=Ja  andere Taste=Nein",
-        "confirm.quit"              => "Wirklich beenden?  J=Ja  andere Taste=Nein",
-        "confirm.delete.project"    => "Projekt wirklich löschen?  J=Ja  andere Taste=Nein",
-        "confirm.delete.service"    => "Service löschen?  J=Ja  andere Taste=Nein",
-        "confirm.delete.host"       => "Host wirklich löschen?  J=Ja  andere Taste=Nein",
-        "confirm.stop.service"      => "Service stoppen?  J=Ja  andere Taste=Nein",
-        "form.hint.ctrl"       => "^←=Voriger Tab  ^→=Nächster Tab  ^C=Beenden",
-        "form.required"             => "* Pflichtfeld",
-        "form.all_required_filled"  => "✓ Alle Pflichtfelder ausgefüllt",
-        "form.missing_required"     => "Pflichtfeld(er) noch leer",
-        "form.multiselect.none"     => "(Nichts ausgewählt)",
-        "form.error"           => "Fehler",
-        "form.submit"          => "Projekt anlegen",
-        "form.submit.service"  => "Service anlegen",
-        "form.submit.host"     => "Host anlegen",
-        "form.project.name"              => "Projektname",
-        "form.project.name.hint"         => "Kurzname ohne Leerzeichen, z.B. myproject",
-        "form.project.domain"            => "Domain",
-        "form.project.domain.hint"       => "Hauptdomain, z.B. example.com  (wird aus Projektname abgeleitet)",
-        "form.project.description"       => "Beschreibung",
-        "form.project.description.hint"  => "Kurze Projektbeschreibung (optional)",
-        "form.project.path"              => "Installationsverzeichnis",
-        "form.project.path.hint"         => "Wo fsn die Daten speichert (wird angelegt falls nicht vorhanden)",
-        "form.project.email"             => "Kontakt-E-Mail",
-        "form.project.email.hint"        => "Für Let's Encrypt Benachrichtigungen (wird aus Domain abgeleitet)",
-        "form.options.language"    => "Primärsprache (↑↓ zum Wählen)",
-        "form.options.version"     => "Version",
-        "form.tab.service"         => "Service",
-        "form.tab.network"         => "Netzwerk",
-        "form.tab.env"             => "Umgebung",
-        "form.new_service"         => "Neuer Service",
-        "form.edit_service"        => "Service bearbeiten",
-        "form.service.name"        => "Service-Name",
-        "form.service.name.hint"   => "Instanzname, z.B. forgejo (eindeutig im Projekt)",
-        "form.service.class"       => "Service-Typ (↑↓ zum Wählen)",
-        "form.service.tags"        => "Tags (kommagetrennt)",
-        "form.service.tags.hint"   => "Optionale Tags, z.B. internal,critical",
-        "form.service.alias"           => "Subdomain-Alias",
-        "form.service.alias.hint"      => "Optionaler Alias, z.B. git → git.<domain>",
-        "form.service.subdomain"       => "Subdomain",
-        "form.service.subdomain.hint"  => "Subdomain für diese Instanz (wird aus Name abgeleitet)",
-        "form.service.port"            => "Port (optional)",
-        "form.service.env"             => "Umgebungsvariablen",
-        "form.service.env.hint"        => "↑↓=Zeile  Tab=Spalte  Enter=Neue Zeile  ↓=Neue Zeile am Ende",
-        "form.tab.host"     => "Host",
-        "form.tab.system"   => "System",
-        "form.tab.dns"      => "DNS / TLS",
-        "form.new_host"     => "Neuer Host",
-        "form.edit_host"    => "Host bearbeiten",
-        "form.host.name"            => "Hostname",
-        "form.host.name.hint"       => "Eindeutiger Name, z.B. server1 (ohne Leerzeichen)",
-        "form.host.alias"           => "Alias",
-        "form.host.alias.hint"      => "Anzeigename, z.B. main oder backup",
-        "form.host.address"         => "IP-Adresse / FQDN",
-        "form.host.address.hint"    => "Primäre IPv4-Adresse oder FQDN, z.B. 192.168.1.1",
-        "form.host.project"         => "Projekt",
-        "form.host.ssh_user"        => "SSH-Benutzer",
-        "form.host.ssh_port"        => "SSH-Port",
-        "form.host.install_dir"     => "Installationsverzeichnis",
-        "form.host.install_dir.hint" => "Basisverzeichnis auf diesem Host, z.B. /opt/fsn",
-        "form.host.dns_provider"    => "DNS-Anbieter (↑↓ zum Wählen)",
-        "form.host.acme_provider"   => "ACME-Anbieter (↑↓ zum Wählen)",
-        "form.host.acme_email"      => "ACME-E-Mail",
-        "form.host.acme_email.hint" => "Kontakt-E-Mail für Let's Encrypt (wird aus Adresse abgeleitet)",
-        "dash.new_host"   => "+ Neuer Host",
-        "deploy.title"    => "Compose-Export",
-        "deploy.hint"     => "q=Schließen",
-        "deploy.running"  => "↻ Läuft...",
-        "form.tab.bot"           => "Bot",
-        "form.submit.bot"        => "Bot anlegen",
-        "form.bot.name"          => "Bot-Name",
-        "form.bot.name.hint"     => "Eindeutiger Name, z.B. matrix-bot (ohne Leerzeichen)",
-        "form.bot.type"          => "Bot-Typ (↑↓ zum Wählen)",
-        "form.bot.class"         => "Bot-Klasse (↑↓ zum Wählen)",
-        "form.bot.description"   => "Beschreibung",
-        "form.bot.tags"          => "Tags",
-        "form.bot.tags.hint"     => "Kommagetrennte Tags, z.B. notifications,alerts",
-        // ── Wizard ───────────────────────────────────────────────────────
-        "wizard.title"        => "Assistent",
-        "wizard.hint"         => "Tab=Nächstes Feld  ^Enter=Speichern  Esc=Abbrechen",
-        "task.new_project"    => "Projekt",
-        "task.new_host"       => "Host",
-        "task.new_proxy"      => "Proxy",
-        "task.new_iam"        => "IAM",
-        "task.new_mail"       => "Mail",
-        "task.new_service"    => "Service",
-        // ── New-resource selector ─────────────────────────────────────────
-        "new.resource.title"  => "Neu erstellen",
-        "new.project"         => "Neues Projekt",
-        "new.host"            => "Neuer Host",
-        "new.service"         => "Neuer Service",
-        "new.bot"             => "Neuer Bot",
-        "new.resource.hint"   => "↑↓=Wählen  Enter=Öffnen  Esc=Abbr.",
-        // ── Help sidebar ──────────────────────────────────────────────────
-        "help.title"          => "Hilfe (F1)",
-        "help.close_hint"     => "F1=Schließen",
-        "help.nav"            => "Navigation",
-        "help.nav.select"     => "Zeile auswählen",
-        "help.nav.open"       => "Öffnen / Bestätigen",
-        "help.nav.panel"      => "Panel wechseln",
-        "help.new_project"    => "Neues Projekt anlegen",
-        "help.lang"           => "Sprache wechseln",
-        "help.quit"           => "Beenden",
-        "help.deploy"         => "Projekt deployen",
-        "help.export"         => "Compose exportieren",
-        "help.delete"         => "Löschen",
-        "help.form.project"   => "Projekt-Formular",
-        "help.form.host"      => "Host-Formular",
-        "help.form.service"   => "Service-Formular",
-        "help.form.bot"       => "Bot-Formular",
-        "help.form.next"      => "Nächstes Feld",
-        "help.form.prev"      => "Voriges Feld",
-        "help.form.select"    => "Option wählen",
-        "help.form.advance"   => "Nächster Tab",
-        "help.form.submit"    => "Formular absenden",
-        "help.form.tab_next"  => "Tab vorwärts",
-        "help.form.tab_prev"  => "Tab zurück",
-        "help.form.cancel"    => "Abbrechen / Schließen",
-        "help.field"          => "Dieses Feld",
-        "help.settings"       => "Einstellungen",
-        // ── Settings screen ───────────────────────────────────────────────
-        "settings.title"         => "Einstellungen – Modul-Stores",
-        "settings.hint"          => "A=Hinzufügen  D=Löschen  Leertaste=Aktiv/Inaktiv  Esc=Zurück",
-        "settings.stores.header" => "Konfigurierte Stores",
-        "settings.store.enabled" => "✓ aktiv",
-        "settings.store.disabled"=> "✗ deaktiviert",
-        "settings.store.add.prompt" => "Store-URL (z.B. https://github.com/du/modules):",
-        "settings.store.name.prompt"=> "Store-Name:",
-        "settings.empty"         => "(Keine Stores konfiguriert)",
-        // ── Sidebar filter ────────────────────────────────────────────────
-        "dash.filter.empty"      => "(keine Treffer)",
-        "dash.hint.filter"       => "Esc=Schließen  ↑↓=Nav  Enter=Auswählen  Zeichen=Suche",
-        "dash.tab.projects"      => "Projekte",
-        "dash.tab.hosts"         => "Hosts",
-        "dash.tab.services"      => "Services",
-        "dash.tab.store"         => "Store",
-        "dash.tab.settings"      => "⚙ Einstellungen",
-        // ── Multi-select ──────────────────────────────────────────────────
-        "dash.hint.multiselect"  => "Leertaste=Wählen  s=Alle starten  x=Alle stoppen  u=Abwählen",
-        // ── Form navigation (updated hints) ──────────────────────────────
-        "form.hint"              => "Enter=Nächstes Feld  Tab=Tab-Wechsel  ↑↓=Auswahl  ^S=Absenden  Esc=Schließen",
-        // ── Project form – new fields ─────────────────────────────────────
-        "form.tab.services"          => "Services",
-        "form.project.tags"          => "Tags (kommagetrennt)",
-        "form.project.tags.hint"     => "Optionale Tags, z.B. produktion,intern",
-        "form.project.iam"           => "IAM-Service (Instanzname)",
-        "form.project.iam.hint"      => "Name der IAM-Instanz, z.B. kanidm",
-        "form.project.wiki"          => "Wiki-Service (Instanzname)",
-        "form.project.wiki.hint"     => "Name der Wiki-Instanz, z.B. outline",
-        "form.project.mail"          => "Mail-Service (Instanzname)",
-        "form.project.mail.hint"     => "Name der Mail-Instanz, z.B. stalwart",
-        "form.project.monitoring"    => "Monitoring (Instanzname)",
-        "form.project.monitoring.hint" => "Name der Monitoring-Instanz, z.B. netdata",
-        "form.project.git"           => "Git-Service (Instanzname)",
-        "form.project.git.hint"      => "Name der Git-Instanz, z.B. forgejo",
-        // ── Host form – proxy field ───────────────────────────────────────
-        "form.host.proxy"            => "Proxy-Instanz",
-        "form.host.proxy.hint"       => "Name der Zentinel-Instanz auf diesem Host (Standard: zentinel)",
-        // ── Context menu (right-click) ────────────────────────────────────
-        "ctx.edit"   => "Bearbeiten",
-        "ctx.delete" => "Löschen",
-        "ctx.deploy" => "Deployen",
-        "ctx.start"  => "Starten",
-        "ctx.stop"   => "Stoppen",
-        "ctx.logs"   => "Logs anzeigen",
-        _ => return None,
-    })
+/// Contextual field help string for the F1 sidebar. Falls back to English.
+pub fn field_help(lang: Lang, field_key: &str) -> Option<&'static str> {
+    match lang {
+        Lang::En         => en_field_help(field_key),
+        Lang::Dynamic(d) => d.field_map.get(field_key).copied()
+                                .or_else(|| en_field_help(field_key)),
+    }
 }
+
+// ── English (built-in, always available) ─────────────────────────────────────
 
 fn en(key: &str) -> Option<&'static str> {
     Some(match key {
@@ -454,9 +342,9 @@ fn en(key: &str) -> Option<&'static str> {
         "dash.hint.filter"       => "Esc=Close  ↑↓=Nav  Enter=Select  Type=Search",
         // ── Multi-select ──────────────────────────────────────────────────
         "dash.hint.multiselect"  => "Space=Select  s=Start all  x=Stop all  u=Deselect",
-        // ── Form navigation (updated hints) ──────────────────────────────
+        // ── Form navigation ───────────────────────────────────────────────
         "form.hint"              => "Enter=Next field  Tab=Switch tab  ↑↓=Select  ^S=Submit  Esc=Close",
-        // ── Project form – new fields ─────────────────────────────────────
+        // ── Project form – slot / tag fields ─────────────────────────────
         "form.tab.services"            => "Services",
         "form.project.tags"            => "Tags (comma-separated)",
         "form.project.tags.hint"       => "Optional tags, e.g. production,internal",
@@ -473,54 +361,39 @@ fn en(key: &str) -> Option<&'static str> {
         // ── Host form – proxy field ───────────────────────────────────────
         "form.host.proxy"              => "Proxy instance",
         "form.host.proxy.hint"         => "Zentinel instance name on this host (default: zentinel)",
-        // ── Context menu (right-click) ────────────────────────────────────
+        // ── Context menu ─────────────────────────────────────────────────
         "ctx.edit"   => "Edit",
         "ctx.delete" => "Delete",
         "ctx.deploy" => "Deploy",
         "ctx.start"  => "Start",
         "ctx.stop"   => "Stop",
         "ctx.logs"   => "View Logs",
+        // ── Selection popup hints ─────────────────────────────────────────
+        "popup.hint.single" => "↑↓=Navigate  Enter=OK  Esc=Cancel",
+        "popup.hint.multi"  => "↑↓=Navigate  Space=Toggle  Enter=OK  Esc=Cancel",
         _ => return None,
     })
 }
 
-// ── Field-specific help ───────────────────────────────────────────────────────
+// ── English field help (built-in) ─────────────────────────────────────────────
 
-/// Returns a longer contextual description for a form field, or `None` if no
-/// specific help is defined. Used by the F1 help sidebar.
-pub fn field_help(lang: Lang, field_key: &str) -> Option<&'static str> {
-    Some(match (lang, field_key) {
-        (Lang::De, "name") =>
-            "Eindeutiger Kurzname. Nur Kleinbuchstaben, Ziffern und Bindestriche. Wird für Dateinamen und Container-Namen verwendet.",
-        (Lang::De, "domain") =>
-            "Hauptdomain ohne http://. Wildcards möglich: *.example.com. Subdomains werden automatisch abgeleitet.",
-        (Lang::De, "description") =>
-            "Optionale Beschreibung. Mehrzeilige Eingabe möglich. Wird in der Projektübersicht angezeigt.",
-        (Lang::De, "email") | (Lang::De, "acme_email") =>
-            "E-Mail-Adresse für Let's Encrypt (ACME). Wird bei Zertifikatsproblemen kontaktiert.",
-        (Lang::De, "address") =>
-            "IPv4-Adresse oder FQDN des Hosts. Beispiel: 192.168.1.10 oder server.example.com",
-        (Lang::De, "subdomain") =>
-            "Subdomain dieser Instanz. Wird automatisch aus dem Name abgeleitet. Ergibt: subdomain.domain.tld",
-        (Lang::De, "install_dir") =>
-            "Basisverzeichnis für Daten und Konfiguration. Wird angelegt falls nicht vorhanden.",
-        (Lang::De, "ssh_port") =>
-            "Standard ist 22. Andere Ports für Sicherheit möglich, z.B. 2222.",
-        (Lang::En, "name") =>
+fn en_field_help(key: &str) -> Option<&'static str> {
+    Some(match key {
+        "name" =>
             "Unique short name. Lowercase letters, digits and hyphens only. Used for filenames and container names.",
-        (Lang::En, "domain") =>
+        "domain" =>
             "Primary domain without http://. Wildcards allowed: *.example.com. Subdomains are derived automatically.",
-        (Lang::En, "description") =>
+        "description" =>
             "Optional description. Multi-line input supported. Shown in the project overview.",
-        (Lang::En, "email") | (Lang::En, "acme_email") =>
+        "email" | "acme_email" =>
             "Email address for Let's Encrypt (ACME). Used for certificate expiry notifications.",
-        (Lang::En, "address") =>
+        "address" =>
             "IPv4 address or FQDN of the host. Example: 192.168.1.10 or server.example.com",
-        (Lang::En, "subdomain") =>
+        "subdomain" =>
             "Subdomain for this instance. Derived automatically from name. Results in: subdomain.domain.tld",
-        (Lang::En, "install_dir") =>
+        "install_dir" =>
             "Base directory for data and config. Created if it does not exist.",
-        (Lang::En, "ssh_port") =>
+        "ssh_port" =>
             "Default is 22. Alternative ports for security, e.g. 2222.",
         _ => return None,
     })

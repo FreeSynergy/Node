@@ -70,7 +70,7 @@ pub fn handle_mouse(event: MouseEvent, state: &mut AppState, root: &Path) -> Res
     // Checked first so it is never blocked by overlays or form popups.
     if event.kind == MouseEventKind::Down(MouseButton::Left) {
         if let Some(ClickTarget::LangToggle) = state.click_map.hit(event.column, event.row) {
-            state.lang = state.lang.toggle();
+            state.cycle_lang();
             return Ok(());
         }
     }

@@ -51,11 +51,14 @@ use fsn_core::Resource;
 use fsn_core::store::StoreEntry;
 
 use crate::click_map::ClickMap;
+use crate::i18n::DynamicLang;
 use crate::sysinfo::SysInfo;
 
 pub struct AppState {
     pub screen:               Screen,
     pub lang:                 Lang,
+    /// All languages loaded from ~/.local/share/fsn/i18n/ at startup.
+    pub available_langs:      Vec<&'static DynamicLang>,
     pub sysinfo:              SysInfo,
     pub services:             Vec<ServiceRow>,
     pub selected:             usize,
@@ -112,8 +115,20 @@ pub struct AppState {
 
 impl AppState {
     pub fn new(sysinfo: SysInfo, projects: Vec<ProjectHandle>) -> Self {
+        let i18n_dir = {
+            let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+            std::path::PathBuf::from(home).join(".local/share/fsn/i18n")
+        };
+        let available_langs = DynamicLang::load_dir(&i18n_dir);
+        // Prefer German if available, otherwise English.
+        let lang = available_langs.iter()
+            .find(|d| d.code == "de")
+            .map(|d| Lang::Dynamic(d))
+            .unwrap_or(Lang::En);
+
         let mut s = Self {
-            screen: Screen::Welcome, lang: Lang::De, sysinfo, services: vec![],
+            screen: Screen::Welcome, lang, sysinfo, services: vec![],
+            available_langs,
             selected: 0, overlay_stack: vec![],
             should_quit: false, help_visible: false, welcome_focus: 0, form_queue: None,
             ctrl_hint: false, projects, selected_project: 0,
@@ -139,6 +154,15 @@ impl AppState {
         };
         s.rebuild_sidebar();
         s
+    }
+
+    /// Cycle through En → all loaded languages → En → ...
+    pub fn cycle_lang(&mut self) {
+        let langs: Vec<Lang> = std::iter::once(Lang::En)
+            .chain(self.available_langs.iter().map(|d| Lang::Dynamic(d)))
+            .collect();
+        let current = langs.iter().position(|l| *l == self.lang).unwrap_or(0);
+        self.lang = langs[(current + 1) % langs.len()];
     }
 
     pub fn store_entries_for_type(&self, service_type: &str) -> Vec<&StoreEntry> {
@@ -291,6 +315,21 @@ impl AppState {
 
     pub fn t<'a>(&self, key: &'a str) -> &'a str {
         crate::i18n::t(self.lang, key)
+    }
+
+    /// Reload languages from the i18n directory (e.g. after download).
+    pub fn reload_langs(&mut self) {
+        let i18n_dir = {
+            let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+            std::path::PathBuf::from(home).join(".local/share/fsn/i18n")
+        };
+        self.available_langs = DynamicLang::load_dir(&i18n_dir);
+        // Keep current language if still available, else fall back to En.
+        let current_code = self.lang.code();
+        self.lang = self.available_langs.iter()
+            .find(|d| d.code == current_code)
+            .map(|d| Lang::Dynamic(d))
+            .unwrap_or(Lang::En);
     }
 
     pub fn deploy_overlay_mut(&mut self) -> Option<&mut DeployState> {

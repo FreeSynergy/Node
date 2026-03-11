@@ -52,7 +52,7 @@ pub fn handle(key: KeyEvent, state: &mut AppState, root: &Path) -> Result<()> {
         && state.form_queue.is_none()
         && state.sidebar_filter.is_none()
     {
-        state.lang = state.lang.toggle();
+        state.cycle_lang();
         return Ok(());
     }
 
@@ -131,7 +131,7 @@ fn handle_overlay(key: KeyEvent, state: &mut AppState, root: &Path) -> Result<()
 fn handle_welcome(key: KeyEvent, state: &mut AppState) -> Result<()> {
     match key.code {
         KeyCode::Char('q') => state.should_quit = true,
-        KeyCode::Char('l') => state.lang = state.lang.toggle(),
+        KeyCode::Char('l') => state.cycle_lang(),
         KeyCode::Left | KeyCode::Right => state.welcome_focus = 1 - state.welcome_focus,
         KeyCode::Enter => {
             if state.welcome_focus == 0 {
@@ -166,12 +166,12 @@ fn handle_resource_form(key: KeyEvent, state: &mut AppState, root: &Path) -> Res
                 state.close_form_queue();
             }
         }
-        FormAction::LangToggle => state.lang = state.lang.toggle(),
+        FormAction::LangToggle => state.cycle_lang(),
         FormAction::Submit     => handle_form_submit(state, root)?,
         FormAction::Consumed   => {}
         FormAction::Unhandled  => {
             if let KeyCode::Char('l') | KeyCode::Char('L') = key.code {
-                state.lang = state.lang.toggle();
+                state.cycle_lang();
             }
         }
         FormAction::AcceptAndNext
