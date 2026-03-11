@@ -17,11 +17,16 @@ pub struct AppSettings {
     /// Module stores to query when browsing or installing services.
     #[serde(default = "default_stores")]
     pub stores: Vec<StoreConfig>,
+
+    /// Preferred UI language (BCP 47 code, e.g. "de", "fr").
+    /// `None` = auto-detect from system locale.
+    #[serde(default)]
+    pub preferred_lang: Option<String>,
 }
 
 impl Default for AppSettings {
     fn default() -> Self {
-        Self { stores: default_stores() }
+        Self { stores: default_stores(), preferred_lang: None }
     }
 }
 

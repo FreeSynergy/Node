@@ -120,9 +120,13 @@ impl AppState {
             std::path::PathBuf::from(home).join(".local/share/fsn/i18n")
         };
         let available_langs = DynamicLang::load_dir(&i18n_dir);
-        // Prefer German if available, otherwise English.
-        let lang = available_langs.iter()
-            .find(|d| d.code == "de")
+        let settings = AppSettings::load().unwrap_or_default();
+
+        // Language priority: saved setting → system locale → English.
+        let preferred_code: Option<String> = settings.preferred_lang.clone()
+            .or_else(system_lang_code);
+        let lang = preferred_code.as_deref()
+            .and_then(|code| available_langs.iter().find(|d| d.code == code))
             .map(|d| Lang::Dynamic(d))
             .unwrap_or(Lang::En);
 
@@ -140,7 +144,7 @@ impl AppState {
             deploy_rx: None,
             reconcile_rx: None,
             store_rx: None,
-            settings: AppSettings::load().unwrap_or_default(),
+            settings,
             store_entries: Vec::new(),
             settings_cursor: 0,
             notifications: Vec::new(),
@@ -156,13 +160,18 @@ impl AppState {
         s
     }
 
-    /// Cycle through En → all loaded languages → En → ...
+    /// Cycle through En → all loaded languages → En → ... and persist the choice.
     pub fn cycle_lang(&mut self) {
         let langs: Vec<Lang> = std::iter::once(Lang::En)
             .chain(self.available_langs.iter().map(|d| Lang::Dynamic(d)))
             .collect();
         let current = langs.iter().position(|l| *l == self.lang).unwrap_or(0);
         self.lang = langs[(current + 1) % langs.len()];
+        self.settings.preferred_lang = match self.lang {
+            Lang::En         => None,
+            Lang::Dynamic(d) => Some(d.code.to_string()),
+        };
+        let _ = self.settings.save();
     }
 
     pub fn store_entries_for_type(&self, service_type: &str) -> Vec<&StoreEntry> {
@@ -386,6 +395,28 @@ impl AppState {
             }
         }
     }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/// Detect the user's preferred language from Linux locale environment variables.
+///
+/// Checks LANGUAGE, LANG, LC_ALL, LC_MESSAGES in that order.
+/// Extracts the two-letter language code from values like "de_DE.UTF-8".
+/// Returns `None` for "C", "POSIX", or missing/unset values.
+fn system_lang_code() -> Option<String> {
+    for var in &["LANGUAGE", "LANG", "LC_ALL", "LC_MESSAGES"] {
+        if let Ok(val) = std::env::var(var) {
+            // LANGUAGE can be colon-separated list; take the first entry.
+            let first = val.split(':').next().unwrap_or("");
+            // Split on locale separators and take the base language code.
+            let code = first.split(['_', '.', '@']).next().unwrap_or("");
+            if code.len() >= 2 && !matches!(code, "C" | "POSIX") {
+                return Some(code.to_lowercase());
+            }
+        }
+    }
+    None
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
