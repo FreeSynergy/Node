@@ -232,16 +232,14 @@ pub fn run(root: &Path) -> Result<()> {
     let store_index = fsn_engine::store::StoreClient::load_bundled(&root.join("modules"));
     state.store_entries = store_index.modules;
 
-    // Load hosts for the first selected project.
-    if let Some(proj) = state.projects.first() {
+    // Load hosts from ALL project directories — show everything in the sidebar.
+    for proj in &state.projects.clone() {
         let project_dir = root.join("projects").join(&proj.slug);
         let (hosts, host_errors) = load_hosts(&project_dir);
-        state.hosts = hosts;
-        for msg in host_errors {
-            state.push_notif(app::NotifKind::Info, msg);
-        }
-        state.rebuild_sidebar();
+        state.hosts.extend(hosts);
+        for msg in host_errors { state.push_notif(app::NotifKind::Info, msg); }
     }
+    state.rebuild_sidebar();
 
     // Build initial service list from desired state + Podman query.
     state.apply_podman_status(podman_container_statuses());

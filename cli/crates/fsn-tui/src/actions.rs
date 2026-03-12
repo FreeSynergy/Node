@@ -98,12 +98,13 @@ pub fn stop_service_container(state: &mut AppState, name: String) {
 // ── Sidebar sync ──────────────────────────────────────────────────────────────
 
 pub fn reload_hosts(state: &mut AppState, root: &Path) {
-    if let Some(proj) = state.projects.get(state.selected_project) {
+    state.hosts.clear();
+    for proj in &state.projects.clone() {
         let (hosts, host_errs) = crate::load_hosts(&root.join("projects").join(&proj.slug));
-        state.hosts = hosts;
+        state.hosts.extend(hosts);
         for msg in host_errs { state.push_notif(NotifKind::Info, msg); }
-        state.rebuild_sidebar();
     }
+    state.rebuild_sidebar();
 }
 
 /// Sync `selected_project` / `selected_host` after `sidebar_cursor` moves.

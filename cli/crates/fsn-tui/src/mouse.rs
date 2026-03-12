@@ -197,76 +197,74 @@ fn handle_left_click(col: u16, row: u16, state: &mut AppState, root: &Path) -> R
     let dbl = is_double_click(col, row, state);
     state.last_click = Some((col, row, Instant::now()));
 
-    match dash_hit(col, row, state) {
-        DashHit::Sidebar(item_idx) => {
-            if state.sidebar_items[item_idx].is_selectable() {
-                state.dash_focus = DashFocus::Sidebar;
-                state.sidebar_cursor = item_idx;
-                crate::actions::sync_sidebar_selection(state, root);
-
-                if dbl {
-                    // Double-click = activate (same as Enter)
-                    if let Some(item) = state.current_sidebar_item().cloned() {
-                        activate_sidebar_item(item, state, root);
-                    }
-                }
-            }
-        }
-        DashHit::Service(svc_idx) if svc_idx < state.services.len() => {
-            state.dash_focus = DashFocus::Services;
-            state.selected = svc_idx;
-
-            if dbl {
-                // Double-click = open logs
-                if let Some(svc) = state.services.get(svc_idx) {
-                    let lines = fetch_logs(&svc.name);
-                    state.push_overlay(OverlayLayer::Logs(LogsState {
-                        service_name: svc.name.clone(), lines, scroll: 0,
-                    }));
-                }
-            }
-        }
-        DashHit::Miss => {
-            // ClickMap dispatch for non-dashboard screens (e.g. Settings).
-            let target = state.click_map.hit(col, row).cloned();
-            match target {
-                Some(ClickTarget::SettingsSidebar { idx }) => {
-                    use crate::app::{SettingsFocus, SettingsSection};
-                    state.settings_sidebar_cursor = idx;
-                    state.settings_section = SettingsSection::from_idx(idx);
+    // Guard: dash_hit() relies on sidebar/services areas stored during Dashboard render.
+    // On other screens those areas are stale — only call dash_hit on Dashboard screen.
+    if state.screen == crate::app::Screen::Dashboard {
+        match dash_hit(col, row, state) {
+            DashHit::Sidebar(item_idx) => {
+                if state.sidebar_items[item_idx].is_selectable() {
+                    state.dash_focus = DashFocus::Sidebar;
+                    state.sidebar_cursor = item_idx;
+                    crate::actions::sync_sidebar_selection(state, root);
                     if dbl {
-                        state.settings_focus = SettingsFocus::Content;
-                        state.settings_cursor = 0;
-                        state.lang_cursor = 0;
-                    } else {
-                        state.settings_focus = SettingsFocus::Sidebar;
-                    }
-                }
-                Some(ClickTarget::SettingsCursor { idx }) => {
-                    use crate::app::SettingsFocus;
-                    state.settings_cursor = idx;
-                    state.settings_focus = SettingsFocus::Content;
-                    if dbl {
-                        // Double-click on store row — open edit form.
-                        if let Some(store) = state.settings.stores.get(idx) {
-                            let form = crate::settings_form::edit_store_form(idx, store);
-                            state.open_form(form);
+                        if let Some(item) = state.current_sidebar_item().cloned() {
+                            activate_sidebar_item(item, state, root);
                         }
                     }
                 }
-                Some(ClickTarget::LangCursor { idx }) => {
-                    use crate::app::SettingsFocus;
-                    state.lang_cursor = idx;
-                    state.settings_focus = SettingsFocus::Content;
-                    if dbl {
-                        // Double-click: activate language (Enter behavior).
-                        crate::events::lang_cursor_activate_pub(state, idx);
-                    } else {
-                        // Single-click: toggle checkbox (Space behavior).
-                        crate::events::lang_cursor_toggle_pub(state, idx);
+                return Ok(());
+            }
+            DashHit::Service(svc_idx) if svc_idx < state.services.len() => {
+                state.dash_focus = DashFocus::Services;
+                state.selected = svc_idx;
+                if dbl {
+                    if let Some(svc) = state.services.get(svc_idx) {
+                        let lines = fetch_logs(&svc.name);
+                        state.push_overlay(OverlayLayer::Logs(LogsState {
+                            service_name: svc.name.clone(), lines, scroll: 0,
+                        }));
                     }
                 }
-                _ => {}
+                return Ok(());
+            }
+            _ => {}
+        }
+    }
+
+    // ClickMap dispatch — Settings and any other screen registered in the map.
+    let target = state.click_map.hit(col, row).cloned();
+    match target {
+        Some(ClickTarget::SettingsSidebar { idx }) => {
+            use crate::app::{SettingsFocus, SettingsSection};
+            state.settings_sidebar_cursor = idx;
+            state.settings_section = SettingsSection::from_idx(idx);
+            if dbl {
+                state.settings_focus = SettingsFocus::Content;
+                state.settings_cursor = 0;
+                state.lang_cursor = 0;
+            } else {
+                state.settings_focus = SettingsFocus::Sidebar;
+            }
+        }
+        Some(ClickTarget::SettingsCursor { idx }) => {
+            use crate::app::SettingsFocus;
+            state.settings_cursor = idx;
+            state.settings_focus = SettingsFocus::Content;
+            if dbl {
+                if let Some(store) = state.settings.stores.get(idx) {
+                    let form = crate::settings_form::edit_store_form(idx, store);
+                    state.open_form(form);
+                }
+            }
+        }
+        Some(ClickTarget::LangCursor { idx }) => {
+            use crate::app::SettingsFocus;
+            state.lang_cursor = idx;
+            state.settings_focus = SettingsFocus::Content;
+            if dbl {
+                crate::events::lang_cursor_activate_pub(state, idx);
+            } else {
+                crate::events::lang_cursor_toggle_pub(state, idx);
             }
         }
         _ => {}
@@ -434,7 +432,7 @@ pub fn execute_context_action(
     match action {
         ContextAction::Edit => {
             if let Some(item) = source_item(state) {
-                item.open_edit_form(state);
+                item.open_edit_form(state, root);
             }
         }
         ContextAction::Delete => {

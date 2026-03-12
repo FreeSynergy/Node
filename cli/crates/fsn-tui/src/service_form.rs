@@ -243,25 +243,45 @@ pub fn submit_service_form(form: &ResourceForm, services_dir: &Path, project_slu
         content.push_str(&format!("tags          = [{tag_list}]\n"));
     }
 
-    // Env vars: "KEY=value\n..." → [environment] TOML table.
-    // Comment lines (# ...) are UI-only metadata — not written to the file.
+    // Env vars: parse "KEY=value" lines and "# comment" lines from the env field.
+    // Comments (# ...) attach to the NEXT key-value pair as metadata → [vars_comments].
     let env_raw = form.field_value("env");
-    let env_pairs: Vec<(String, String)> = env_raw.lines()
-        .filter_map(|line| {
-            let line = line.trim();
-            if line.is_empty() || line.starts_with('#') { return None; }
-            let (k, v) = line.split_once('=')?;
+    let mut env_pairs:    Vec<(String, String)> = Vec::new();
+    let mut env_comments: Vec<(String, String)> = Vec::new();  // (key, comment)
+    let mut pending_comment = String::new();
+    for line in env_raw.lines() {
+        let line = line.trim();
+        if line.is_empty() {
+            pending_comment.clear();
+            continue;
+        }
+        if let Some(comment) = line.strip_prefix('#') {
+            pending_comment = comment.trim().to_string();
+            continue;
+        }
+        if let Some((k, v)) = line.split_once('=') {
             let k = k.trim().to_string();
-            if k.is_empty() { return None; }
+            if k.is_empty() { pending_comment.clear(); continue; }
             // Escape backslashes and double-quotes for TOML string literals.
             let v = v.trim().replace('\\', "\\\\").replace('"', "\\\"");
-            Some((k, v))
-        })
-        .collect();
+            if !pending_comment.is_empty() {
+                env_comments.push((k.clone(), std::mem::take(&mut pending_comment)));
+            }
+            env_pairs.push((k, v));
+        }
+        pending_comment.clear();
+    }
     if !env_pairs.is_empty() {
-        content.push_str("\n[environment]\n");
+        content.push_str("\n[vars]\n");
         for (k, v) in &env_pairs {
             content.push_str(&format!("{k} = \"{v}\"\n"));
+        }
+    }
+    if !env_comments.is_empty() {
+        content.push_str("\n[vars_comments]\n");
+        for (k, c) in &env_comments {
+            let c_escaped = c.replace('\\', "\\\\").replace('"', "\\\"");
+            content.push_str(&format!("{k} = \"{c_escaped}\"\n"));
         }
     }
 
@@ -271,24 +291,46 @@ pub fn submit_service_form(form: &ResourceForm, services_dir: &Path, project_slu
 
 /// Build a pre-filled service form for editing an existing service instance.
 ///
-/// Reads from the in-memory `ServiceInstanceMeta` stored in the project config.
-/// The service `name` is locked as the edit ID (slug-based).
+/// `svc_entry` provides the project-TOML metadata (alias, host, subdomain, …).
+/// `svc_config` is the standalone `.service.toml` parsed config — used to
+/// populate the env table with the correct [vars] + [vars_comments] data.
+/// When absent (file missing or unreadable) the form still opens with empty env.
 pub fn edit_service_form(
-    svc_name:  &str,
-    svc_entry: &fsn_core::config::project::ServiceEntry,
-    edit_slug: String,
+    svc_name:   &str,
+    svc_entry:  &fsn_core::config::project::ServiceEntry,
+    svc_config: Option<&fsn_core::config::project::ServiceInstanceConfig>,
+    edit_slug:  String,
 ) -> ResourceForm {
-    let tags   = svc_entry.tags.join(", ");
-    let port   = svc_entry.port.map(|p| p.to_string()).unwrap_or_default();
-    let sub    = svc_entry.subdomain.as_deref().unwrap_or("");
-    let alias  = svc_entry.alias.as_deref().unwrap_or("");
-    let ver    = svc_entry.version.as_str();
+    let tags  = svc_entry.tags.join(", ");
+    let port  = svc_entry.port.map(|p| p.to_string()).unwrap_or_default();
+    let sub   = svc_entry.subdomain.as_deref().unwrap_or("");
+    let alias = svc_entry.alias.as_deref().unwrap_or("");
+    let ver   = svc_entry.version.as_str();
 
-    // Serialize env: IndexMap<String,String> → "KEY=value\n..." for EnvTableNode
-    let env_str: String = svc_entry.env.iter()
-        .map(|(k, v)| format!("{k}={v}"))
-        .collect::<Vec<_>>()
-        .join("\n");
+    // Build env string from standalone file (vars + vars_comments).
+    // Format: "# comment\nKEY=value\n..." — EnvTableNode parses this correctly.
+    let env_str: String = if let Some(cfg) = svc_config {
+        cfg.vars.iter()
+            .map(|(k, v)| {
+                let val = match v {
+                    toml::Value::String(s) => s.clone(),
+                    other                  => other.to_string(),
+                };
+                if let Some(comment) = cfg.vars_comments.get(k) {
+                    format!("# {comment}\n{k}={val}")
+                } else {
+                    format!("{k}={val}")
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    } else {
+        // Fallback: project-TOML env (no comments)
+        svc_entry.env.iter()
+            .map(|(k, v)| format!("{k}={v}"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
 
     let mut prefill = HashMap::new();
     prefill.insert("name",      svc_name);

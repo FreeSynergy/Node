@@ -42,7 +42,7 @@ impl SidebarItem {
     ///
     /// Noop for `Section` and `Action` variants — they have no edit form.
     /// Called by `execute_context_action` (mouse.rs) and keyboard 'e' / Enter.
-    pub(crate) fn open_edit_form(&self, state: &mut AppState) {
+    pub(crate) fn open_edit_form(&self, state: &mut AppState, root: &Path) {
         match self {
             SidebarItem::Project { slug, .. } => {
                 if let Some(proj) = state.projects.iter().find(|p| p.slug == *slug).cloned() {
@@ -60,10 +60,20 @@ impl SidebarItem {
                 }
             }
             SidebarItem::Service { name, .. } => {
-                if let Some(proj) = state.projects.get(state.selected_project).cloned() {
+                // Search all projects for this service (sidebar shows ALL services).
+                let proj = state.projects.iter().find(|p| p.config.load.services.contains_key(name)).cloned();
+                if let Some(proj) = proj {
                     if let Some(entry) = proj.config.load.services.get(name).cloned() {
                         let slug = crate::resource_form::slugify(name);
-                        let form = crate::service_form::edit_service_form(name, &entry, slug);
+                        // Load standalone .service.toml to get vars + vars_comments.
+                        let svc_path = root.join("projects")
+                            .join(&proj.slug)
+                            .join("services")
+                            .join(format!("{slug}.service.toml"));
+                        let svc_config = fsn_core::config::project::ServiceInstanceConfig::load(&svc_path).ok();
+                        let form = crate::service_form::edit_service_form(
+                            name, &entry, svc_config.as_ref(), slug,
+                        );
                         state.open_form(form);
                     }
                 }
@@ -112,10 +122,10 @@ pub fn activate_sidebar_item(item: SidebarItem, state: &mut AppState, root: &Pat
                 }
             }
             // No missing resources — open edit form.
-            item.open_edit_form(state);
+            item.open_edit_form(state, root);
         }
         // Resource items: open their edit form (same behavior as 'e' key).
-        other => other.open_edit_form(state),
+        other => other.open_edit_form(state, root),
     }
     let _ = root;
 }

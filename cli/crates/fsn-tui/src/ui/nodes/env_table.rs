@@ -503,6 +503,52 @@ impl FormNode for EnvTableNode {
 
         FormAction::Unhandled
     }
+
+    /// Handle a click inside the EnvTable area.
+    ///
+    /// Editor row (top 3 lines) — click selects the column (KEY/VALUE/COMMENT).
+    /// Compact list below — click navigates to that row.
+    /// Column widths match render() exactly: KEY=28%, VALUE=40%, COMMENT=rest.
+    fn handle_mouse(&mut self, event: crossterm::event::MouseEvent, area: Rect) -> FormAction {
+        use crossterm::event::{MouseButton, MouseEventKind};
+        if event.kind != MouseEventKind::Down(MouseButton::Left) { return FormAction::Unhandled; }
+
+        // 1-cell border on all sides → inner starts at (area.x+1, area.y+1).
+        let inner_x = area.x + 1;
+        let inner_y = area.y + 1;
+        let inner_w = area.width.saturating_sub(2);
+
+        let rel_y = match event.row.checked_sub(inner_y) {
+            Some(r) => r as usize,
+            None    => return FormAction::Unhandled,
+        };
+
+        const EDITOR_H: usize = 3;
+
+        if rel_y < EDITOR_H {
+            // Editor area — determine which column was clicked.
+            if event.column < inner_x { return FormAction::Unhandled; }
+            let rel_x = (event.column - inner_x) as usize;
+            let key_w = (inner_w as usize * 28 / 100).max(5);
+            let val_w = (inner_w as usize * 40 / 100).max(8);
+            let new_col = if rel_x < key_w { 0 } else if rel_x < key_w + val_w { 1 } else { 2 };
+            self.cur_col = new_col;
+            let cell_len = self.rows[self.cur_row][self.cur_col].len();
+            self.cur_pos = cell_len; // place cursor at end on column switch
+            FormAction::Consumed
+        } else {
+            // Compact list — map click row to actual row index (skipping cur_row).
+            let list_row = rel_y - EDITOR_H;
+            let mut actual = list_row + self.scroll_offset;
+            if actual >= self.cur_row { actual += 1; }
+            if actual < self.rows.len() {
+                self.move_to_row(actual);
+                self.cur_col = 0;
+                self.cur_pos = self.rows[self.cur_row][0].len();
+            }
+            FormAction::Consumed
+        }
+    }
 }
 
 // ── Module-level helpers ──────────────────────────────────────────────────────

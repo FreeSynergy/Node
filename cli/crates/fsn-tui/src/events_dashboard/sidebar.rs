@@ -59,7 +59,7 @@ pub(super) fn handle_dashboard_sidebar(key: KeyEvent, state: &mut AppState, root
         // 'e' = explicit edit (same as Enter on a resource item, but not on Action items).
         KeyCode::Char('e') => {
             if let Some(item) = state.current_sidebar_item().cloned() {
-                item.open_edit_form(state);
+                item.open_edit_form(state, root);
             }
         }
         // Enter = "activate": opens create form for Action items, edit form for resources.

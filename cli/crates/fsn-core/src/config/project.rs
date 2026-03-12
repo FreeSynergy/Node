@@ -172,8 +172,14 @@ pub type ModuleRef = ServiceEntry;
 pub struct ServiceInstanceConfig {
     pub service: ServiceInstanceMeta,
 
+    /// Environment variable overrides: KEY → value.
     #[serde(default)]
     pub vars: IndexMap<String, Value>,
+
+    /// Optional human-readable comments for each var, keyed by var name.
+    /// Written as [vars_comments] in the TOML file; UI-only, not used by the deployer.
+    #[serde(default)]
+    pub vars_comments: IndexMap<String, String>,
 }
 
 /// Metadata block inside a standalone service instance file.

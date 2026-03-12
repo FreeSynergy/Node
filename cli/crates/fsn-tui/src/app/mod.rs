@@ -333,7 +333,8 @@ impl AppState {
         items.push(SidebarItem::Action { label_key: "dash.new_host", kind: SidebarAction::NewHost });
 
         items.push(SidebarItem::Section("sidebar.services"));
-        if let Some(proj) = self.projects.get(self.selected_project) {
+        // Show services from ALL projects so nothing stays hidden.
+        for proj in &self.projects {
             for (name, entry) in &proj.config.load.services {
                 let status = self.last_podman_statuses.get(name).copied().unwrap_or(RunState::Missing);
                 items.push(SidebarItem::Service { name: name.clone(), class: entry.service_class.clone(), status });

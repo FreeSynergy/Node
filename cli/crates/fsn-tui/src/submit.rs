@@ -245,10 +245,8 @@ pub fn submit_host(state: &mut AppState, root: &Path) -> Result<()> {
     match result {
         Some(Ok(())) => {
             let name = state.active_form().map(|f| f.field_value("name")).unwrap_or_default();
-            let (hosts, host_errs) = crate::load_hosts(&project_dir);
-            state.hosts = hosts;
-            for msg in host_errs { state.push_notif(crate::app::NotifKind::Info, msg); }
-            state.rebuild_sidebar();
+            // Reload ALL hosts from ALL projects after save (also calls rebuild_sidebar).
+            crate::actions::reload_hosts(state, root);
             state.dash_focus = DashFocus::Sidebar;
             advance_or_close(state);
             state.push_notif(NotifKind::Success, format!("Host '{}' saved", name));
