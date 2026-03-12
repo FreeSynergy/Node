@@ -47,7 +47,7 @@ impl SidebarItem {
             SidebarItem::Project { slug, .. } => {
                 if let Some(proj) = state.projects.iter().find(|p| p.slug == *slug).cloned() {
                     let form = crate::project_form::edit_project_form(
-                        &proj, &state.svc_handles, &state.store_entries,
+                        &proj, &state.svc_handles, &state.store_entries, &state.available_langs,
                     );
                     state.open_form(form);
                 }
@@ -83,7 +83,7 @@ impl SidebarItem {
 pub fn activate_sidebar_item(item: SidebarItem, state: &mut AppState, root: &Path) {
     match item {
         SidebarItem::Action { kind: SidebarAction::NewProject, .. } => {
-            let form = crate::project_form::new_project_form(&state.svc_handles, &state.store_entries);
+            let form = crate::project_form::new_project_form(&state.svc_handles, &state.store_entries, &state.available_langs);
             state.open_form(form);
         }
         SidebarItem::Action { kind: SidebarAction::NewHost, .. } => {
@@ -237,7 +237,7 @@ fn open_new_resource_form(item_idx: usize, state: &mut AppState, root: &Path) {
     let Some(&(_, kind)) = NEW_RESOURCE_ITEMS.get(item_idx) else { return };
     match kind {
         ResourceKind::Project => {
-            let form = crate::project_form::new_project_form(&state.svc_handles, &state.store_entries);
+            let form = crate::project_form::new_project_form(&state.svc_handles, &state.store_entries, &state.available_langs);
             state.open_form(form);
         }
         ResourceKind::Host => {

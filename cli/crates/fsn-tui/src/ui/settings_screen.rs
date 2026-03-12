@@ -228,16 +228,29 @@ fn render_stores(f: &mut RenderCtx<'_>, state: &AppState, area: Rect, cmap: &mut
 }
 
 // ── Languages content ─────────────────────────────────────────────────────────
+//
+// Design: Unified checkbox list — one row per language, installed = [x], not installed = [ ].
+//
+// Cursor layout:
+//   0              → English (built-in, always [x])
+//   1..store_langs → each store language in Store index order
+//
+// When store_langs is empty (still fetching): fall back to showing only installed langs.
+//
+// Interactions:
+//   Enter  → activate language for UI (only if installed)
+//   Space  → toggle: download if [ ], remove if [x]
+//   Del/D  → remove installed language
+//   ←/Esc  → back to sidebar
 
 fn render_languages(f: &mut RenderCtx<'_>, state: &AppState, area: Rect, cmap: &mut ClickMap) {
-    let lang      = state.lang;
+    let ui_lang   = state.lang;
     let focused   = state.settings_focus == SettingsFocus::Content
         && state.settings_section == SettingsSection::Languages;
-    let installed = state.available_langs.len();
     let mut lines: Vec<Line<'static>> = Vec::new();
     let mut line_y = area.y;
 
-    // ── English — built-in, always first (cursor index 0) ─────────────────────
+    // ── English — built-in, always index 0 ────────────────────────────────────
     {
         let is_active = matches!(state.lang, crate::app::Lang::En);
         let is_sel    = focused && state.lang_cursor == 0;
@@ -247,126 +260,127 @@ fn render_languages(f: &mut RenderCtx<'_>, state: &AppState, area: Rect, cmap: &
                 ClickTarget::LangCursor { idx: 0 },
             );
         }
-        push_lang_row(
-            &mut lines,
-            "EN".to_string(), "English".to_string(), is_active, is_sel,
-            t(lang, "settings.lang.builtin").to_string(), Color::DarkGray, lang,
-        );
         line_y += 1;
+        lines.push(lang_checkbox_row(
+            "[x]".to_string(), "EN".to_string(), "English".to_string(),
+            is_active, is_sel, true,
+            t(ui_lang, "settings.lang.builtin").to_string(),
+        ));
     }
 
-    // ── Installed languages ────────────────────────────────────────────────────
-    if state.available_langs.is_empty() {
+    if state.store_langs.is_empty() {
+        // Store index not yet fetched — show installed languages only.
         lines.push(Line::from(""));
-        lines.push(Line::from(vec![
-            Span::raw("  "),
-            Span::styled(t(lang, "settings.lang.none"), Style::default().fg(Color::DarkGray)),
-        ]));
-        line_y += 2;
-    } else {
+        line_y += 1;
         for (i, dl) in state.available_langs.iter().enumerate() {
-            let lang_cursor = i + 1;
-            let is_active   = matches!(state.lang, crate::app::Lang::Dynamic(d) if d.code == dl.code);
-            let is_sel      = focused && state.lang_cursor == lang_cursor;
-
+            let cursor_idx = i + 1;
+            let is_active  = matches!(state.lang, crate::app::Lang::Dynamic(d) if d.code == dl.code);
+            let is_sel     = focused && state.lang_cursor == cursor_idx;
             if line_y < area.bottom() {
                 cmap.push(
                     Rect { x: area.x, y: line_y, width: area.width, height: 1 },
-                    ClickTarget::LangCursor { idx: lang_cursor },
+                    ClickTarget::LangCursor { idx: cursor_idx },
                 );
             }
             line_y += 1;
-
-            let (api_label, api_color) = if dl.api_version == TRANSLATION_API_VERSION {
-                (t(lang, "settings.lang.api_ok"), Color::Green)
+            let (api_label, _) = if dl.api_version == TRANSLATION_API_VERSION {
+                (t(ui_lang, "settings.lang.api_ok"), Color::Green)
             } else {
-                (t(lang, "settings.lang.api_warn"), Color::Yellow)
+                (t(ui_lang, "settings.lang.api_warn"), Color::Yellow)
             };
             let info = format!("{}%  {}", dl.completeness, api_label);
-            push_lang_row(
-                &mut lines,
-                dl.code_upper.to_string(), dl.name.to_string(), is_active, is_sel,
-                info, api_color, lang,
-            );
+            lines.push(lang_checkbox_row(
+                "[x]".to_string(), dl.code_upper.to_string(), dl.name.to_string(),
+                is_active, is_sel, true, info,
+            ));
         }
-    }
-
-    // ── Available for download (from Store, not yet installed) ─────────────────
-    let downloadable = state.downloadable_store_langs();
-
-    if !downloadable.is_empty() {
+        if state.available_langs.is_empty() {
+            lines.push(Line::from(vec![
+                Span::raw("  "),
+                Span::styled(
+                    "Loading Store index…",
+                    Style::default().fg(Color::DarkGray),
+                ),
+            ]));
+        }
+    } else {
+        // Store index loaded — show all languages as a unified checkbox list.
         lines.push(Line::from(""));
-        lines.push(Line::from(vec![
-            Span::raw("  "),
-            Span::styled(
-                "Available in Store",
-                Style::default().fg(Color::DarkGray).add_modifier(Modifier::UNDERLINED),
-            ),
-        ]));
-        line_y += 2; // blank + section header (not clickable)
+        line_y += 1;
 
-        for (i, e) in downloadable.iter().enumerate() {
-            let dl_cursor = 1 + installed + i;
-            let is_sel    = focused && state.lang_cursor == dl_cursor;
+        for (i, entry) in state.store_langs.iter().enumerate() {
+            let cursor_idx  = i + 1;
+            let is_installed = state.available_langs.iter().any(|d| d.code == entry.code);
+            let is_active    = matches!(state.lang, crate::app::Lang::Dynamic(d) if d.code == entry.code);
+            let is_sel       = focused && state.lang_cursor == cursor_idx;
 
             if line_y < area.bottom() {
                 cmap.push(
                     Rect { x: area.x, y: line_y, width: area.width, height: 1 },
-                    ClickTarget::LangCursor { idx: dl_cursor },
+                    ClickTarget::LangCursor { idx: cursor_idx },
                 );
             }
             line_y += 1;
 
-            let marker     = if is_sel { "▶ " } else { "  " };
-            let name_style = if is_sel {
-                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+            let checkbox  = if is_installed { "[x]" } else { "[ ]" };
+            let code_up   = entry.code.to_uppercase();
+            let info_str  = if is_installed {
+                format!("{}%  ✓", entry.completeness)
             } else {
-                Style::default().fg(Color::DarkGray)
+                format!("{}%  ↓ Space", entry.completeness)
             };
-            let code_upper = e.code.to_uppercase();
-            lines.push(Line::from(vec![
-                Span::raw(marker),
-                Span::styled(format!("[{code_upper}] "), Style::default().fg(Color::DarkGray)),
-                Span::styled(e.name.clone(),            name_style),
-                Span::raw("  "),
-                Span::styled("↓ Enter/F to download",  Style::default().fg(Color::Yellow)),
-            ]));
+            lines.push(lang_checkbox_row(
+                checkbox.to_string(), code_up, entry.name.clone(),
+                is_active, is_sel, is_installed, info_str,
+            ));
         }
     }
 
-    let _ = line_y; // suppress unused warning
+    let _ = line_y;
     f.render_stateful_widget(Paragraph::new(lines), area, &mut ParagraphState::new());
 }
 
-fn push_lang_row(
-    lines:     &mut Vec<Line<'static>>,
-    code:      String,
-    name:      String,
-    is_active: bool,
-    is_sel:    bool,
-    info:      String,
-    info_col:  Color,
-    lang:      crate::app::Lang,
-) {
+/// Build one language row for the checkbox list.
+///
+///   ▶ [x] [DE] Deutsch    ✓ Active   100%  ✓
+///     [ ] [FR] Français              100%  ↓ Space
+fn lang_checkbox_row(
+    checkbox:     String,
+    code_upper:   String,
+    name:         String,
+    is_active:    bool,
+    is_sel:       bool,
+    is_installed: bool,
+    info:         String,
+) -> Line<'static> {
     let marker     = if is_sel { "▶ " } else { "  " };
-    let status_key = if is_active { "settings.lang.active" } else { "settings.lang.inactive" };
-    let status     = t(lang, status_key);
-    let status_col = if is_active { Color::Green } else { Color::DarkGray };
+    let chk_col    = if is_installed { Color::Green  } else { Color::DarkGray };
     let name_style = if is_sel {
         Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
-    } else {
+    } else if is_installed {
         Style::default().fg(Color::White)
+    } else {
+        Style::default().fg(Color::DarkGray)
     };
-
-    lines.push(Line::from(vec![
+    let active_badge: Vec<Span<'static>> = if is_active {
+        vec![
+            Span::raw("  "),
+            Span::styled("✓ Active", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+        ]
+    } else {
+        vec![]
+    };
+    let mut spans = vec![
         Span::raw(marker),
-        Span::styled(format!("[{code}] "), Style::default().fg(Color::Yellow)),
-        Span::styled(name,   name_style),
-        Span::raw("  "),
-        Span::styled(status, Style::default().fg(status_col)),
-        Span::raw("  "),
-        Span::styled(info,   Style::default().fg(info_col)),
-    ]));
+        Span::styled(checkbox,             Style::default().fg(chk_col)),
+        Span::raw(" "),
+        Span::styled(format!("[{code_upper}] "), Style::default().fg(Color::Yellow)),
+        Span::styled(name,                  name_style),
+    ];
+    spans.extend(active_badge);
+    spans.push(Span::raw("  "));
+    spans.push(Span::styled(info, Style::default().fg(Color::DarkGray)));
+    Line::from(spans)
 }
 
 // ── General content ───────────────────────────────────────────────────────────

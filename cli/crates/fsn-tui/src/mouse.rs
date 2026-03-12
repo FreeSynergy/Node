@@ -258,22 +258,10 @@ fn handle_left_click(col: u16, row: u16, state: &mut AppState, root: &Path) -> R
                     use crate::app::SettingsFocus;
                     state.lang_cursor = idx;
                     state.settings_focus = SettingsFocus::Content;
-                    // Double-click activates / downloads — same as Enter in events.rs.
+                    // Double-click: activate if installed, download if not.
+                    // Single source of truth via lang_cursor_activate_pub.
                     if dbl {
-                        let installed = state.available_langs.len();
-                        if idx == 0 {
-                            state.lang = crate::app::Lang::En;
-                            state.settings.preferred_lang = None;
-                            let _ = state.settings.save();
-                        } else if idx <= installed {
-                            if let Some(dl) = state.available_langs.get(idx - 1) {
-                                state.lang = crate::app::Lang::Dynamic(dl);
-                                state.settings.preferred_lang = Some(dl.code.to_string());
-                                let _ = state.settings.save();
-                            }
-                        } else {
-                            crate::events::trigger_lang_download_pub(state, idx - 1 - installed);
-                        }
+                        crate::events::lang_cursor_activate_pub(state, idx);
                     }
                 }
                 _ => {}

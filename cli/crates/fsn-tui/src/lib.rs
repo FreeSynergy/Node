@@ -289,12 +289,71 @@ pub fn load_projects(root: &Path) -> Vec<ProjectHandle> {
             let stem = fp.file_stem().and_then(|s| s.to_str()).unwrap_or("");
             let slug = stem.strip_suffix(".project").unwrap_or(stem).to_string();
 
-            if let Ok(config) = fsn_core::config::project::ProjectConfig::load(&fp) {
+            if let Ok(mut config) = fsn_core::config::project::ProjectConfig::load(&fp) {
+                // Merge standalone .service.toml files — source of truth for env + all fields.
+                // Services in the services/ subdir are always authoritative; project TOML
+                // entries are just a lightweight reference (class + version).
+                merge_service_instances(&mut config, &path);
                 projects.push(ProjectHandle { slug, toml_path: fp, config });
             }
         }
     }
     projects
+}
+
+/// Merge standalone `.service.toml` files from `{project_dir}/services/` into the
+/// project config's `load.services` map.
+///
+/// Standalone files are the single source of truth for per-service data (env vars,
+/// subdomain, port, tags, …).  Services present only in standalone files (not yet
+/// referenced from the project TOML) are inserted automatically so they always
+/// appear in the sidebar and can be edited.
+fn merge_service_instances(
+    config:      &mut fsn_core::config::project::ProjectConfig,
+    project_dir: &Path,
+) {
+    use fsn_core::config::project::{ServiceEntry, ServiceInstanceConfig};
+
+    let services_dir = project_dir.join("services");
+    let Ok(entries) = std::fs::read_dir(&services_dir) else { return; };
+
+    for entry in entries.flatten() {
+        let fp = entry.path();
+        let is_svc_toml = fp.extension().and_then(|e| e.to_str()) == Some("toml")
+            && fp.file_stem().and_then(|s| s.to_str())
+                .map(|s| s.ends_with(".service"))
+                .unwrap_or(false);
+        if !is_svc_toml { continue; }
+
+        let stem = fp.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+        let name = stem.strip_suffix(".service").unwrap_or(stem).to_string();
+
+        let Ok(svc_config) = ServiceInstanceConfig::load(&fp) else { continue; };
+        let m = &svc_config.service;
+
+        // Insert a new entry or update the existing one with the standalone file's data.
+        // Using entry().or_insert_with() then updating ensures both code paths are covered.
+        let se = config.load.services.entry(name).or_insert_with(|| ServiceEntry {
+            service_class: m.service_class.clone(),
+            alias:         m.alias.clone(),
+            host:          m.host.clone(),
+            subdomain:     m.subdomain.clone(),
+            port:          m.port,
+            version:       m.version.clone(),
+            tags:          m.tags.clone(),
+            env:           Default::default(),
+            vars:          svc_config.vars.clone(),
+        });
+        // Always sync from standalone file so edited vars / subdomain / port is reflected.
+        se.service_class = m.service_class.clone();
+        se.alias         = m.alias.clone();
+        se.host          = m.host.clone();
+        se.subdomain     = m.subdomain.clone();
+        se.port          = m.port;
+        se.version       = m.version.clone();
+        se.tags          = m.tags.clone();
+        se.vars          = svc_config.vars.clone();
+    }
 }
 
 /// Load all `.host.toml` files from a project directory.

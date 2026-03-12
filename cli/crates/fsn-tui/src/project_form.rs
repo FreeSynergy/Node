@@ -78,9 +78,10 @@ pub struct ProjectFormData {
     pub _section_languages: String,
 
     /// Languages the project content is available in (multi-select).
+    /// Options are populated dynamically from installed store languages — see build_lang_options().
     #[form(label = "form.project.languages", widget = "multi_select", tab = 0,
            hint = "form.project.languages.hint",
-           options = "de,en,fr,es,it,pt,ru,zh,ja,ar")]
+           options = "en")]
     pub languages: String,
 
     // ── Section: Services ─────────────────────────────────────────────────
@@ -109,8 +110,10 @@ pub fn lang_display(code: &str) -> &'static str {
 }
 
 const DISPLAY_FNS: &[(&str, fn(&str) -> &'static str)] = &[
-    ("language",  lang_display),
-    ("languages", lang_display),
+    // "language" (single select for UI lang) → native name display.
+    // "languages" (multi-select for project content langs) → codes shown directly
+    // because the options are dynamic and cannot be resolved by a static fn.
+    ("language", lang_display),
 ];
 
 /// Build the SlotEntry list for a single service slot field.
@@ -216,17 +219,37 @@ fn sync_email_from_domain(nodes: &mut Vec<Box<dyn FormNode>>) {
 
 // ── Form builders ─────────────────────────────────────────────────────────────
 
-pub fn new_project_form(services: &[ServiceHandle], store_entries: &[StoreEntry]) -> ResourceForm {
+/// Build the dynamic options list for the `languages` multi-select field.
+///
+/// Always includes "en" (English built-in), then all installed dynamic langs by code.
+/// These are the languages the user has enabled in Settings → Languages.
+pub fn build_lang_options(available_langs: &[&'static crate::i18n::DynamicLang]) -> Vec<String> {
+    let mut opts = vec!["en".to_string()];
+    for dl in available_langs {
+        if dl.code != "en" {
+            opts.push(dl.code.to_string());
+        }
+    }
+    opts
+}
+
+pub fn new_project_form(
+    services:       &[ServiceHandle],
+    store_entries:  &[StoreEntry],
+    available_langs: &[&'static crate::i18n::DynamicLang],
+) -> ResourceForm {
     let home = std::env::var("HOME").unwrap_or_else(|_| "/home/user".into());
     let dynamics: &[(&str, String)] = &[
         ("install_dir", format!("{}/fsn", home)),
     ];
+    let lang_opts   = build_lang_options(available_langs);
+    let class_opts  = [("languages", lang_opts)];
     let mut nodes = schema_form::build_nodes(
         ProjectFormData::schema(),
         &HashMap::new(),
         DISPLAY_FNS,
         dynamics,
-        &[],
+        &class_opts,
     );
     append_slot_nodes(&mut nodes, services, store_entries, &[
         ("iam",        "form.project.iam",        "iam/",        "iam",        ""),
@@ -239,9 +262,10 @@ pub fn new_project_form(services: &[ServiceHandle], store_entries: &[StoreEntry]
 }
 
 pub fn edit_project_form(
-    handle:        &ProjectHandle,
-    services:      &[ServiceHandle],
-    store_entries: &[StoreEntry],
+    handle:          &ProjectHandle,
+    services:        &[ServiceHandle],
+    store_entries:   &[StoreEntry],
+    available_langs: &[&'static crate::i18n::DynamicLang],
 ) -> ResourceForm {
     let p    = &handle.config.project;
     let desc = p.description.as_deref().unwrap_or("").to_string();
@@ -260,12 +284,14 @@ pub fn edit_project_form(
         ("version",       p.version.as_str()),
     ].into_iter().filter(|(_, v)| !v.is_empty()).collect();
 
+    let lang_opts  = build_lang_options(available_langs);
+    let class_opts = [("languages", lang_opts)];
     let mut nodes = schema_form::build_nodes(
         ProjectFormData::schema(),
         &prefill,
         DISPLAY_FNS,
         &[],
-        &[],
+        &class_opts,
     );
     append_slot_nodes(&mut nodes, services, store_entries, &[
         ("iam",        "form.project.iam",        "iam/",        "iam",        slots.iam.as_deref().unwrap_or("")),

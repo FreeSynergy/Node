@@ -393,7 +393,7 @@ fn en(key: &str) -> Option<&'static str> {
         // ── Settings hints (context-sensitive) ────────────────────────────────
         "settings.hint.sidebar"    => "↑↓=Navigate  Enter/→=Open  Esc=Back",
         "settings.hint.stores"     => "↑↓=Nav  Enter=Edit  Space=Toggle  A=Add  D=Delete  ←=Sidebar",
-        "settings.hint.languages"  => "↑↓=Nav  Enter=Activate  F=Download  Del=Remove  ←=Sidebar",
+        "settings.hint.languages"  => "↑↓=Nav  Enter=Activate  Space=Toggle(↓/✕)  Del=Remove  ←=Sidebar",
         "settings.hint.general"    => "←=Sidebar",
         "settings.hint.about"      => "←=Sidebar",
         _ => return None,
