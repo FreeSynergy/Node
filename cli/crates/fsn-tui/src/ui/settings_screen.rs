@@ -43,29 +43,37 @@ use crate::ui::components::{Component, FooterBar, HeaderBar};
 use crate::ui::layout::{AppLayout, LayoutConfig};
 use crate::ui::render_ctx::RenderCtx;
 
-/// Width of the settings sidebar column in characters.
-const SIDEBAR_WIDTH: u16 = 22;
+/// Width of the settings sidebar column (used by root.rs for layout).
+pub const SIDEBAR_WIDTH: u16 = 22;
 
+/// Legacy standalone entry point — renders the full screen including Header/Footer.
+/// Kept for compatibility; root.rs calls `render_body` directly.
 pub fn render(f: &mut RenderCtx<'_>, state: &mut AppState, area: Rect) {
-    // Clear last frame's ClickMap — HeaderBar + content will rebuild it.
     state.click_map.clear();
 
     let layout = AppLayout::compute(area, &LayoutConfig {
-        topbar_height: 5,
-        left_width:    Some(SIDEBAR_WIDTH),
+        topbar_height:  6,
+        menubar_height: 1,
+        left_width:     Some(SIDEBAR_WIDTH),
         ..LayoutConfig::default()
     });
 
     HeaderBar.render(f, layout.topbar, state);
     FooterBar.render(f, layout.footer_primary, state);
+    render_body(f, state, layout.body.left, layout.body.main);
+}
 
-    let sidebar_area = layout.body.left.unwrap_or(layout.body.main);
-    let content_area = layout.body.main;
-
-    // Take ClickMap — avoids simultaneous borrow of state + state.click_map.
+/// Body-only renderer — called by root.rs after it has drawn Header/NavBar/Footer.
+pub fn render_body(
+    f:    &mut RenderCtx<'_>,
+    state: &mut AppState,
+    left: Option<Rect>,
+    main: Rect,
+) {
+    let sidebar_area = left.unwrap_or(main);
     let mut cmap = std::mem::take(&mut state.click_map);
     render_sidebar(f, state, sidebar_area, &mut cmap);
-    render_content(f, state, content_area, &mut cmap);
+    render_content(f, state, main, &mut cmap);
     state.click_map = cmap;
 }
 

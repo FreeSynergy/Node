@@ -25,6 +25,9 @@ use crate::ui::components::{Component, FooterBar, HeaderBar};
 use crate::ui::layout::{AppLayout, LayoutConfig};
 use crate::ui::render_ctx::RenderCtx;
 
+/// Sidebar column width for the Store screen (used by root.rs for layout).
+pub const SIDEBAR_WIDTH: u16 = 32;
+
 // ── Category grouping ─────────────────────────────────────────────────────────
 
 /// A flat list item in the store sidebar — either a category header or a package row.
@@ -75,36 +78,46 @@ fn build_sidebar_rows(entries: &[StoreEntry]) -> Vec<SidebarRow<'_>> {
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
+/// Legacy standalone entry point — renders the full screen including Header/Footer.
+/// Kept for compatibility; root.rs calls `render_body` directly.
 pub fn render(f: &mut RenderCtx<'_>, state: &mut AppState) {
     let full = f.area();
     state.click_map.clear();
 
     let layout = AppLayout::compute(full, &LayoutConfig {
-        topbar_height: 5,
-        left_width: Some(32),
+        topbar_height:  6,
+        menubar_height: 1,
+        left_width:     Some(SIDEBAR_WIDTH),
         ..LayoutConfig::default()
     });
 
     HeaderBar.render(f, layout.topbar, state);
     FooterBar.render(f, layout.footer_primary, state);
+    render_body(f, state, layout.body.left, layout.body.main);
+}
 
+/// Body-only renderer — called by root.rs after it has drawn Header/NavBar/Footer.
+pub fn render_body(
+    f:    &mut RenderCtx<'_>,
+    state: &mut AppState,
+    left: Option<Rect>,
+    main: Rect,
+) {
     // Show a dedicated error/empty screen for non-ready states.
     match &state.store_load_state.clone() {
-        StoreLoadState::NoStores    => { render_status_screen(f, state, layout.body.main, StatusKind::NoStores, None); return; }
-        StoreLoadState::AllDisabled => { render_disabled_stores(f, state, layout.body.main); return; }
-        StoreLoadState::Error(msg)  => { render_status_screen(f, state, layout.body.main, StatusKind::Error, Some(msg.clone())); return; }
+        StoreLoadState::NoStores    => { render_status_screen(f, state, main, StatusKind::NoStores, None); return; }
+        StoreLoadState::AllDisabled => { render_disabled_stores(f, state, main); return; }
+        StoreLoadState::Error(msg)  => { render_status_screen(f, state, main, StatusKind::Error, Some(msg.clone())); return; }
         StoreLoadState::Loading | StoreLoadState::None => {
-            render_status_screen(f, state, layout.body.main, StatusKind::Loading, None);
+            render_status_screen(f, state, main, StatusKind::Loading, None);
             return;
         }
         StoreLoadState::Loaded(_) => {} // fall through to normal sidebar/detail
     }
 
-    let sidebar_area = layout.body.left.unwrap_or(layout.body.main);
-    let detail_area  = layout.body.main;
-
+    let sidebar_area = left.unwrap_or(main);
     render_sidebar(f, state, sidebar_area);
-    render_detail(f, state, detail_area);
+    render_detail(f, state, main);
 }
 
 // ── Status screens (no stores / all disabled / loading / error) ───────────────

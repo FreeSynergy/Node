@@ -23,15 +23,14 @@ pub mod overlays;
 pub mod new_project;
 pub mod nodes;
 pub mod render_ctx;
+pub mod root;
 pub mod settings_screen;
 pub mod store_screen;
 pub mod style;
 pub mod widgets;
 
-use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use crate::app::{AppState, OverlayLayer, Screen};
+use crate::app::{AppState, OverlayLayer};
 use render_ctx::RenderCtx;
-use components::{Component, NotifStack};
 
 // ── OverlayLayer rendering — each variant renders itself ──────────────────────
 
@@ -51,67 +50,7 @@ impl OverlayLayer {
 }
 
 pub fn render(f: &mut RenderCtx<'_>, state: &mut AppState) {
-    let full = f.area();
-
-    // Route to the correct screen renderer.
-    // Screen::Welcome now uses the Dashboard layout — the Welcome overlay is drawn on top.
-    match state.screen {
-        Screen::Welcome    => dashboard::render(f, state, full),
-        Screen::Dashboard  => dashboard::render(f, state, full),
-        Screen::NewProject => render_with_help(f, state, full, |f, s, a| new_project::render(f, s, a)),
-        Screen::Settings   => render_with_help(f, state, full, |f, s, a| settings_screen::render(f, s, a)),
-        Screen::Store      => store_screen::render(f, state),
-    }
-
-    // Overlay layers drawn on top (Ebene system).
-    // Collect indices first to avoid borrow conflict (render borrows state immutably).
-    let layer_count = state.overlay_stack.len();
-    for i in 0..layer_count {
-        // SAFETY: index is valid, no mutation during iteration
-        let layer = &state.overlay_stack[i];
-        layer.render(f, state);
-    }
-
-    // Register Welcome overlay buttons in the click-map (overlays render with &AppState,
-    // so they cannot push to click_map themselves — we do it here with &mut AppState).
-    if matches!(state.top_overlay(), Some(crate::app::OverlayLayer::Welcome { .. })) {
-        let (btn1, btn2) = overlays::welcome::button_rects(full, state);
-        state.click_map.push(btn1, crate::click_map::ClickTarget::WelcomeButton { index: 0 });
-        state.click_map.push(btn2, crate::click_map::ClickTarget::WelcomeButton { index: 1 });
-    }
-
-    // Toast notifications — always on top, top-right corner.
-    NotifStack.render(f, full, state);
-}
-
-/// Renders a non-dashboard screen with the optional full-screen help sidebar.
-fn render_with_help<R>(f: &mut RenderCtx<'_>, state: &mut AppState, area: Rect, render_fn: R)
-where
-    R: FnOnce(&mut RenderCtx<'_>, &mut AppState, Rect),
-{
-    let (main_area, help_area) = if state.help_visible && area.width > help_sidebar::SIDEBAR_WIDTH + 20 {
-        let chunks = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([
-                Constraint::Min(20),
-                Constraint::Length(help_sidebar::SIDEBAR_WIDTH),
-            ])
-            .split(area);
-        (chunks[0], Some(chunks[1]))
-    } else {
-        (area, None)
-    };
-
-    render_fn(f, state, main_area);
-
-    if let Some(help_area) = help_area {
-        let kind    = state.active_form().map(|f| f.kind);
-        let foc_key = state.active_form()
-            .and_then(|f| f.focused_node())
-            .map(|n| n.key());
-        let sections = help_sidebar::build_help(state.screen, kind, foc_key, state.lang);
-        help_sidebar::render_help_sidebar(f, help_area, &sections, state.lang);
-    }
+    root::render(f, state);
 }
 
 fn render_new_resource(f: &mut RenderCtx<'_>, state: &AppState) {
