@@ -30,7 +30,7 @@ pub use overlay::{
 };
 pub use screen::{
     DashFocus, NavTab, Screen, SettingsFocus, SettingsSection, SettingsTab,
-    StoreScreenFocus, StoreSettingsFocus, StoreSidebarMode,
+    StoreLoadState, StoreScreenFocus, StoreSettingsFocus, StoreSidebarMode,
 };
 pub use sidebar::{NEW_RESOURCE_ITEMS, SidebarAction, SidebarItem};
 
@@ -89,8 +89,8 @@ pub struct AppState {
     pub deploy_rx:            Option<mpsc::Receiver<DeployMsg>>,
     /// Background reconciler — receives Podman container status maps every ~5 s.
     pub reconcile_rx:         Option<mpsc::Receiver<HashMap<String, RunState>>>,
-    /// Background store fetcher — receives fresh entries after HTTP fetch completes.
-    pub store_rx:             Option<mpsc::Receiver<Vec<fsn_core::store::StoreEntry>>>,
+    /// Background store fetcher — receives Ok(entries) or Err(message) after fetch completes.
+    pub store_rx:             Option<mpsc::Receiver<Result<Vec<fsn_core::store::StoreEntry>, String>>>,
     /// Background language downloader — receives Ok(code) on success, Err(msg) on failure.
     pub lang_download_rx:     Option<mpsc::Receiver<Result<String, String>>>,
     pub settings:                AppSettings,
@@ -107,6 +107,8 @@ pub struct AppState {
     pub lang_cursor:             usize,
 
     // ── Store screen ──────────────────────────────────────────────────────────
+    /// Current catalog fetch state — drives what the Store screen renders.
+    pub store_load_state:     StoreLoadState,
     /// Which panel of the Store screen has keyboard focus.
     pub store_screen_focus:   StoreScreenFocus,
     /// Whether the Store screen sidebar groups by type or shows a flat list.
@@ -117,6 +119,8 @@ pub struct AppState {
     pub store_cursor:         usize,
     /// Scroll offset in the Store screen detail panel.
     pub store_detail_scroll:  u16,
+    /// Cursor within the "all disabled" store list (for enabling stores).
+    pub store_disabled_cursor: usize,
 
     // ── Settings → Store section ──────────────────────────────────────────────
     /// Which part of the Settings → Store section has focus (Repos / Modules).
@@ -192,11 +196,13 @@ impl AppState {
             lang_cursor: 0,
             store_langs: Vec::new(),
             store_langs_rx: None,
+            store_load_state: StoreLoadState::default(),
             store_screen_focus: StoreScreenFocus::default(),
             store_screen_mode: StoreSidebarMode::default(),
             store_type_cursor: 0,
             store_cursor: 0,
             store_detail_scroll: 0,
+            store_disabled_cursor: 0,
             settings_store_focus: StoreSettingsFocus::default(),
             settings_module_pending: std::collections::HashSet::new(),
             settings_module_cursor: 0,

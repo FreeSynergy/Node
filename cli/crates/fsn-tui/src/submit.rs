@@ -307,9 +307,14 @@ pub fn submit_store(state: &mut AppState) -> Result<()> {
 /// loading state rather than stale data while the fetch is in progress.
 pub(crate) fn trigger_store_refetch(state: &mut AppState) {
     state.store_entries.clear();
-    if state.settings.stores.iter().any(|s| s.enabled) {
+    if state.settings.stores.is_empty() {
+        state.store_load_state = crate::app::StoreLoadState::NoStores;
+        state.store_rx = None;
+    } else if state.settings.stores.iter().any(|s| s.enabled) {
+        state.store_load_state = crate::app::StoreLoadState::Loading;
         state.store_rx = Some(crate::spawn_store_fetcher(state.settings.clone()));
     } else {
+        state.store_load_state = crate::app::StoreLoadState::AllDisabled;
         state.store_rx = None;
     }
 }

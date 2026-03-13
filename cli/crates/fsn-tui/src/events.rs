@@ -20,7 +20,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::app::{
     AppState, ConfirmAction, OverlayKind, OverlayLayer, Screen,
-    SettingsFocus, SettingsSection, StoreScreenFocus, StoreSettingsFocus,
+    SettingsFocus, SettingsSection, StoreLoadState, StoreScreenFocus, StoreSettingsFocus,
 };
 use crate::resource_form::FormErrorKind;
 use crate::ui::form_node::FormAction;
@@ -418,6 +418,19 @@ fn store_current_id(state: &AppState) -> Option<String> {
 }
 
 fn handle_store_screen(key: KeyEvent, state: &mut AppState) -> Result<()> {
+    // ── Error / empty states — limited key set ────────────────────────────────
+    match &state.store_load_state.clone() {
+        StoreLoadState::AllDisabled => {
+            return handle_store_disabled(key, state);
+        }
+        StoreLoadState::Error(_) | StoreLoadState::NoStores
+        | StoreLoadState::Loading | StoreLoadState::None => {
+            return handle_store_non_ready(key, state);
+        }
+        StoreLoadState::Loaded(_) => {} // fall through to normal handler
+    }
+
+    // ── Normal store navigation ───────────────────────────────────────────────
     let n_packages = state.store_entries.len();
 
     match key.code {
@@ -426,10 +439,7 @@ fn handle_store_screen(key: KeyEvent, state: &mut AppState) -> Result<()> {
             if state.store_screen_focus == StoreScreenFocus::Sidebar {
                 crate::ui::cursor::up(&mut state.store_cursor);
             } else {
-                // Scroll detail panel up
-                if state.store_detail_scroll > 0 {
-                    state.store_detail_scroll -= 1;
-                }
+                if state.store_detail_scroll > 0 { state.store_detail_scroll -= 1; }
             }
         }
         KeyCode::Down => {
@@ -447,6 +457,11 @@ fn handle_store_screen(key: KeyEvent, state: &mut AppState) -> Result<()> {
         KeyCode::Right | KeyCode::Char('l') | KeyCode::Enter => {
             state.store_screen_focus = StoreScreenFocus::Detail;
             state.store_detail_scroll = 0;
+        }
+
+        // Retry fetch
+        KeyCode::Char('R') | KeyCode::F(5) => {
+            store_start_fetch(state);
         }
 
         // Install / uninstall / reinstall
@@ -482,13 +497,67 @@ fn handle_store_screen(key: KeyEvent, state: &mut AppState) -> Result<()> {
             }
         }
 
-        // Exit Store screen
-        KeyCode::Esc | KeyCode::Char('q') => {
-            state.screen = Screen::Dashboard;
-        }
+        // Exit
+        KeyCode::Esc | KeyCode::Char('q') => { state.screen = Screen::Dashboard; }
         _ => {}
     }
     Ok(())
+}
+
+/// Keys when store is in a non-ready state (loading, error, no stores).
+fn handle_store_non_ready(key: KeyEvent, state: &mut AppState) -> Result<()> {
+    match key.code {
+        // Retry
+        KeyCode::Char('R') | KeyCode::F(5) => {
+            if !matches!(state.store_load_state, StoreLoadState::NoStores | StoreLoadState::AllDisabled) {
+                store_start_fetch(state);
+            }
+        }
+        // Navigate to Settings → Store
+        KeyCode::Char('S') => { state.screen = Screen::Settings; }
+        // Exit
+        KeyCode::Esc | KeyCode::Char('q') => { state.screen = Screen::Dashboard; }
+        _ => {}
+    }
+    Ok(())
+}
+
+/// Keys when all stores are disabled — allows enabling a store in-place.
+fn handle_store_disabled(key: KeyEvent, state: &mut AppState) -> Result<()> {
+    let n = state.settings.stores.len();
+    match key.code {
+        KeyCode::Up   => { crate::ui::cursor::up(&mut state.store_disabled_cursor); }
+        KeyCode::Down => { crate::ui::cursor::down(&mut state.store_disabled_cursor, n); }
+
+        // Toggle enabled state for selected store, save, start fetch.
+        KeyCode::Char(' ') | KeyCode::Enter => {
+            if let Some(store) = state.settings.stores.get_mut(state.store_disabled_cursor) {
+                store.enabled = !store.enabled;
+            }
+            let _ = state.settings.save();
+
+            // If at least one store is now enabled, start the fetch.
+            if state.settings.stores.iter().any(|s| s.enabled) {
+                store_start_fetch(state);
+            } else {
+                state.store_load_state = StoreLoadState::AllDisabled;
+            }
+        }
+
+        // Navigate to Settings → Store
+        KeyCode::Char('S') => { state.screen = Screen::Settings; }
+        // Exit
+        KeyCode::Esc | KeyCode::Char('q') => { state.screen = Screen::Dashboard; }
+        _ => {}
+    }
+    Ok(())
+}
+
+/// Start a fresh store fetch: reset entries, set state to Loading, spawn fetcher.
+fn store_start_fetch(state: &mut AppState) {
+    state.store_entries.clear();
+    state.store_load_state = StoreLoadState::Loading;
+    state.store_rx = Some(crate::spawn_store_fetcher(state.settings.clone()));
 }
 
 fn handle_settings_languages(key: KeyEvent, state: &mut AppState) -> Result<()> {

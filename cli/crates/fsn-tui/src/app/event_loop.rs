@@ -131,15 +131,21 @@ fn fsn_event(
             for msg in deploy_msgs { state.apply_deploy_msg(msg); }
 
             // Drain store fetcher channel (one-shot).
-            let store_result: Option<Vec<StoreEntry>> = state.store_rx
+            let store_result: Option<Result<Vec<StoreEntry>, String>> = state.store_rx
                 .as_ref()
                 .and_then(|rx| rx.try_recv().ok());
-            if let Some(entries) = store_result {
-                let count = entries.len();
-                state.store_entries = entries;
+            if let Some(result) = store_result {
                 state.store_rx = None;
-                if count > 0 {
-                    state.push_notif(NotifKind::Info, format!("Store: {count} modules loaded"));
+                match result {
+                    Ok(entries) => {
+                        let count = entries.len();
+                        state.store_entries = entries;
+                        state.store_load_state = crate::app::StoreLoadState::Loaded(count);
+                        state.push_notif(NotifKind::Info, format!("Store: {count} modules loaded"));
+                    }
+                    Err(msg) => {
+                        state.store_load_state = crate::app::StoreLoadState::Error(msg);
+                    }
                 }
             }
 

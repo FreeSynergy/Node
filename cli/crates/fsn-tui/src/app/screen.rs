@@ -202,3 +202,28 @@ pub enum StoreSidebarMode {
     ByType,   // grouped by ServiceType category
     All,      // flat list
 }
+
+// ── Store load state ──────────────────────────────────────────────────────────
+
+/// Current state of the store catalog fetch.
+///
+/// Drives what the Store screen renders instead of always showing "Loading…".
+/// Transitions:
+///   None → Loading → Loaded(n) | Error(msg)
+///   None → NoStores | AllDisabled  (fetch never started)
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub enum StoreLoadState {
+    /// Fetch not yet initiated.
+    #[default]
+    None,
+    /// Fetch in progress — waiting for the background thread.
+    Loading,
+    /// At least one catalog fetched. Contains the package count.
+    Loaded(usize),
+    /// No stores configured at all (stores list is empty).
+    NoStores,
+    /// Stores configured but all disabled — user can enable them here.
+    AllDisabled,
+    /// Fetch failed (network, parse, all stores unavailable).
+    Error(String),
+}

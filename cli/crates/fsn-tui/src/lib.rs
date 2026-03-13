@@ -45,22 +45,26 @@ use sysinfo::SysInfo;
 
 /// Fetch the store index from all enabled stores in a background thread.
 ///
-/// Sends the merged entry list back via channel once the HTTP requests
-/// complete. The main loop picks it up and updates `state.store_entries`.
-/// Called at startup so the wizard always has fresh module options,
-/// even when the bundled offline index is absent or stale.
+/// Sends `Ok(entries)` when at least one store succeeds (partial results are
+/// still returned alongside errors). Sends `Err(combined_errors)` when ALL
+/// stores fail and no entries were loaded.
 pub fn spawn_store_fetcher(
     settings: fsn_core::config::AppSettings,
-) -> mpsc::Receiver<Vec<fsn_core::store::StoreEntry>> {
+) -> mpsc::Receiver<Result<Vec<fsn_core::store::StoreEntry>, String>> {
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
-        let rt      = tokio::runtime::Runtime::new().expect("tokio runtime");
-        let entries = rt.block_on(async move {
+        let rt = tokio::runtime::Runtime::new().expect("tokio runtime");
+        let result = rt.block_on(async move {
             let registry = fsn_core::config::ServiceRegistry::default();
             let client   = fsn_engine::store::StoreClient::new(settings, registry);
-            client.fetch_all().await
+            let (entries, errors) = client.fetch_all().await;
+            if entries.is_empty() && !errors.is_empty() {
+                Err(errors.join("\n"))
+            } else {
+                Ok(entries)
+            }
         });
-        let _ = tx.send(entries);
+        let _ = tx.send(result);
     });
     rx
 }
@@ -271,13 +275,19 @@ pub fn run(root: &Path) -> Result<()> {
         state.overlay_stack.push(app::OverlayLayer::Welcome { focus: 0 });
     }
 
-    // Fetch fresh store index from HTTP in the background.
-    let store_fetcher_rx = if state.settings.stores.iter().any(|s| s.enabled) {
+    // Determine initial store load state and start background fetch if needed.
+    state.store_load_state = if state.settings.stores.is_empty() {
+        app::StoreLoadState::NoStores
+    } else if !state.settings.stores.iter().any(|s| s.enabled) {
+        app::StoreLoadState::AllDisabled
+    } else {
+        app::StoreLoadState::Loading
+    };
+    state.store_rx = if matches!(state.store_load_state, app::StoreLoadState::Loading) {
         Some(spawn_store_fetcher(state.settings.clone()))
     } else {
         None
     };
-    state.store_rx = store_fetcher_rx;
 
     // Fetch language index from Store in the background.
     // Always spawned — even if no store is configured, the fetcher returns a

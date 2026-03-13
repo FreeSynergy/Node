@@ -20,7 +20,7 @@ use rat_widget::paragraph::{Paragraph, ParagraphState};
 
 use fsn_core::store::StoreEntry;
 
-use crate::app::{AppState, StoreScreenFocus};
+use crate::app::{AppState, StoreLoadState, StoreScreenFocus};
 use crate::ui::components::{Component, FooterBar, HeaderBar};
 use crate::ui::layout::{AppLayout, LayoutConfig};
 use crate::ui::render_ctx::RenderCtx;
@@ -88,11 +88,114 @@ pub fn render(f: &mut RenderCtx<'_>, state: &mut AppState) {
     HeaderBar.render(f, layout.topbar, state);
     FooterBar.render(f, layout.footer_primary, state);
 
+    // Show a dedicated error/empty screen for non-ready states.
+    match &state.store_load_state.clone() {
+        StoreLoadState::NoStores    => { render_status_screen(f, state, layout.body.main, StatusKind::NoStores, None); return; }
+        StoreLoadState::AllDisabled => { render_disabled_stores(f, state, layout.body.main); return; }
+        StoreLoadState::Error(msg)  => { render_status_screen(f, state, layout.body.main, StatusKind::Error, Some(msg.clone())); return; }
+        StoreLoadState::Loading | StoreLoadState::None => {
+            render_status_screen(f, state, layout.body.main, StatusKind::Loading, None);
+            return;
+        }
+        StoreLoadState::Loaded(_) => {} // fall through to normal sidebar/detail
+    }
+
     let sidebar_area = layout.body.left.unwrap_or(layout.body.main);
     let detail_area  = layout.body.main;
 
     render_sidebar(f, state, sidebar_area);
     render_detail(f, state, detail_area);
+}
+
+// ── Status screens (no stores / all disabled / loading / error) ───────────────
+
+enum StatusKind { Loading, NoStores, Error }
+
+/// Render a centered status message when the store can't show packages.
+fn render_status_screen(
+    f:    &mut RenderCtx<'_>,
+    _state: &AppState,
+    area: Rect,
+    kind: StatusKind,
+    detail: Option<String>,
+) {
+    let (icon, headline, hint) = match kind {
+        StatusKind::Loading  => ("⏳", "Loading store…", "[q] Back"),
+        StatusKind::NoStores => ("⚠", "No stores configured.", "[S] Settings → Store to add one  [q] Back"),
+        StatusKind::Error    => ("✗", "Store could not be loaded.", "[R] Retry  [S] Settings  [q] Back"),
+    };
+
+    let mut lines = vec![
+        Line::from(""),
+        Line::from(Span::styled(icon,     Style::default().fg(Color::Yellow))),
+        Line::from(""),
+        Line::from(Span::styled(headline, Style::default().fg(Color::White).add_modifier(Modifier::BOLD))),
+        Line::from(""),
+    ];
+
+    if let Some(msg) = detail {
+        // Word-wrap the error message.
+        let wrap_width = (area.width as usize).saturating_sub(4);
+        for line in word_wrap(&msg, wrap_width) {
+            lines.push(Line::from(Span::styled(line, Style::default().fg(Color::Red))));
+        }
+        lines.push(Line::from(""));
+    }
+
+    lines.push(Line::from(Span::styled(hint, Style::default().fg(Color::DarkGray))));
+
+    f.render_stateful_widget(Paragraph::new(lines), area, &mut ParagraphState::new());
+}
+
+/// Render the interactive list of disabled stores.
+/// The user can press Space to enable a store, which triggers a reload.
+fn render_disabled_stores(f: &mut RenderCtx<'_>, state: &AppState, area: Rect) {
+    let mut lines = vec![
+        Line::from(""),
+        Line::from(Span::styled(
+            "All stores are disabled.",
+            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+        )),
+        Line::from(Span::styled(
+            "Enable a store to browse modules.",
+            Style::default().fg(Color::DarkGray),
+        )),
+        Line::from(""),
+    ];
+
+    for (idx, store) in state.settings.stores.iter().enumerate() {
+        let is_sel = idx == state.store_disabled_cursor;
+        let marker = if is_sel { "▶ " } else { "  " };
+        let bullet = if store.enabled { "●" } else { "○" };
+        let bullet_col = if store.enabled { Color::Green } else { Color::DarkGray };
+        let name_style = if is_sel {
+            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::White)
+        };
+        let url_truncated = if store.url.len() > 40 {
+            format!("{}…", &store.url[..40])
+        } else {
+            store.url.clone()
+        };
+
+        lines.push(Line::from(vec![
+            Span::raw(marker),
+            Span::styled(bullet, Style::default().fg(bullet_col)),
+            Span::raw(" "),
+            Span::styled(store.name.as_str(), name_style),
+            Span::raw("  "),
+            Span::styled(url_truncated, Style::default().fg(Color::DarkGray)),
+        ]));
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "[Space] Enable  [q] Back  [S] Settings",
+        Style::default().fg(Color::DarkGray),
+    )));
+
+    f.render_stateful_widget(Paragraph::new(lines), area, &mut ParagraphState::new());
 }
 
 // ── Sidebar ───────────────────────────────────────────────────────────────────

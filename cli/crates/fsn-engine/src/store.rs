@@ -50,9 +50,13 @@ impl StoreClient {
     ///
     /// Entries from earlier stores take precedence when IDs collide.
     /// Each `StoreEntry` is annotated with `store_source` at call time.
-    pub async fn fetch_all(&self) -> Vec<StoreEntry> {
-        let mut seen = std::collections::HashSet::new();
+    ///
+    /// Returns `(entries, errors)`. Per-store failures are collected in `errors`
+    /// so the caller can surface them while still returning partial results.
+    pub async fn fetch_all(&self) -> (Vec<StoreEntry>, Vec<String>) {
+        let mut seen   = std::collections::HashSet::new();
         let mut result = Vec::new();
+        let mut errors = Vec::new();
 
         for store in &self.settings.stores {
             if !store.enabled { continue; }
@@ -74,11 +78,13 @@ impl StoreClient {
                     }
                 }
                 Err(e) => {
-                    tracing::warn!("Store '{}' unavailable: {:#}", store.name, e);
+                    let msg = format!("Store '{}': {:#}", store.name, e);
+                    tracing::warn!("{}", msg);
+                    errors.push(msg);
                 }
             }
         }
-        result
+        (result, errors)
     }
 
     /// Returns all entries for a given service type from the merged index.
