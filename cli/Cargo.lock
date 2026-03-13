@@ -1138,6 +1138,8 @@ dependencies = [
  "fsn-engine",
  "fsn-form",
  "fsn-podman",
+ "fsy-core",
+ "fsy-tui",
  "rat-menu",
  "rat-salsa",
  "rat-theme4",
@@ -1166,6 +1168,20 @@ dependencies = [
  "tokio",
  "tower-http",
  "tracing",
+]
+
+[[package]]
+name = "fsy-core"
+version = "0.1.0"
+
+[[package]]
+name = "fsy-tui"
+version = "0.1.0"
+dependencies = [
+ "crossterm",
+ "fsy-core",
+ "rat-widget",
+ "ratatui",
 ]
 
 [[package]]

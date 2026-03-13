@@ -7,6 +7,9 @@
 // only the type in the signature changes.
 //
 // Design: Facade pattern — same interface, different backend.
+//
+// Migration note: this will be replaced by fsy_tui::render_ctx::RenderCtx
+// once FSN adopts the fsy-tui API (lang + translator moved into RenderCtx).
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;

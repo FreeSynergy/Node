@@ -6,6 +6,9 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+# FreeSynergy.UI — will be used progressively as API migration completes
+fsy-core   = { workspace = true }
+fsy-tui    = { workspace = true }
 fsn-form   = { workspace = true }
 fsn-core   = { workspace = true }
 fsn-engine = { workspace = true }
