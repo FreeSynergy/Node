@@ -16,7 +16,6 @@ use ratatui::{
 };
 use rat_widget::paragraph::{Paragraph, ParagraphState};
 
-use crate::app::Lang;
 use crate::ui::form_node::{FormAction, FormNode};
 use crate::ui::render_ctx::RenderCtx;
 
@@ -52,9 +51,9 @@ impl FormNode for SectionNode {
     // 2 rows: 1 for the rule + label, 1 for spacing below.
     fn preferred_height(&self) -> u16 { 2 }
 
-    fn render(&mut self, f: &mut RenderCtx<'_>, area: Rect, _focused: bool, lang: Lang) {
+    fn render(&mut self, f: &mut RenderCtx<'_>, area: Rect, _focused: bool) {
         if area.height == 0 { return; }
-        let label = crate::i18n::t(lang, self.label_key);
+        let label = f.translate(self.label_key);
         // Build "── Label ──────────────..." filling the full width.
         let prefix   = "── ";
         let suffix   = " ";

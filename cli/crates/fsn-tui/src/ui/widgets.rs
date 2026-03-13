@@ -16,7 +16,7 @@ use ratatui::{
     widgets::{Block, Borders, Clear},
 };
 
-use crate::app::{run_state_i18n, AppState, Lang, RunState};
+use crate::app::{run_state_i18n, AppState, RunState};
 use crate::ui::render_ctx::RenderCtx;
 use crate::ui::style::Styleable;
 
@@ -172,24 +172,26 @@ pub fn node_styles(focused: bool) -> (Style, Style) {
 
 /// Standard bordered block for a form field — label in title, `*` suffix when required.
 ///
+/// `label` must be pre-translated: call `f.translate(label_key)` at the call site.
 /// Single source of truth for the visual chrome shared by all FormNode render() methods.
-pub fn node_block(label_key: &str, required: bool, focused: bool, lang: Lang) -> Block<'static> {
+pub fn node_block(label: &str, required: bool, focused: bool) -> Block<'static> {
     let (label_style, border_style) = node_styles(focused);
     let req_suffix = if required { " *" } else { "" };
     Block::default()
         .borders(Borders::ALL)
         .border_style(border_style)
         .title(Line::from(Span::styled(
-            format!(" {}{} ", crate::i18n::t(lang, label_key), req_suffix),
+            format!(" {}{} ", label, req_suffix),
             label_style,
         )))
 }
 
 /// Render a DarkGray hint line below a form field.
-pub fn render_hint(f: &mut RenderCtx<'_>, area: Rect, hint_key: &str, lang: Lang) {
+/// Translates `hint_key` via `f.translate()`.
+pub fn render_hint(f: &mut RenderCtx<'_>, area: Rect, hint_key: &'static str) {
     f.render_stateful_widget(
         Paragraph::new(Line::from(Span::styled(
-            crate::i18n::t(lang, hint_key),
+            f.translate(hint_key),
             Style::default().fg(Color::DarkGray),
         ))),
         area,
@@ -198,9 +200,9 @@ pub fn render_hint(f: &mut RenderCtx<'_>, area: Rect, hint_key: &str, lang: Lang
 }
 
 /// Render a hint line only when `hint_key` is Some — no-op when None.
-pub fn render_hint_opt(f: &mut RenderCtx<'_>, area: Rect, hint_key: Option<&str>, lang: Lang) {
+pub fn render_hint_opt(f: &mut RenderCtx<'_>, area: Rect, hint_key: Option<&'static str>) {
     if let Some(hk) = hint_key {
-        render_hint(f, area, hk, lang);
+        render_hint(f, area, hk);
     }
 }
 

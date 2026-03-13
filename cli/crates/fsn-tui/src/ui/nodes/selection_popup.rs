@@ -25,7 +25,6 @@ use ratatui::{
 };
 use rat_widget::paragraph::{Paragraph, ParagraphState};
 
-use crate::app::Lang;
 use crate::ui::render_ctx::RenderCtx;
 
 // ── Public result type ────────────────────────────────────────────────────────
@@ -161,7 +160,6 @@ impl SelectionPopup {
         options:    &[String],
         display_fn: Option<fn(&str) -> String>,
         title_key:  &'static str,
-        lang:       Lang,
     ) {
         if !self.is_open { return; }
 
@@ -169,8 +167,8 @@ impl SelectionPopup {
         let popup  = popup_rect(options.len(), self.mode, screen);
         self.rendered_rect = Some(popup); // store for mouse hit-testing
 
-        let hint_line = hint_line(self.mode, lang);
-        let title_text = crate::i18n::t(lang, title_key);
+        let hint_line = hint_line(self.mode, f);
+        let title_text = f.translate(title_key);
 
         let block = Block::default()
             .title(Span::styled(
@@ -358,9 +356,9 @@ fn render_checkboxes(
 
 // ── Hint text ─────────────────────────────────────────────────────────────────
 
-fn hint_line(mode: SelectionMode, lang: Lang) -> &'static str {
+fn hint_line(mode: SelectionMode, f: &RenderCtx<'_>) -> &'static str {
     match mode {
-        SelectionMode::Single => crate::i18n::t(lang, "popup.hint.single"),
-        SelectionMode::Multi  => crate::i18n::t(lang, "popup.hint.multi"),
+        SelectionMode::Single => f.translate("popup.hint.single"),
+        SelectionMode::Multi  => f.translate("popup.hint.multi"),
     }
 }

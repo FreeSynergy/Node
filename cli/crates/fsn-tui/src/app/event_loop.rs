@@ -90,7 +90,7 @@ fn fsn_render(
     state: &mut AppState,
     _ctx:  &mut AppGlobal,
 ) -> anyhow::Result<()> {
-    let mut rctx = crate::ui::render_ctx::RenderCtx::new(area, buf);
+    let mut rctx = crate::ui::render_ctx::RenderCtx::new(area, buf, state.lang);
     crate::ui::render(&mut rctx, state);
     Ok(())
 }

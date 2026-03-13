@@ -212,8 +212,8 @@ mod tests {
     #[test]
     fn raw_url_to_git_works() {
         assert_eq!(
-            raw_url_to_git("https://raw.githubusercontent.com/FreeSynergy/Store/main"),
-            "https://github.com/FreeSynergy/Store"
+            raw_url_to_git("https://raw.githubusercontent.com/FreeSynergy/Node.Store/main"),
+            "https://github.com/FreeSynergy/Node.Store"
         );
     }
 

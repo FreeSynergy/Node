@@ -20,7 +20,6 @@ use ratatui::{
 };
 use rat_widget::paragraph::{Paragraph, ParagraphState};
 
-use crate::app::Lang;
 use crate::ui::form_node::{handle_selection_nav, FormAction, FormNode};
 use crate::ui::nodes::selection_popup::{SelectionPopup, SelectionResult};
 use crate::ui::render_ctx::RenderCtx;
@@ -90,15 +89,15 @@ impl MultiSelectInputNode {
     }
 
     /// Display string: shows human labels of selected items, or placeholder.
-    fn display_value(&self, lang: Lang) -> String {
+    fn display_value(&self, f: &crate::ui::render_ctx::RenderCtx<'_>) -> String {
         let selected: Vec<String> = self.value.split(',')
             .filter(|s| !s.is_empty())
             .map(|code| {
-                if let Some(f) = self.display_fn { f(code) } else { code.to_string() }
+                if let Some(df) = self.display_fn { df(code) } else { code.to_string() }
             })
             .collect();
         if selected.is_empty() {
-            crate::i18n::t(lang, "form.multiselect.none").to_string()
+            f.translate("form.multiselect.none").to_string()
         } else {
             selected.join(", ")
         }
@@ -123,15 +122,15 @@ impl FormNode for MultiSelectInputNode {
 
     fn preferred_height(&self) -> u16 { 4 }
 
-    fn render(&mut self, f: &mut RenderCtx<'_>, area: Rect, focused: bool, lang: Lang) {
+    fn render(&mut self, f: &mut RenderCtx<'_>, area: Rect, focused: bool) {
         let rows = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Length(3), Constraint::Length(1)])
             .split(area);
 
-        let block = node_block(self.label_key, self.required, focused, lang);
+        let block = node_block(f.translate(self.label_key), self.required, focused);
 
-        let display = self.display_value(lang);
+        let display = self.display_value(f);
         let input_line = if focused {
             Line::from(vec![
                 Span::styled(display, Style::default().fg(Color::White)),
@@ -146,11 +145,11 @@ impl FormNode for MultiSelectInputNode {
             &mut ParagraphState::new(),
         );
 
-        render_hint_opt(f, rows[1], self.hint_key, lang);
+        render_hint_opt(f, rows[1], self.hint_key);
     }
 
-    fn render_overlay(&mut self, f: &mut RenderCtx<'_>, _available: Rect, lang: Lang) {
-        self.popup.render(f, &self.options, self.display_fn, self.label_key, lang);
+    fn render_overlay(&mut self, f: &mut RenderCtx<'_>, _available: Rect) {
+        self.popup.render(f, &self.options, self.display_fn, self.label_key);
     }
 
     fn has_open_popup(&self) -> bool { self.popup.is_open }

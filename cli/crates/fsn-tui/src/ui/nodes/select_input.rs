@@ -18,7 +18,6 @@ use ratatui::{
 };
 use rat_widget::paragraph::{Paragraph, ParagraphState};
 
-use crate::app::Lang;
 use crate::ui::form_node::{handle_selection_nav, FormAction, FormNode};
 use crate::ui::nodes::selection_popup::{SelectionPopup, SelectionResult};
 use crate::ui::render_ctx::RenderCtx;
@@ -110,13 +109,13 @@ impl FormNode for SelectInputNode {
 
     fn preferred_height(&self) -> u16 { 4 }
 
-    fn render(&mut self, f: &mut RenderCtx<'_>, area: Rect, focused: bool, lang: Lang) {
+    fn render(&mut self, f: &mut RenderCtx<'_>, area: Rect, focused: bool) {
         let rows = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Length(3), Constraint::Length(1)])
             .split(area);
 
-        let block = node_block(self.label_key, self.required, focused, lang);
+        let block = node_block(f.translate(self.label_key), self.required, focused);
 
         let display = self.human_label();
         let input_line = if focused {
@@ -133,12 +132,12 @@ impl FormNode for SelectInputNode {
             &mut ParagraphState::new(),
         );
 
-        render_hint_opt(f, rows[1], self.hint_key, lang);
+        render_hint_opt(f, rows[1], self.hint_key);
     }
 
     /// Render the popup — centered on the full terminal. Called after all fields are rendered.
-    fn render_overlay(&mut self, f: &mut RenderCtx<'_>, _available: Rect, lang: Lang) {
-        self.popup.render(f, &self.options, self.display_fn, self.label_key, lang);
+    fn render_overlay(&mut self, f: &mut RenderCtx<'_>, _available: Rect) {
+        self.popup.render(f, &self.options, self.display_fn, self.label_key);
     }
 
     fn has_open_popup(&self) -> bool { self.popup.is_open }

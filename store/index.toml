@@ -1,5 +1,5 @@
 # FreeSynergy.Node – Bundled Module Store Index (offline fallback)
-# Live store: https://raw.githubusercontent.com/FreeSynergy/Store/main/Node/index.toml
+# Live store: https://raw.githubusercontent.com/FreeSynergy/Node.Store/main/Node/index.toml
 #
 # Field order (mandatory): id → name → service_type → version
 #   → description → icon → website → repository → author → tags

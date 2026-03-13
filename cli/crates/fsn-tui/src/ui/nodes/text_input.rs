@@ -19,7 +19,6 @@ use rat_widget::text_input::{TextInput, TextInputState, handle_events};
 use rat_widget::event::TextOutcome;
 use rat_widget::text::HasScreenCursor;
 
-use crate::app::Lang;
 use crate::ui::form_node::{handle_form_nav, FormAction, FormNode};
 use crate::ui::render_ctx::RenderCtx;
 use crate::ui::widgets::{node_block, render_hint_opt};
@@ -117,10 +116,10 @@ impl FormNode for TextInputNode {
 
     fn preferred_height(&self) -> u16 { 4 } // input box(3) + hint(1)
 
-    fn render(&mut self, f: &mut RenderCtx<'_>, area: Rect, focused: bool, lang: Lang) {
+    fn render(&mut self, f: &mut RenderCtx<'_>, area: Rect, focused: bool) {
         let rows = Layout::vertical([Constraint::Length(3), Constraint::Length(1)]).split(area);
 
-        let block = node_block(self.label_key, self.required, focused, lang);
+        let block = node_block(f.translate(self.label_key), self.required, focused);
 
         // Inform the widget about focus so it applies focus_style.
         self.state.focus.set(focused);
@@ -143,7 +142,7 @@ impl FormNode for TextInputNode {
             }
         }
 
-        render_hint_opt(f, rows[1], self.hint_key, lang);
+        render_hint_opt(f, rows[1], self.hint_key);
     }
 
     fn handle_mouse(&mut self, event: crossterm::event::MouseEvent, _area: Rect) -> FormAction {

@@ -20,7 +20,6 @@ use ratatui::{
 };
 use rat_widget::paragraph::{Paragraph, ParagraphState};
 
-use crate::app::Lang;
 use crate::ui::form_node::FormAction;
 use crate::ui::render_ctx::RenderCtx;
 use super::service_slot::{SlotCategory, SlotEntry};
@@ -244,7 +243,6 @@ impl ServiceSlotPopup {
         screen:    Rect,
         entries:   &[SlotEntry],
         label_key: &'static str,
-        lang:      Lang,
     ) {
         let visible: Vec<&SlotEntry> = self.visible_entries(entries);
         let n_items = visible.len();
@@ -261,7 +259,7 @@ impl ServiceSlotPopup {
         };
         self.rendered_rect = Some(popup);
 
-        let title_text = crate::i18n::t(lang, label_key);
+        let title_text = f.translate(label_key);
         let block = Block::default()
             .title(Span::styled(
                 format!(" {} ", title_text),

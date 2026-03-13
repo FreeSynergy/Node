@@ -22,7 +22,8 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::Rect;
 
-use crate::app::Lang;
+pub use fsy_core::FormAction;
+
 use crate::ui::render_ctx::RenderCtx;
 
 // ── Common navigation helper ──────────────────────────────────────────────────
@@ -69,40 +70,6 @@ pub fn handle_selection_nav(key: KeyEvent) -> Option<FormAction> {
         KeyCode::Char('l') | KeyCode::Char('L')    => Some(FormAction::LangToggle),
         _                                           => None,
     }
-}
-
-// ── FormAction ────────────────────────────────────────────────────────────────
-
-/// What a form node returns after handling a keyboard event.
-/// The outer handler (events.rs) reacts to these without knowing field details.
-#[derive(Debug, Clone, PartialEq)]
-pub enum FormAction {
-    /// Event consumed internally; no outer action needed.
-    Consumed,
-    /// Value was modified (triggers the form's `on_change` hook).
-    ValueChanged,
-    /// Move focus to the next node in the current tab.
-    FocusNext,
-    /// Move focus to the previous node in the current tab.
-    FocusPrev,
-    /// Value was modified AND focus should advance to the next field.
-    /// Used by SelectInput / MultiSelectInput after popup confirmation so that
-    /// `on_change` fires and the cursor advances in one step.
-    AcceptAndNext,
-    /// Advance to the next form tab (Ctrl+Right).
-    TabNext,
-    /// Go back to the previous form tab (Ctrl+Left).
-    TabPrev,
-    /// Enter was pressed: attempt to advance or submit the form.
-    Submit,
-    /// Close the form / pop the current screen (Esc).
-    Cancel,
-    /// Toggle the UI language (L/l key outside text input).
-    LangToggle,
-    /// Quit the application (Ctrl+C — handled before node dispatch).
-    Quit,
-    /// Event not handled by this node; fall through to the outer handler.
-    Unhandled,
 }
 
 // ── FormNode trait ────────────────────────────────────────────────────────────
@@ -167,12 +134,13 @@ pub trait FormNode: std::fmt::Debug {
     fn preferred_height(&self) -> u16 { 4 }
 
     /// Render the field (label-in-title + input box + hint) into `area`.
-    fn render(&mut self, f: &mut RenderCtx<'_>, area: Rect, focused: bool, lang: Lang);
+    /// Use `f.translate(key)` for i18n — lang is carried by `RenderCtx`.
+    fn render(&mut self, f: &mut RenderCtx<'_>, area: Rect, focused: bool);
 
     /// Render a floating overlay (e.g., dropdown list) below the input box.
     /// Called *after* all fields are rendered so the overlay appears on top.
     /// Default: no-op (text inputs have no overlay).
-    fn render_overlay(&mut self, _f: &mut RenderCtx<'_>, _available: Rect, _lang: Lang) {}
+    fn render_overlay(&mut self, _f: &mut RenderCtx<'_>, _available: Rect) {}
 
     // ── Input ──────────────────────────────────────────────────────────────
 

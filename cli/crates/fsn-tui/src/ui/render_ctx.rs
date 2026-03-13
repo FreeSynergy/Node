@@ -8,12 +8,16 @@
 //
 // Design: Facade pattern — same interface, different backend.
 //
-// Migration note: this will be replaced by fsy_tui::render_ctx::RenderCtx
-// once FSN adopts the fsy-tui API (lang + translator moved into RenderCtx).
+// Lang + translate(): mirrors the fsy_tui::RenderCtx API so FormNode::render()
+// nodes can call `f.translate("key")` without carrying a `lang` parameter.
+// The active language travels with the render context, not with each call site.
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::widgets::{StatefulWidget, Widget};
+
+use crate::app::Lang;
+use crate::i18n::Translate as _;
 
 pub struct RenderCtx<'a> {
     /// Full area of the terminal for this frame.
@@ -23,11 +27,20 @@ pub struct RenderCtx<'a> {
     /// Cursor position to apply after the frame is done.
     /// Set via `set_cursor_position()`, read by the rat-salsa render callback.
     cursor: Option<(u16, u16)>,
+    /// Active UI language — carried so FormNode::render() needs no lang param.
+    pub lang: Lang,
 }
 
 impl<'a> RenderCtx<'a> {
-    pub fn new(area: Rect, buf: &'a mut Buffer) -> Self {
-        Self { area, buf, cursor: None }
+    pub fn new(area: Rect, buf: &'a mut Buffer, lang: Lang) -> Self {
+        Self { area, buf, cursor: None, lang }
+    }
+
+    /// Translate an i18n key using the active language.
+    /// Falls back to English, then to the key itself.
+    #[inline]
+    pub fn translate(&self, key: &'static str) -> &'static str {
+        self.lang.t(key)
     }
 
     /// The full terminal area — mirrors `Frame::area()`.

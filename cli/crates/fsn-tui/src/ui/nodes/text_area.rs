@@ -26,7 +26,6 @@ use rat_widget::textarea::{TextArea, TextAreaState, handle_events};
 use rat_widget::event::TextOutcome;
 use rat_widget::text::HasScreenCursor;
 
-use crate::app::Lang;
 use crate::ui::form_node::{handle_form_nav, FormAction, FormNode};
 use crate::ui::render_ctx::RenderCtx;
 use crate::ui::widgets::{node_block, render_hint};
@@ -111,11 +110,11 @@ impl FormNode for TextAreaNode {
         self.visible_lines + 3 // box(visible_lines + 2 borders) + hint(1)
     }
 
-    fn render(&mut self, f: &mut RenderCtx<'_>, area: Rect, focused: bool, lang: Lang) {
+    fn render(&mut self, f: &mut RenderCtx<'_>, area: Rect, focused: bool) {
         let box_h = self.visible_lines + 2;
         let rows  = Layout::vertical([Constraint::Length(box_h), Constraint::Length(1)]).split(area);
 
-        let block = node_block(self.label_key, self.required, focused, lang);
+        let block = node_block(f.translate(self.label_key), self.required, focused);
 
         self.state.focus.set(focused);
 
@@ -136,7 +135,7 @@ impl FormNode for TextAreaNode {
 
         // Hint line — falls back to generic textarea hint if none specified.
         let hk = self.hint_key.unwrap_or("form.textarea.hint");
-        render_hint(f, rows[1], hk, lang);
+        render_hint(f, rows[1], hk);
     }
 
     /// Delegate mouse events to rat-widget — same source of truth as handle_key().

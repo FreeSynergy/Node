@@ -320,7 +320,7 @@ pub(crate) fn render_fields(
             // Fast path — no horizontal split needed.
             let (slot, node_idx) = row[0];
             let focused = form.active_field == slot;
-            form.nodes[node_idx].render(f, row_rect, focused, lang);
+            form.nodes[node_idx].render(f, row_rect, focused);
             // Register in click_map only for focusable nodes.
             if form.nodes[node_idx].is_focusable() {
                 cmap.push(row_rect, ClickTarget::FormField { slot, node_idx, rect: row_rect });
@@ -340,7 +340,7 @@ pub(crate) fn render_fields(
 
             for (i, &(slot, node_idx)) in row.iter().enumerate() {
                 let focused = form.active_field == slot;
-                form.nodes[node_idx].render(f, cols[i], focused, lang);
+                form.nodes[node_idx].render(f, cols[i], focused);
                 if form.nodes[node_idx].is_focusable() {
                     cmap.push(cols[i], ClickTarget::FormField { slot, node_idx, rect: cols[i] });
                 }
@@ -378,7 +378,7 @@ pub(crate) fn render_fields(
     // Called for every node — each checks its own is_open state.
     // This keeps popups visible even when focus moves elsewhere.
     for &node_idx in &tab_indices {
-        form.nodes[node_idx].render_overlay(f, inner, lang);
+        form.nodes[node_idx].render_overlay(f, inner);
     }
 }
 

@@ -38,7 +38,6 @@ use rat_widget::paragraph::{Paragraph, ParagraphState};
 
 use crate::ui::render_ctx::RenderCtx;
 
-use crate::app::Lang;
 use crate::ui::form_node::{handle_form_nav, FormAction, FormNode};
 
 const DEFAULT_VISIBLE_ROWS: u16 = 3;
@@ -261,7 +260,7 @@ impl FormNode for EnvTableNode {
     /// 3 (editor boxes) + (visible_rows - 1) (other-rows list) + 2 (block borders) + 1 (hint).
     fn preferred_height(&self) -> u16 { self.visible_rows + 5 }
 
-    fn render(&mut self, f: &mut RenderCtx<'_>, area: Rect, focused: bool, lang: Lang) {
+    fn render(&mut self, f: &mut RenderCtx<'_>, area: Rect, focused: bool) {
         if focused { self.update_scroll(); }
 
         // Split into block area and hint line.
@@ -272,7 +271,7 @@ impl FormNode for EnvTableNode {
         let [block_area, hint_area] = [chunks[0], chunks[1]];
 
         // ── Outer block ──────────────────────────────────────────────────────
-        let label_text  = crate::i18n::t(lang, self.label_key);
+        let label_text  = f.translate(self.label_key);
         // Show row counter in title so the user always knows how many rows exist.
         let title_text  = if focused && self.rows.len() > 1 {
             format!(" {} [{}/{}] ", label_text, self.cur_row + 1, self.rows.len())
@@ -390,7 +389,7 @@ impl FormNode for EnvTableNode {
         let hint_text = if focused {
             "Tab: next col   ↑/↓: rows   Enter: new row   Ctrl+D: delete"
         } else if let Some(hk) = self.hint_key {
-            crate::i18n::t(lang, hk)
+            f.translate(hk)
         } else {
             ""
         };

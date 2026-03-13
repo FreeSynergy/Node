@@ -18,7 +18,6 @@ use ratatui::{
 };
 use rat_widget::paragraph::{Paragraph, ParagraphState};
 
-use crate::app::Lang;
 use crate::ui::form_node::{handle_selection_nav, FormAction, FormNode};
 use crate::ui::render_ctx::RenderCtx;
 use super::service_slot_popup::ServiceSlotPopup;
@@ -201,13 +200,13 @@ impl FormNode for ServiceSlotNode {
     fn preferred_height(&self) -> u16 { 4 }
     fn is_filled(&self)       -> bool { !self.value.is_empty() }
 
-    fn render(&mut self, f: &mut RenderCtx<'_>, area: Rect, focused: bool, lang: Lang) {
+    fn render(&mut self, f: &mut RenderCtx<'_>, area: Rect, focused: bool) {
         let rows = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Length(3), Constraint::Length(1)])
             .split(area);
 
-        let label_text   = crate::i18n::t(lang, self.label_key);
+        let label_text   = f.translate(self.label_key);
         let req_suffix   = if self.required { " *" } else { "" };
         let label_style  = if focused {
             Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
@@ -246,7 +245,7 @@ impl FormNode for ServiceSlotNode {
         if let Some(hk) = self.hint_key {
             f.render_stateful_widget(
                 Paragraph::new(Line::from(Span::styled(
-                    crate::i18n::t(lang, hk),
+                    f.translate(hk),
                     Style::default().fg(Color::DarkGray),
                 ))),
                 rows[1],
@@ -255,9 +254,9 @@ impl FormNode for ServiceSlotNode {
         }
     }
 
-    fn render_overlay(&mut self, f: &mut RenderCtx<'_>, _available: Rect, lang: Lang) {
+    fn render_overlay(&mut self, f: &mut RenderCtx<'_>, _available: Rect) {
         if self.popup.is_open {
-            self.popup.render(f, f.area(), &self.entries, self.label_key, lang);
+            self.popup.render(f, f.area(), &self.entries, self.label_key);
         }
     }
 
