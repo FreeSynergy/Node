@@ -3,6 +3,95 @@
 // Pattern: State Machine discriminant — Screen is the top-level state that
 // drives which renderer and event handler are active. DashFocus is a
 // sub-state within Screen::Dashboard.
+//
+// NavTab is the new routing enum — it maps directly to what the user sees in
+// the nav bar. Screen remains as a legacy alias during migration.
+
+// ── NavTab — primary routing enum ────────────────────────────────────────────
+
+/// Navigation tab — determines which composition pair (sidebar + main) is active.
+///
+/// This is the Single Source of Truth for app routing. The nav bar renders
+/// exactly these variants in order. Tabs marked `is_coming_soon()` are shown
+/// dimmed and cannot receive keyboard focus.
+///
+/// To add a new tab:
+///   1. Add a variant here.
+///   2. Add a `label_key()` arm.
+///   3. Add `is_coming_soon()` arm (false if ready).
+///   4. Add sidebar + main composition files.
+///   5. Add event handler in events.rs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum NavTab {
+    #[default]
+    Projects,    // SidebarProjects + ProjectsMain
+    Hosts,       // SidebarHosts + HostsMain
+    Services,    // SidebarServices + ServicesMain
+    Bots,        // SidebarBots + BotsMain          [active, content coming]
+    Federation,  // SidebarFederation + FederationMain  [coming soon]
+    Websites,    // SidebarWebsites + WebsitesMain      [coming soon]
+    Store,       // SidebarStore + StoreMain
+    Settings,    // SidebarSettings + SettingsMain
+}
+
+impl NavTab {
+    pub const ALL: &'static [NavTab] = &[
+        Self::Projects,
+        Self::Hosts,
+        Self::Services,
+        Self::Bots,
+        Self::Federation,
+        Self::Websites,
+        Self::Store,
+        Self::Settings,
+    ];
+
+    /// i18n key for the nav bar label.
+    pub fn label_key(self) -> &'static str {
+        match self {
+            Self::Projects   => "dash.tab.projects",
+            Self::Hosts      => "dash.tab.hosts",
+            Self::Services   => "dash.tab.services",
+            Self::Bots       => "dash.tab.bots",
+            Self::Federation => "dash.tab.federation",
+            Self::Websites   => "dash.tab.websites",
+            Self::Store      => "dash.tab.store",
+            Self::Settings   => "dash.tab.settings",
+        }
+    }
+
+    /// Tabs that are planned but not yet implemented.
+    /// Rendered dimmed in the nav bar; keyboard navigation skips them.
+    pub fn is_coming_soon(self) -> bool {
+        matches!(self, Self::Federation | Self::Websites | Self::Bots)
+    }
+
+    /// Nav bar index (position in the ALL slice).
+    pub fn index(self) -> usize {
+        Self::ALL.iter().position(|&t| t == self).unwrap_or(0)
+    }
+
+    /// Resolve a NavTab from a nav bar index (0-based).
+    pub fn from_index(idx: usize) -> Option<Self> {
+        Self::ALL.get(idx).copied()
+    }
+
+    /// Next non-coming-soon tab (wraps around).
+    pub fn next(self) -> Self {
+        let all: Vec<NavTab> = Self::ALL.iter().copied().filter(|t| !t.is_coming_soon()).collect();
+        let cur = all.iter().position(|&t| t == self).unwrap_or(0);
+        all[(cur + 1) % all.len()]
+    }
+
+    /// Previous non-coming-soon tab (wraps around).
+    pub fn prev(self) -> Self {
+        let all: Vec<NavTab> = Self::ALL.iter().copied().filter(|t| !t.is_coming_soon()).collect();
+        let cur = all.iter().position(|&t| t == self).unwrap_or(0);
+        all[(cur + all.len() - 1) % all.len()]
+    }
+}
+
+// ── Screen — legacy state discriminant (kept during migration) ────────────────
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Screen {

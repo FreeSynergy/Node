@@ -521,13 +521,23 @@ fn is_in_sidebar(col: u16, state: &AppState) -> bool {
 /// Tabs 0-2 all map to Dashboard (the sidebar focus is set by the sidebar cursor,
 /// not the tab).  Tab 3 (Store) is not yet implemented.  Tab 4 = Settings.
 fn navigate_to_tab(index: usize, state: &mut AppState) {
-    match index {
-        0..=2 => { state.screen = Screen::Dashboard; }
-        4 => {
+    let Some(tab) = crate::app::NavTab::from_index(index) else { return };
+    if tab.is_coming_soon() { return; }
+
+    state.active_tab = tab;
+
+    // Keep legacy Screen in sync during migration.
+    match tab {
+        crate::app::NavTab::Settings => {
             state.settings_cursor = 0;
             state.screen = Screen::Settings;
         }
-        _ => {}
+        crate::app::NavTab::Store => {
+            state.screen = Screen::Store;
+        }
+        _ => {
+            state.screen = Screen::Dashboard;
+        }
     }
 }
 

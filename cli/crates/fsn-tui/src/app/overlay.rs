@@ -43,6 +43,8 @@ pub struct DeployState {
 /// then taking a mutable borrow separately for the actual handling).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OverlayKind {
+    /// Welcome popup — shown when no project exists.
+    Welcome,
     Logs,
     Confirm,
     Deploy,
@@ -54,6 +56,9 @@ pub enum OverlayKind {
 
 #[derive(Debug, Clone)]
 pub enum OverlayLayer {
+    /// Welcome popup — shown when no project exists (no form is open).
+    /// Floats centered over the normal layout (header/nav/footer stay visible).
+    Welcome { focus: usize },
     Logs(LogsState),
     Confirm { message: String, data: Option<String>, yes_action: ConfirmAction },
     Deploy(DeployState),
@@ -67,6 +72,7 @@ impl OverlayLayer {
     /// Returns the discriminant without borrowing the inner data.
     pub fn kind(&self) -> OverlayKind {
         match self {
+            OverlayLayer::Welcome { .. }     => OverlayKind::Welcome,
             OverlayLayer::Logs(_)            => OverlayKind::Logs,
             OverlayLayer::Confirm { .. }     => OverlayKind::Confirm,
             OverlayLayer::Deploy(_)          => OverlayKind::Deploy,

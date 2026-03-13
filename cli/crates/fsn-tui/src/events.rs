@@ -119,6 +119,9 @@ fn handle_overlay(key: KeyEvent, state: &mut AppState, root: &Path) -> Result<()
                 state.deploy_rx = None;
             }
         }
+        Some(OverlayKind::Welcome) => {
+            handle_welcome_overlay(key, state, root)?;
+        }
         Some(OverlayKind::NewResource) => {
             handle_new_resource_overlay(key, state, root)?;
         }
@@ -127,6 +130,34 @@ fn handle_overlay(key: KeyEvent, state: &mut AppState, root: &Path) -> Result<()
         }
         None => { state.pop_overlay(); }
     }
+    Ok(())
+}
+
+// ── Welcome overlay ───────────────────────────────────────────────────────────
+
+fn handle_welcome_overlay(key: KeyEvent, state: &mut AppState, root: &std::path::Path) -> Result<()> {
+    match key.code {
+        KeyCode::Char('q') => state.should_quit = true,
+        KeyCode::Char('l') => state.cycle_lang(),
+        KeyCode::Left | KeyCode::Right => {
+            if let Some(focus) = state.welcome_overlay_mut() {
+                *focus = 1 - *focus;
+            }
+        }
+        KeyCode::Enter => {
+            let focus = state.overlay_stack.iter().rev().find_map(|o| {
+                if let crate::app::OverlayLayer::Welcome { focus } = o { Some(*focus) } else { None }
+            }).unwrap_or(0);
+            if focus == 0 {
+                state.pop_overlay();
+                let form = crate::project_form::new_project_form(&state.svc_handles, &state.store_entries, &state.available_langs);
+                state.open_form(form);
+            }
+        }
+        _ => {}
+    }
+    // Fall through to dashboard handling for nav shortcuts (L, Tab, etc.)
+    let _ = root;
     Ok(())
 }
 

@@ -264,8 +264,11 @@ pub fn run(root: &Path) -> Result<()> {
     state.apply_podman_status(podman_container_statuses());
 
     // Navigate straight to Dashboard if at least one project was loaded.
+    // If no projects exist, push the Welcome overlay over the normal layout.
     if !state.projects.is_empty() {
         state.screen = app::Screen::Dashboard;
+    } else {
+        state.overlay_stack.push(app::OverlayLayer::Welcome { focus: 0 });
     }
 
     // Fetch fresh store index from HTTP in the background.

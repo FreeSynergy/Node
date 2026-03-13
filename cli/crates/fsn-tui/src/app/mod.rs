@@ -29,7 +29,7 @@ pub use overlay::{
     LogsState, OverlayKind, OverlayLayer,
 };
 pub use screen::{
-    DashFocus, Screen, SettingsFocus, SettingsSection, SettingsTab,
+    DashFocus, NavTab, Screen, SettingsFocus, SettingsSection, SettingsTab,
     StoreScreenFocus, StoreSettingsFocus, StoreSidebarMode,
 };
 pub use sidebar::{NEW_RESOURCE_ITEMS, SidebarAction, SidebarItem};
@@ -59,6 +59,9 @@ use crate::sysinfo::SysInfo;
 
 pub struct AppState {
     pub screen:               Screen,
+    /// Active navigation tab — Single Source of Truth for routing.
+    /// Replaces per-screen `Screen::Settings` / `Screen::Store` branches.
+    pub active_tab:           NavTab,
     pub lang:                 Lang,
     /// All languages loaded from ~/.local/share/fsn/i18n/ at startup.
     pub available_langs:      Vec<&'static DynamicLang>,
@@ -166,7 +169,7 @@ impl AppState {
             .unwrap_or(Lang::En);
 
         let mut s = Self {
-            screen: Screen::Welcome, lang, sysinfo, services: vec![],
+            screen: Screen::Welcome, active_tab: NavTab::Projects, lang, sysinfo, services: vec![],
             available_langs,
             selected: 0, overlay_stack: vec![],
             should_quit: false, help_visible: false, welcome_focus: 0, form_queue: None,
@@ -266,12 +269,25 @@ impl AppState {
     pub fn open_form(&mut self, form: crate::resource_form::ResourceForm) {
         self.form_queue = Some(crate::form_queue::FormQueue::single(form));
         self.screen = Screen::NewProject;
+        // Remove Welcome overlay while form is open (form takes precedence).
+        self.overlay_stack.retain(|o| !matches!(o, OverlayLayer::Welcome { .. }));
     }
 
-    /// Close the entire form queue and return to Dashboard (or Welcome if no projects).
+    /// Close the entire form queue and return to Dashboard (or Welcome overlay if no projects).
     pub fn close_form_queue(&mut self) {
         self.form_queue = None;
         self.screen = if self.projects.is_empty() { Screen::Welcome } else { Screen::Dashboard };
+        // Re-show Welcome overlay if still no projects.
+        if self.projects.is_empty() && !self.overlay_stack.iter().any(|o| matches!(o, OverlayLayer::Welcome { .. })) {
+            self.overlay_stack.push(OverlayLayer::Welcome { focus: 0 });
+        }
+    }
+
+    /// Returns a mutable reference to the Welcome overlay's focus field, if present.
+    pub fn welcome_overlay_mut(&mut self) -> Option<&mut usize> {
+        self.overlay_stack.iter_mut().find_map(|o| {
+            if let OverlayLayer::Welcome { focus } = o { Some(focus) } else { None }
+        })
     }
 
     // ── Overlay helpers ────────────────────────────────────────────────────

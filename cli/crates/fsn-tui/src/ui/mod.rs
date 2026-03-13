@@ -10,6 +10,7 @@
 // When help_visible=false the sidebar column is omitted.
 
 pub mod anim;
+pub mod compositions;
 pub mod components;
 pub mod cursor;
 pub mod dashboard;
@@ -18,13 +19,13 @@ pub mod form_node;
 pub mod help_sidebar;
 pub mod layout;
 pub mod logs;
+pub mod overlays;
 pub mod new_project;
 pub mod nodes;
 pub mod render_ctx;
 pub mod settings_screen;
 pub mod store_screen;
 pub mod style;
-pub mod welcome;
 pub mod widgets;
 
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
@@ -39,6 +40,7 @@ impl OverlayLayer {
     /// Analogous to `Element::render()` — the caller just iterates the stack.
     fn render(&self, f: &mut RenderCtx<'_>, state: &AppState) {
         match self {
+            OverlayLayer::Welcome { .. }     => overlays::welcome::render(f, state),
             OverlayLayer::Logs(_)            => logs::render(f, state),
             OverlayLayer::Confirm { .. }     => render_confirm(f, state),
             OverlayLayer::Deploy(_)          => render_deploy(f, state),
@@ -51,11 +53,11 @@ impl OverlayLayer {
 pub fn render(f: &mut RenderCtx<'_>, state: &mut AppState) {
     let full = f.area();
 
-    // Dashboard handles F1 help panel internally (body-area only).
-    // All other screens use a full-screen horizontal split when help is visible.
+    // Route to the correct screen renderer.
+    // Screen::Welcome now uses the Dashboard layout — the Welcome overlay is drawn on top.
     match state.screen {
+        Screen::Welcome    => dashboard::render(f, state, full),
         Screen::Dashboard  => dashboard::render(f, state, full),
-        Screen::Welcome    => render_with_help(f, state, full, |f, s, a| welcome::render(f, s, a)),
         Screen::NewProject => render_with_help(f, state, full, |f, s, a| new_project::render(f, s, a)),
         Screen::Settings   => render_with_help(f, state, full, |f, s, a| settings_screen::render(f, s, a)),
         Screen::Store      => store_screen::render(f, state),

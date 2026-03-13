@@ -5,11 +5,13 @@
 // this module only decides where each component goes.
 //
 // ┌──────────────────────────────────────────────────────────────────────┐
-// │ [BigText FSN]  FreeSynergy.Node                         v0.1  [DE]  │ ← HeaderBar (5 rows)
-// │ [          ]  Modular Deployment System  —  by KalEl               │
-// │ [          ]  myproject @ example.com                               │
-// │ [          ]  ──────────────────────────────────────────────────── │
-// │  [Projekte]│[Hosts]│[Services]│[Store]│[⚙ Einstellungen]           │
+// │ [top pad]  FreeSynergy.Node                             v0.1  [DE]  │ ← HeaderBar (6 rows)
+// │ [BigText]  Modular Deployment System  —  by KalEl                   │
+// │ [  FSN  ]  myproject @ example.com                                  │
+// │ [       ]  ──────────────────────────────────────────────────────── │
+// │ [bot pad]                                                            │
+// ├──────────────────────────────────────────────────────────────────────┤
+// │  [Projekte]│[Hosts]│[Services]│[Bots]│[Fed.]│[Websites]│[Store]│[⚙] │ ← NavBarMain (1 row)
 // ├──────────────┬──────────────────────────────────────────────────────┤
 // │              │ ╭──────────╮╭──────────╮╭──────────╮╭──────────╮   │ ← DetailPanel
 // │  SidebarList │ │  RAM     ││  System  ││ Running  ││  Alerts  │   │
@@ -26,6 +28,7 @@ use ratatui::layout::Rect;
 use crate::ui::render_ctx::RenderCtx;
 use crate::ui::layout::{AppLayout, LayoutConfig};
 use crate::ui::components::{Component, DetailPanel, FooterBar, HeaderBar, SidebarList};
+use crate::ui::compositions::{Composition, NavBarMain};
 use crate::ui::{help_sidebar};
 use crate::app::AppState;
 
@@ -37,13 +40,17 @@ pub fn render(f: &mut RenderCtx<'_>, state: &mut AppState, area: Rect) {
         .then_some(help_sidebar::SIDEBAR_WIDTH);
 
     let layout = AppLayout::compute(area, &LayoutConfig {
-        topbar_height: 5,               // 4 logo rows + 1 tab bar
+        topbar_height:  6, // 1 pad + 4 logo rows + 1 pad
+        menubar_height: 1, // nav bar (NavBarMain composition)
         left_width:    Some(SIDEBAR_COL_WIDTH),
         right_width:   help_w,
         ..LayoutConfig::default()
     });
 
     HeaderBar.render(f, layout.topbar, state);
+    if let Some(navbar_area) = layout.menubar {
+        NavBarMain.render(f, navbar_area, state);
+    }
     render_body(f, state, &layout);
     FooterBar.render(f, layout.footer_primary, state);
 }
