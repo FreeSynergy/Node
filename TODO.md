@@ -180,11 +180,11 @@ Stand: 2026-03
 
 ## Theme-System
 
-- [ ] `ThemeEngine::from_css()` implementieren (CSS Custom Properties → Theme)
-- [ ] `ThemeEngine::to_tailwind_config()` implementieren
-- [ ] Mehrere Themes unterstützen (Wechsel per Settings)
-- [ ] Theme aus Store laden (Store-Themes)
-- [ ] FreeSynergy-Default-Theme finalisieren (Cyan + White)
+- [x] `ThemeEngine::from_css()` implementieren (CSS Custom Properties → Theme)
+- [x] `ThemeEngine::to_tailwind_config()` implementieren (valides JSON)
+- [x] Mehrere Themes unterstützen — `ThemeRegistry` (register, set_active, names, remove)
+- [x] Theme aus Store laden — `ThemeEngine::from_toml_str()` + `ThemeRegistry::register_toml_str()`
+- [x] FreeSynergy-Default-Theme finalisiert (Cyan #00BCD4 + White #e6edf3 auf Dark Navy)
 
 ---
 
@@ -230,17 +230,17 @@ Stand: 2026-03
 
 ### In FreeSynergy.Lib geladen aber noch nicht genutzt
 
-- [ ] `fsn-federation`: `activitypub_federation` (0.6) — komplett Stub
-- [ ] `fsn-federation`: `openidconnect` — komplett Stub
-- [ ] `fsn-auth`: `jsonwebtoken` — Stub
-- [ ] `fsn-bridge-sdk`: komplett leer
-- [ ] `fsn-plugin-runtime`: `wasmtime` geladen, aber kein Host implementiert
-- [ ] `fsn-plugin-sdk`: `wit-bindgen` — keine `.wit` Interfaces definiert
-- [ ] `fsn-db`: `sea-orm` + `automerge` (für sync_state) — Entities definiert, aber kein echter Betrieb
+- [x] `fsn-federation`: `activitypub_federation` — OIDC/SCIM/WebFinger/ActivityPub vollständig implementiert
+- [x] `fsn-federation`: `openidconnect` — OidcClient (discover + userinfo) fertig
+- [x] `fsn-auth`: `jsonwebtoken` — JwtSigner + JwtValidator (HMAC/RSA) + PermissionSet fertig
+- [ ] `fsn-bridge-sdk`: komplett leer (noch kein Bedarf)
+- [x] `fsn-plugin-runtime`: `wasmtime` Host vollständig implementiert (WASI sandbox + ProcessPluginRunner)
+- [x] `fsn-plugin-sdk`: PluginContext/PluginManifest/PluginResponse definiert, deploy engine verdrahtet
+- [ ] `fsn-db`: `sea-orm` + `automerge` — Entities definiert, aber kein echter Betrieb
 
 ### Zu ergänzen (fehlen noch, stehen im Plan)
 
-- [ ] `russh` — für fsn-host SSH-Implementierung
+- [x] `russh` — fsn-host SSH vollständig implementiert
 - [ ] `tokio-tungstenite` — WebSocket (für Desktop Live-Updates)
 - [ ] `tonic` — gRPC (für Inter-Process Communication)
 - [ ] `schemars` — JSON-Schema Generation aus Rust-Structs
@@ -281,5 +281,6 @@ Stand: 2026-03
 4. ~~**fsn-crypto** age-Encryption~~ ✓ fertig — vault.age mit passphrase KDF, VaultConfig in fsn-core
 5. ~~**FreeSynergy.Desktop** Repo anlegen + fsd-conductor als erstes~~ ✓ fertig — fsd-shell, fsd-conductor, fsd-app compilierbar (braucht libxdo-devel)
 6. **i18n** `.ftl`-Migration
-7. **fsn-plugin-runtime** WASM Host (für Zentinel als echtes Plugin)
-8. **fsn-auth + fsn-federation** (für Bot-Management + OIDC)
+7. ~~**fsn-plugin-runtime** WASM Host~~ ✓ fertig — wasmtime Host + WASI sandbox + ProcessPluginRunner + deploy engine verdrahtet
+8. ~~**fsn-auth + fsn-federation**~~ ✓ fertig — JWT (HMAC/RSA), RBAC, OIDC, SCIM, WebFinger vollständig
+9. **fsn-db** echter Betrieb (sea-orm Migrations laufen lassen)
