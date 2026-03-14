@@ -15,13 +15,11 @@ Stand: 2026-03
 
 ## FreeSynergy.Lib — Was fehlt
 
-### Phase 3: Store + Plugins (Stubs)
+### Phase 3: Store + Plugins
 
-- [ ] `fsn-store`: StoreClient implementieren (Download, Registry, Suche, Cache)
-  - [ ] `catalog.toml` fetchen + parsen
-  - [ ] Offline-Fallback (`index.toml` aus Binary)
-  - [ ] Modulverzeichnis lokal cachen (`~/.local/share/fsn/store/`)
-  - [ ] Retry + Backoff (Netzwerk offline → kein Crash)
+- [x] `fsn-store`: StoreClient implementiert (HTTP + Local, CatalogCache, Retry via Timeout)
+  - [ ] Retry + Backoff bei Netzwerkfehler (`backon` crate)
+  - [ ] Offline-Fallback: bei HTTP-Fehler auf lokalen Cache zurückfallen
 - [ ] `fsn-plugin-sdk`: Echte wit-bindgen Interfaces definieren (`.wit` Dateien)
 - [ ] `fsn-plugin-runtime`: wasmtime Host implementieren
   - [ ] WASM-Modul laden + ausführen
@@ -41,14 +39,9 @@ Stand: 2026-03
   - [ ] Passphrase-basiert (vault.toml)
   - [ ] Public-Key (mTLS)
 
-### Phase 5: Container + Templates (Stubs)
+### Phase 5: Container + Templates
 
-- [ ] `fsn-container`: PodmanClient via bollard implementieren
-  - [ ] Container listen, starten, stoppen, logs streamen
-  - [ ] Image pull
-  - [ ] Volume-Management
-- [ ] `fsn-container`: SystemdManager implementieren (ist noch Stub in Lib, genutzt wird fsn-container aus Node)
-  - Achtung: `fsn-container` in Node.cli hat eine eigene Implementierung — prüfen ob Lib-Version die ablösen kann
+- [x] `fsn-container`: PodmanClient + SystemdManager in Lib implementiert und aktiv (fsn-podman aus Node entfernt)
 - [ ] `fsn-template`: Tera-Wrapper implementieren (ist noch Stub, Node-Wrapper existiert schon)
 
 ### Phase 6: DB + Sync
@@ -199,15 +192,17 @@ Stand: 2026-03
 
 ## Tests / CI
 
-### Unit Tests (fehlen fast überall)
+### Unit Tests
 
-- [ ] `fsn-config`: Lade/Speicher-Tests, Auto-Repair Tests
-- [ ] `fsn-health`: Health-Check Tests mit Mock-Configs
-- [ ] `fsn-deploy`: Quadlet-Generation Tests
-- [ ] `fsn-deploy`: Diff-Berechnung Tests
-- [ ] `fsn-deploy`: KDL-Generator Tests
-- [ ] `fsn-core`: Config-Parser Tests (ProjectConfig, HostConfig)
-- [ ] `fsn-dns`: DNS-Provider Tests (Mock-HTTP)
+- [x] `fsn-config`: Lade/Speicher-Tests, Auto-Repair Tests
+- [x] `fsn-health`: Health-Check Tests mit Mock-Configs
+- [x] `fsn-deploy`: Quadlet-Generation Tests
+- [x] `fsn-deploy`: Diff-Berechnung Tests
+- [x] `fsn-deploy`: KDL-Generator Tests
+- [x] `fsn-core`: Config-Parser Tests (ProjectConfig, HostConfig)
+- [x] `fsn-core`: ServiceType Tests (from_class_prefix, exported_contract, ...)
+- [x] `fsn-core`: Health-Check Tests (ProjectConfig, HostConfig, ServiceInstanceConfig)
+- [x] `fsn-dns`: DNS-Provider Tests (MockDns, reconcile, NoopDns, Factory)
 
 ### Integration Tests
 
@@ -273,8 +268,8 @@ Stand: 2026-03
 
 ## Reihenfolge (empfohlen)
 
-1. **fsn-store** implementieren (Node braucht das für `fsn install`)
-2. **fsn-container** in Lib fertigstellen + Node-Implementierung ablösen
+1. ~~**fsn-store** implementieren~~ ✓ fertig — Node nutzt jetzt fsn-store (Lib)
+2. ~~**fsn-container** in Lib fertigstellen + Node-Implementierung ablösen~~ ✓ fertig — fsn-podman entfernt, Lib-Version aktiv
 3. **fsn-host** SSH (Remote-Deploy)
 4. **fsn-crypto** age-Encryption (vault.toml braucht das)
 5. **i18n** `.ftl`-Migration

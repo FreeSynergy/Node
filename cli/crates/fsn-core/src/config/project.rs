@@ -282,3 +282,91 @@ impl ProjectResource for ProjectConfig {
     fn languages(&self) -> &[String] { &self.project.languages }
     fn install_dir(&self) -> Option<&str> { self.project.install_dir.as_deref() }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn project_config_parses_minimal_toml() {
+        let config: ProjectConfig = toml::from_str(r#"
+[project]
+name = "myproject"
+domain = "example.com"
+        "#).unwrap();
+        assert_eq!(config.project.meta.name, "myproject");
+        assert_eq!(config.project.domain, "example.com");
+        assert_eq!(config.project.language, "en"); // default
+    }
+
+    #[test]
+    fn project_config_parses_services() {
+        let config: ProjectConfig = toml::from_str(r#"
+[project]
+name = "myproject"
+domain = "example.com"
+
+[load.services.forgejo]
+service_class = "git/forgejo"
+version = "9"
+        "#).unwrap();
+        let entry = config.load.services.get("forgejo").unwrap();
+        assert_eq!(entry.service_class, "git/forgejo");
+        assert_eq!(entry.version, "9");
+    }
+
+    #[test]
+    fn service_entry_version_defaults_to_latest() {
+        let config: ProjectConfig = toml::from_str(r#"
+[project]
+name = "myproject"
+domain = "example.com"
+
+[load.services.forgejo]
+service_class = "git/forgejo"
+        "#).unwrap();
+        assert_eq!(config.load.services["forgejo"].version, "latest");
+    }
+
+    #[test]
+    fn project_config_parses_contact_sub_table() {
+        let config: ProjectConfig = toml::from_str(r#"
+[project]
+name = "myproject"
+domain = "example.com"
+
+[project.contact]
+email = "admin@example.com"
+        "#).unwrap();
+        let contact = config.project.contact.as_ref().unwrap();
+        assert_eq!(contact.email.as_deref(), Some("admin@example.com"));
+    }
+
+    #[test]
+    fn project_resource_impl_returns_correct_values() {
+        use crate::resource::{ProjectResource, Resource};
+        let config: ProjectConfig = toml::from_str(r#"
+[project]
+name = "testproject"
+domain = "test.example.com"
+        "#).unwrap();
+        assert_eq!(config.id(), "testproject");
+        assert_eq!(config.domain(), "test.example.com");
+        assert_eq!(config.kind(), "project");
+    }
+
+    #[test]
+    fn service_instance_config_parses_toml() {
+        let config: ServiceInstanceConfig = toml::from_str(r#"
+[service]
+name = "forgejo"
+service_class = "git/forgejo"
+project = "myproject"
+host = "myhost"
+        "#).unwrap();
+        assert_eq!(config.service.meta.name, "forgejo");
+        assert_eq!(config.service.service_class, "git/forgejo");
+        assert_eq!(config.service.project, "myproject");
+        assert_eq!(config.service.host.as_deref(), Some("myhost"));
+    }
+}

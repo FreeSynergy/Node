@@ -155,3 +155,158 @@ fn push_proxy_instance(inst: &ServiceInstance, out: &mut Vec<ServiceInstance>) {
         push_proxy_instance(sub, out);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+    use indexmap::IndexMap;
+    use fsn_core::{
+        config::service::{
+            Constraints, ContainerDef, ServiceClass, ServiceContract,
+            ServiceLoad, ServiceMeta, ServiceSetup, ServiceType,
+        },
+        state::desired::{DesiredState, ServiceInstance},
+    };
+
+    fn make_class(name: &str, port: u16, service_types: Vec<ServiceType>) -> ServiceClass {
+        ServiceClass {
+            meta: ServiceMeta {
+                name: name.to_string(),
+                alias: vec![],
+                service_types,
+                author: None,
+                version: "1.0".to_string(),
+                tags: vec![],
+                description: None,
+                website: None,
+                repository: None,
+                port,
+                constraints: Constraints::default(),
+                federation: None,
+                health_path: None,
+                health_port: None,
+                health_scheme: None,
+                capabilities: vec![],
+            },
+            vars: IndexMap::default(),
+            load: ServiceLoad::default(),
+            container: ContainerDef {
+                name: name.to_string(),
+                image: format!("docker.io/{name}"),
+                image_tag: "latest".to_string(),
+                networks: vec![],
+                volumes: vec![],
+                published_ports: vec![],
+                healthcheck: None,
+                user: None,
+                read_only: false,
+                tmpfs: vec![],
+                security_opt: vec![],
+                ulimits: IndexMap::default(),
+            },
+            environment: IndexMap::default(),
+            setup: ServiceSetup::default(),
+            contract: ServiceContract::default(),
+            manifest: None,
+        }
+    }
+
+    fn make_instance(name: &str, domain: &str, service_types: Vec<ServiceType>, port: u16) -> ServiceInstance {
+        ServiceInstance {
+            name: name.to_string(),
+            class_key: format!("test/{name}"),
+            class: make_class(name, port, service_types.clone()),
+            service_types,
+            resolved_env: HashMap::new(),
+            service_domain: domain.to_string(),
+            alias_domains: vec![],
+            sub_services: vec![],
+            version: "1.0".to_string(),
+            resolved_volumes: vec![],
+            capabilities: vec![],
+        }
+    }
+
+    fn desired(services: Vec<ServiceInstance>) -> DesiredState {
+        DesiredState { project_name: "myproject".to_string(), domain: "example.com".to_string(), services }
+    }
+
+    #[test]
+    fn full_config_contains_markers() {
+        let config = generate_full_config(&desired(vec![
+            make_instance("forgejo", "git.example.com", vec![ServiceType::Git], 3000),
+        ]));
+        assert!(config.contains(MARKER_START));
+        assert!(config.contains(MARKER_END));
+    }
+
+    #[test]
+    fn full_config_contains_upstream_and_route_for_git() {
+        let config = generate_full_config(&desired(vec![
+            make_instance("forgejo", "git.example.com", vec![ServiceType::Git], 3000),
+        ]));
+        assert!(config.contains(r#"upstream "forgejo""#));
+        assert!(config.contains("forgejo:3000"));
+        assert!(config.contains("git.example.com"));
+    }
+
+    #[test]
+    fn proxy_service_excluded_from_routes() {
+        let config = generate_full_config(&desired(vec![
+            make_instance("zentinel", "example.com", vec![ServiceType::Proxy], 443),
+        ]));
+        assert!(!config.contains(r#"upstream "zentinel""#));
+    }
+
+    #[test]
+    fn internal_service_excluded_from_routes() {
+        let config = generate_full_config(&desired(vec![
+            make_instance("postgres", "postgres.internal", vec![ServiceType::Database], 5432),
+        ]));
+        assert!(!config.contains(r#"upstream "postgres""#));
+    }
+
+    #[test]
+    fn domain_dots_replaced_in_route_name() {
+        let config = generate_full_config(&desired(vec![
+            make_instance("forgejo", "git.example.com", vec![ServiceType::Git], 3000),
+        ]));
+        assert!(config.contains(r#"route "git-example-com""#));
+    }
+
+    #[test]
+    fn alias_domains_generate_extra_routes() {
+        let mut inst = make_instance("forgejo", "git.example.com", vec![ServiceType::Git], 3000);
+        inst.alias_domains = vec!["git2.example.com".to_string()];
+        let config = generate_full_config(&desired(vec![inst]));
+        assert!(config.contains("git.example.com"));
+        assert!(config.contains("git2.example.com"));
+        assert!(config.contains(r#"route "git2-example-com""#));
+    }
+
+    #[test]
+    fn upsert_replaces_managed_section_between_markers() {
+        let existing = format!(
+            "# hand-written config\n{MARKER_START}\nold content\n{MARKER_END}\n# after marker\n"
+        );
+        let result = upsert_managed_section(&existing, &desired(vec![
+            make_instance("forgejo", "git.example.com", vec![ServiceType::Git], 3000),
+        ]));
+        assert!(result.starts_with("# hand-written config\n"));
+        assert!(result.ends_with("# after marker\n"));
+        assert!(!result.contains("old content"));
+        assert!(result.contains(r#"upstream "forgejo""#));
+    }
+
+    #[test]
+    fn upsert_appends_when_no_markers_present() {
+        let existing = "# existing config\n";
+        let result = upsert_managed_section(existing, &desired(vec![
+            make_instance("forgejo", "git.example.com", vec![ServiceType::Git], 3000),
+        ]));
+        assert!(result.starts_with("# existing config"));
+        assert!(result.contains(MARKER_START));
+        assert!(result.contains(MARKER_END));
+    }
+}

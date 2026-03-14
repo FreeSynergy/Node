@@ -465,3 +465,118 @@ where
 
     d.deserialize_any(TypesVisitor)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn from_class_prefix_maps_known_types() {
+        assert_eq!(ServiceType::from_class_prefix("mail"),       Some(ServiceType::Mail));
+        assert_eq!(ServiceType::from_class_prefix("git"),        Some(ServiceType::Git));
+        assert_eq!(ServiceType::from_class_prefix("iam"),        Some(ServiceType::IamProvider));
+        assert_eq!(ServiceType::from_class_prefix("wiki"),       Some(ServiceType::Wiki));
+        assert_eq!(ServiceType::from_class_prefix("chat"),       Some(ServiceType::Chat));
+        assert_eq!(ServiceType::from_class_prefix("monitoring"), Some(ServiceType::Monitoring));
+        assert_eq!(ServiceType::from_class_prefix("tasks"),      Some(ServiceType::Tasks));
+        assert_eq!(ServiceType::from_class_prefix("collab"),     Some(ServiceType::Collab));
+    }
+
+    #[test]
+    fn from_class_prefix_returns_none_for_unknown() {
+        assert_eq!(ServiceType::from_class_prefix("proxy"),    None);
+        assert_eq!(ServiceType::from_class_prefix("database"), None);
+        assert_eq!(ServiceType::from_class_prefix("custom"),   None);
+        assert_eq!(ServiceType::from_class_prefix(""),         None);
+    }
+
+    #[test]
+    fn is_internal_for_database_and_cache() {
+        assert!(ServiceType::Database.is_internal());
+        assert!(ServiceType::Cache.is_internal());
+        assert!(!ServiceType::Git.is_internal());
+        assert!(!ServiceType::Mail.is_internal());
+        assert!(!ServiceType::Proxy.is_internal());
+    }
+
+    #[test]
+    fn is_iam_for_iam_variants() {
+        assert!(ServiceType::IamProvider.is_iam());
+        assert!(ServiceType::IamBroker.is_iam());
+        assert!(ServiceType::Iam.is_iam());
+        assert!(!ServiceType::Git.is_iam());
+        assert!(!ServiceType::Database.is_iam());
+    }
+
+    #[test]
+    fn is_proxy_for_proxy_only() {
+        assert!(ServiceType::Proxy.is_proxy());
+        assert!(!ServiceType::WebhosterSimple.is_proxy());
+        assert!(!ServiceType::Git.is_proxy());
+    }
+
+    #[test]
+    fn category_correct_per_type() {
+        assert_eq!(ServiceType::Git.category(),        "developer");
+        assert_eq!(ServiceType::Mail.category(),       "communication");
+        assert_eq!(ServiceType::Chat.category(),       "communication");
+        assert_eq!(ServiceType::Database.category(),   "infrastructure");
+        assert_eq!(ServiceType::Cache.category(),      "infrastructure");
+        assert_eq!(ServiceType::Proxy.category(),      "proxy");
+        assert_eq!(ServiceType::IamProvider.category(),"iam");
+        assert_eq!(ServiceType::Monitoring.category(), "monitoring");
+        assert_eq!(ServiceType::Custom.category(),     "custom");
+    }
+
+    #[test]
+    fn exported_contract_none_for_internal_types() {
+        assert!(ServiceType::Database.exported_contract().is_none());
+        assert!(ServiceType::Cache.exported_contract().is_none());
+        assert!(ServiceType::Proxy.exported_contract().is_none());
+        assert!(ServiceType::Bot.exported_contract().is_none());
+        assert!(ServiceType::Custom.exported_contract().is_none());
+    }
+
+    #[test]
+    fn exported_contract_resolves_four_vars() {
+        let contract = ServiceType::Mail.exported_contract().unwrap();
+        let vars = contract.resolve("stalwart", "mail.example.com", 25);
+        assert_eq!(vars["MAIL_HOST"],   "stalwart");
+        assert_eq!(vars["MAIL_DOMAIN"], "mail.example.com");
+        assert_eq!(vars["MAIL_URL"],    "https://mail.example.com");
+        assert_eq!(vars["MAIL_PORT"],   "25");
+    }
+
+    #[test]
+    fn exported_contract_prefix_for_git() {
+        let contract = ServiceType::Git.exported_contract().unwrap();
+        let vars = contract.resolve("forgejo", "git.example.com", 3000);
+        assert!(vars.contains_key("GIT_HOST"));
+        assert!(vars.contains_key("GIT_URL"));
+    }
+
+    #[test]
+    fn de_service_types_accepts_single_string() {
+        // Test via ServiceMeta TOML parsing (which uses de_service_types internally)
+        use crate::config::service::ServiceMeta;
+        let meta: ServiceMeta = toml::from_str(r#"
+name    = "test"
+version = "1.0"
+port    = 3000
+type    = "git"
+        "#).unwrap();
+        assert_eq!(meta.service_types, vec![ServiceType::Git]);
+    }
+
+    #[test]
+    fn de_service_types_accepts_array() {
+        use crate::config::service::ServiceMeta;
+        let meta: ServiceMeta = toml::from_str(r#"
+name    = "zentinel"
+version = "1.0"
+port    = 443
+types   = ["proxy", "webhoster_simple"]
+        "#).unwrap();
+        assert_eq!(meta.service_types, vec![ServiceType::Proxy, ServiceType::WebhosterSimple]);
+    }
+}

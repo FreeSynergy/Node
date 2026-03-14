@@ -120,3 +120,151 @@ pub fn network_path(network_name: &str) -> std::path::PathBuf {
         home, network_name
     ))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+    use indexmap::IndexMap;
+    use fsn_core::{
+        config::service::{
+            Constraints, ContainerDef, HealthCheck, ServiceClass, ServiceContract,
+            ServiceLoad, ServiceMeta, ServiceSetup, ServiceType,
+        },
+        state::desired::ServiceInstance,
+    };
+
+    fn make_instance(name: &str, with_healthcheck: bool) -> ServiceInstance {
+        ServiceInstance {
+            name: name.to_string(),
+            class_key: format!("git/{name}"),
+            class: ServiceClass {
+                meta: ServiceMeta {
+                    name: name.to_string(),
+                    alias: vec![],
+                    service_types: vec![ServiceType::Git],
+                    author: None,
+                    version: "1.0".to_string(),
+                    tags: vec![],
+                    description: None,
+                    website: None,
+                    repository: None,
+                    port: 3000,
+                    constraints: Constraints::default(),
+                    federation: None,
+                    health_path: Some("/health".to_string()),
+                    health_port: None,
+                    health_scheme: None,
+                    capabilities: vec![],
+                },
+                vars: IndexMap::default(),
+                load: ServiceLoad::default(),
+                container: ContainerDef {
+                    name: name.to_string(),
+                    image: "ghcr.io/forgejo/forgejo".to_string(),
+                    image_tag: "9".to_string(),
+                    networks: vec![],
+                    volumes: vec!["/data/forgejo:/data".to_string()],
+                    published_ports: vec![],
+                    healthcheck: if with_healthcheck {
+                        Some(HealthCheck {
+                            cmd: "curl -f http://localhost:3000/health".to_string(),
+                            interval: "30s".to_string(),
+                            timeout: "10s".to_string(),
+                            retries: 3,
+                            start_period: "60s".to_string(),
+                        })
+                    } else {
+                        None
+                    },
+                    user: Some("1000".to_string()),
+                    read_only: true,
+                    tmpfs: vec!["/tmp".to_string()],
+                    security_opt: vec![],
+                    ulimits: IndexMap::default(),
+                },
+                environment: IndexMap::default(),
+                setup: ServiceSetup::default(),
+                contract: ServiceContract::default(),
+                manifest: None,
+            },
+            service_types: vec![ServiceType::Git],
+            resolved_env: HashMap::new(),
+            service_domain: format!("{name}.example.com"),
+            alias_domains: vec![],
+            sub_services: vec![],
+            version: "1.0".to_string(),
+            resolved_volumes: vec!["/opt/data/forgejo:/data".to_string()],
+            capabilities: vec![],
+        }
+    }
+
+    #[test]
+    fn quadlet_contains_unit_section() {
+        let out = generate(&make_instance("forgejo", false), None).unwrap();
+        assert!(out.contains("[Unit]"));
+        assert!(out.contains("Description=FreeSynergy.Node – forgejo"));
+        assert!(out.contains("After=network-online.target"));
+    }
+
+    #[test]
+    fn quadlet_contains_container_fields() {
+        let out = generate(&make_instance("forgejo", false), None).unwrap();
+        assert!(out.contains("[Container]"));
+        assert!(out.contains("ContainerName=forgejo"));
+        assert!(out.contains("Image=ghcr.io/forgejo/forgejo:9"));
+        assert!(out.contains("User=1000"));
+        assert!(out.contains("ReadOnly=true"));
+    }
+
+    #[test]
+    fn quadlet_injects_project_network() {
+        let out = generate(&make_instance("forgejo", false), Some("fsn-myproject")).unwrap();
+        assert!(out.contains("Network=fsn-myproject.network"));
+    }
+
+    #[test]
+    fn quadlet_no_network_when_none() {
+        let out = generate(&make_instance("forgejo", false), None).unwrap();
+        assert!(!out.contains("Network="));
+    }
+
+    #[test]
+    fn quadlet_uses_resolved_volumes_over_class_volumes() {
+        let out = generate(&make_instance("forgejo", false), None).unwrap();
+        assert!(out.contains("Volume=/opt/data/forgejo:/data"));
+        assert!(!out.contains("Volume=/data/forgejo:/data"));
+    }
+
+    #[test]
+    fn quadlet_contains_healthcheck() {
+        let out = generate(&make_instance("forgejo", true), None).unwrap();
+        assert!(out.contains("HealthCmd=curl -f http://localhost:3000/health"));
+        assert!(out.contains("HealthInterval=30s"));
+        assert!(out.contains("HealthTimeout=10s"));
+        assert!(out.contains("HealthRetries=3"));
+        assert!(out.contains("HealthStartPeriod=60s"));
+    }
+
+    #[test]
+    fn quadlet_no_healthcheck_section_when_absent() {
+        let out = generate(&make_instance("forgejo", false), None).unwrap();
+        assert!(!out.contains("HealthCmd="));
+    }
+
+    #[test]
+    fn quadlet_contains_service_and_install_sections() {
+        let out = generate(&make_instance("forgejo", false), None).unwrap();
+        assert!(out.contains("[Service]"));
+        assert!(out.contains("Restart=on-failure"));
+        assert!(out.contains("[Install]"));
+        assert!(out.contains("WantedBy=default.target"));
+    }
+
+    #[test]
+    fn generate_network_contains_project_label() {
+        let out = generate_network("fsn-myproject", "myproject");
+        assert!(out.contains("[Network]"));
+        assert!(out.contains("Label=fsn.project=myproject"));
+    }
+}
