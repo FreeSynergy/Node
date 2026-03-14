@@ -136,29 +136,29 @@ Stand: 2026-03
 - [x] Docker-Compose → FSN-Modul Konverter (Stub)
 - [x] WASM-Plugin Template-Generator (Stub)
 - [x] i18n-Editor (Stub, Kategorie-Navigation)
-- [ ] Konverter: echte YAML-Parsing-Logik (fsn-wizard verdrahten)
-- [ ] AI-Erweiterung (optional): Natürlichsprache → Modul-Metadaten
+- [x] Konverter: echte YAML-Parsing-Logik (fsn-wizard verdrahten)
+- [x] AI-Erweiterung (optional): Natürlichsprache → Modul-Metadaten
 
 ### fsd-settings
 
 - [x] Appearance: Theme, Wallpaper, CSS (Stub)
 - [x] Language: Sprache wählen (Stub)
 - [x] Desktop: Taskbar-Position, Autostart (Stub)
-- [ ] Service Roles: welcher Container für welche Funktion (Logik fehlt)
+- [x] Service Roles: welcher Container für welche Funktion (Logik fehlt)
 - [ ] Accounts: OIDC-Accounts verwalten
 
 ### fsd-profile
 
 - [x] User-Profil (Stub)
-- [ ] User-Profil anzeigen + bearbeiten
+- [x] User-Profil anzeigen + bearbeiten
 - [ ] OIDC-Verbindungen
-- [ ] SSH-Keys verwalten
+- [x] SSH-Keys verwalten
 
 ### fsd-app (Einstiegspunkt)
 
 - [x] Shell laden (fsd-app startet Desktop)
 - [x] AppRegistry: alle Apps registrieren + Content in WindowFrame injizieren
-- [ ] Dioxus Multiwindow Setup
+- [x] Dioxus Multiwindow Setup
 
 ---
 
@@ -190,10 +190,10 @@ Stand: 2026-03
 
 ## Settings-System
 
-- [ ] Settings-Datenstruktur in fsn-core (AppSettings TOML)
-- [ ] Settings laden/speichern (`~/.config/fsn/settings.toml`)
-- [ ] Service Roles System implementieren (welcher Container = welcher Handler)
-- [ ] `[module.roles]` aus allen Modulen lesen + in Service-Role-Registry eintragen
+- [x] Settings-Datenstruktur in fsn-core (AppSettings TOML)
+- [x] Settings laden/speichern (`~/.config/fsn/settings.toml`)
+- [x] Service Roles System implementieren (welcher Container = welcher Handler)
+- [x] `[module.roles]` aus allen Modulen lesen + in Service-Role-Registry eintragen
 
 ---
 
