@@ -1,4 +1,5 @@
 pub mod clean;
+pub mod conductor;
 pub mod config;
 pub mod deploy;
 pub mod init;
@@ -8,6 +9,7 @@ pub mod restart;
 pub mod serve;
 pub mod server_setup;
 pub mod status;
+pub mod store;
 pub mod sync;
 pub mod tui;
 pub mod undeploy;

@@ -1,0 +1,27 @@
+# FreeSynergy.Node CLI — English translations
+
+[wizard]
+title           = "=== FreeSynergy.Node Setup Wizard ==="
+project-found   = "Existing project found: {path}"
+project-header  = "--- Project ---"
+module-header   = "--- Module selection ---"
+module-hint     = "Press 'y' to add a module, Enter to skip:"
+no-modules      = "(No modules selected)"
+modules-added   = "Added {n} module(s) to project.toml"
+config-header   = "--- Module configuration ---"
+vault-updated   = "vault.toml updated ({n} secret(s))."
+skeleton-created = "Project skeleton created in projects/{path}/"
+deploy-prompt   = "Deploy now?"
+deploying       = "Running fsn deploy ..."
+setup-complete  = "Setup complete. Run `fsn deploy` when ready."
+
+[status]
+no-services     = "No FSN-managed services found."
+header-service  = "SERVICE"
+header-state    = "STATE"
+
+[sync]
+up-to-date      = "✓ All services are up to date."
+to-deploy       = "To deploy ({n}):"
+to-update       = "To update ({n}):"
+to-remove       = "To remove ({n}):"

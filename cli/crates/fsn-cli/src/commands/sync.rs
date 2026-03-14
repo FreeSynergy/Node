@@ -21,20 +21,20 @@ pub async fn run(root: &Path, project: Option<&Path>) -> Result<()> {
     let diff      = compute_diff(&desired, &actual);
 
     if diff.is_empty() {
-        println!("✓ All services are up to date.");
+        println!("{}", fsn_i18n::t("sync.up-to-date"));
         return Ok(());
     }
 
     if !diff.to_deploy.is_empty() {
-        println!("To deploy ({}):", diff.to_deploy.len());
+        println!("{}", fsn_i18n::t_with("sync.to-deploy", &[("n", &diff.to_deploy.len().to_string())]));
         for m in &diff.to_deploy { println!("  + {}", m.name); }
     }
     if !diff.to_update.is_empty() {
-        println!("To update ({}):", diff.to_update.len());
+        println!("{}", fsn_i18n::t_with("sync.to-update", &[("n", &diff.to_update.len().to_string())]));
         for m in &diff.to_update { println!("  ~ {}", m.name); }
     }
     if !diff.to_remove.is_empty() {
-        println!("To remove ({}):", diff.to_remove.len());
+        println!("{}", fsn_i18n::t_with("sync.to-remove", &[("n", &diff.to_remove.len().to_string())]));
         for n in &diff.to_remove { println!("  - {}", n); }
     }
     Ok(())

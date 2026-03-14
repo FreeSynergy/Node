@@ -4,6 +4,10 @@ mod commands;
 use anyhow::Result;
 use tracing_subscriber::EnvFilter;
 
+// Bundled locale strings compiled into the binary for offline-first i18n.
+const LOCALE_EN: &str = include_str!("../locales/en/cli.toml");
+const LOCALE_DE: &str = include_str!("../locales/de/cli.toml");
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize tracing (controlled by RUST_LOG env var)
@@ -11,5 +15,27 @@ async fn main() -> Result<()> {
         .with_env_filter(EnvFilter::from_default_env())
         .init();
 
+    // Detect system language from LANG / LANGUAGE env vars; default to "en".
+    let lang = detect_lang();
+    let _ = fsn_i18n::init_with_toml_strs(&lang, &[("en", LOCALE_EN), ("de", LOCALE_DE)]);
+
     cli::run().await
+}
+
+/// Detect the active UI language from environment variables.
+///
+/// Reads `LANGUAGE`, `LANG`, or `LC_ALL` (in order of precedence) and
+/// extracts the ISO 639-1 two-letter code.  Defaults to `"en"`.
+fn detect_lang() -> String {
+    let raw = std::env::var("LANGUAGE")
+        .or_else(|_| std::env::var("LANG"))
+        .or_else(|_| std::env::var("LC_ALL"))
+        .unwrap_or_default();
+
+    // Take the first two characters of e.g. "de_DE.UTF-8" → "de"
+    let code = raw.split(['.', '_']).next().unwrap_or("en");
+    match code {
+        "de" => "de".to_string(),
+        _    => "en".to_string(),
+    }
 }

@@ -20,7 +20,7 @@ use fsn_core::config::{
 use fsn_deploy::setup::collect_requirements;
 
 pub async fn run(root: &Path) -> Result<()> {
-    println!("=== FreeSynergy.Node Setup Wizard ===\n");
+    println!("{}\n", fsn_i18n::t("wizard.title"));
 
     let (slug, proj_dir) = ensure_project_skeleton(root)?;
 
@@ -31,11 +31,11 @@ pub async fn run(root: &Path) -> Result<()> {
 
     collect_module_secrets(root, &proj_dir, &modules_dir)?;
 
-    if confirm("Deploy now?")? {
-        println!("\nRunning fsn deploy ...");
+    if confirm(&fsn_i18n::t("wizard.deploy-prompt"))? {
+        println!("\n{}", fsn_i18n::t("wizard.deploying"));
         super::deploy::run(root, None, None, None).await?;
     } else {
-        println!("\nSetup complete. Run `fsn deploy` when ready.");
+        println!("\n{}", fsn_i18n::t("wizard.setup-complete"));
     }
 
     Ok(())
@@ -48,11 +48,11 @@ fn ensure_project_skeleton(root: &Path) -> Result<(String, PathBuf)> {
         let stem = existing.file_stem().and_then(|s| s.to_str()).unwrap_or("project");
         let slug = stem.trim_end_matches(".project").to_string();
         let proj_dir = existing.parent().unwrap_or(root).to_path_buf();
-        println!("Existing project found: {}\n", existing.display());
+        println!("{}\n", fsn_i18n::t_with("wizard.project-found", &[("path", &existing.display().to_string())]));
         return Ok((slug, proj_dir));
     }
 
-    println!("--- Project ---");
+    println!("{}", fsn_i18n::t("wizard.project-header"));
     let project_name = prompt("Project name", None)?;
     let domain       = prompt("Primary domain (e.g. example.com)", None)?;
     let contact      = prompt("Contact / ACME email", None)?;
@@ -90,7 +90,7 @@ fn ensure_project_skeleton(root: &Path) -> Result<(String, PathBuf)> {
         std::fs::write(&vault_path, "# Secrets (vault_ prefix required)\n")?;
     }
 
-    println!("\nProject skeleton created in projects/{}/\n", slug);
+    println!("\n{}\n", fsn_i18n::t_with("wizard.skeleton-created", &[("path", &slug)]));
     Ok((slug, proj_dir))
 }
 
@@ -106,8 +106,8 @@ fn select_modules(_root: &Path, proj_dir: &Path, slug: &str, modules_dir: &Path)
         return Ok(());
     }
 
-    println!("--- Module selection ---");
-    println!("Press 'y' to add a module, Enter to skip:\n");
+    println!("{}", fsn_i18n::t("wizard.module-header"));
+    println!("{}\n", fsn_i18n::t("wizard.module-hint"));
 
     let mut selected: Vec<(String, String)> = Vec::new();
 
@@ -124,7 +124,7 @@ fn select_modules(_root: &Path, proj_dir: &Path, slug: &str, modules_dir: &Path)
     }
 
     if selected.is_empty() {
-        println!("(No modules selected)\n");
+        println!("{}\n", fsn_i18n::t("wizard.no-modules"));
         return Ok(());
     }
 
@@ -142,7 +142,7 @@ fn select_modules(_root: &Path, proj_dir: &Path, slug: &str, modules_dir: &Path)
     // Replace placeholder comment if present
     existing = existing.replace("# Added by wizard\n", &additions);
     std::fs::write(&proj_toml, existing)?;
-    println!("\nAdded {} module(s) to project.toml\n", selected.len());
+    println!("\n{}\n", fsn_i18n::t_with("wizard.modules-added", &[("n", &selected.len().to_string())]));
     Ok(())
 }
 
@@ -178,7 +178,7 @@ fn collect_module_secrets(root: &Path, proj_dir: &Path, modules_dir: &Path) -> R
         return Ok(());
     }
 
-    println!("--- Module configuration ---");
+    println!("{}", fsn_i18n::t("wizard.config-header"));
 
     let vault_path = proj_dir.join("vault.toml");
     // Load existing vault values to enable skip_if_set
@@ -247,7 +247,7 @@ fn collect_module_secrets(root: &Path, proj_dir: &Path, modules_dir: &Path) -> R
             content.push_str(&format!("{} = {:?}\n", k, v));
         }
         std::fs::write(&vault_path, content)?;
-        println!("vault.toml updated ({} secret(s)).", vault_values.len());
+        println!("{}", fsn_i18n::t_with("wizard.vault-updated", &[("n", &vault_values.len().to_string())]));
     }
 
     Ok(())

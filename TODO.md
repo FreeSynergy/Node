@@ -75,11 +75,11 @@ Stand: 2026-03
 
 ### fsn-cli
 
-- [ ] `fsn serve` implementieren (Web-UI, oder klar als "Öffnet Desktop" umschreiben)
-- [ ] `fsn tui` — entweder `fsd-conductor` starten (per `which fsd`) oder entfernen
-- [ ] `fsn store search/install/update` Subcommands hinzufügen (wenn fsn-store fertig)
-- [ ] `fsn conductor start/stop/logs` Subcommands hinzufügen
-- [ ] `generate_secret()` in `init.rs` → `/dev/urandom` oder `rand` crate (aktuell nano-Zeit PRNG, unsicher)
+- [x] `fsn serve` — redirected zu fsd mit Hinweis
+- [x] `fsn tui` — startet fsd-conductor → fsd (Fallback-Kette)
+- [x] `fsn store search/info/install/update` Subcommands (StoreClient verdrahtet)
+- [x] `fsn conductor list/start/stop/restart/logs` Subcommands (PodmanClient verdrahtet)
+- [x] `generate_secret()` nutzt rand crate (bereits sicher)
 
 ### fsn-wizard (fehlt komplett)
 
@@ -164,17 +164,15 @@ Stand: 2026-03
 
 ## i18n / Translations
 
-- [ ] `.ftl`-Dateien (Fluent-Format) anlegen für alle i18n-Schlüssel
-  - Aktuell: Store hat `.toml` Dateien, Code erwartet Fluent-Format
-  - Entweder: `.toml`-Format in fsn-i18n nativ supporten ODER alle Store-i18n zu `.ftl` migrieren
-- [ ] Schnipsel-Kategorien anlegen: `actions.ftl`, `nouns.ftl`, `status.ftl`, `errors.ftl`, `phrases.ftl`, `time.ftl`, `validation.ftl`, `help.ftl`
-- [ ] Deutsche Übersetzungen (de) für alle Keys
-- [ ] Englische Basis-Keys (en) als Fallback
-- [ ] Hardcoded Strings aus `fsn-cli` Commands in i18n-Keys migrieren
-  - `println!("=== FreeSynergy.Node Setup Wizard ===")` etc. in `init.rs`
-  - Status-Ausgaben in `status.rs`, `sync.rs`
-  - Fehlermeldungen in allen Commands
-- [ ] Store-i18n: 51 Sprachen sind angelegt aber Inhalte prüfen (sind alle vollständig?)
+- [x] `.toml`-Format in fsn-i18n nativ supporten (`add_toml_str`, `toml_maps`, TOML-Fallback in t/t_with)
+- [x] `init_with_toml_strs()` globale Funktion in fsn-i18n
+- [x] Schnipsel-Kategorien: `wizard`, `status`, `sync` in `cli/crates/fsn-cli/locales/`
+- [x] Deutsche Übersetzungen (de) für CLI-Keys — `locales/de/cli.toml`
+- [x] Englische Basis-Keys (en) — `locales/en/cli.toml`, im Binary gebündelt via `include_str!()`
+- [x] Hardcoded Strings migriert: `init.rs`, `status.rs`, `sync.rs`
+- [x] Language detection aus `LANGUAGE`/`LANG`/`LC_ALL` env vars in `main.rs`
+- [ ] Store-i18n: 51 Sprachen prüfen (Inhalte vollständig?)
+- [ ] Fehlermeldungen in allen Commands (deferred)
 
 ---
 

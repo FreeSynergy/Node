@@ -8,11 +8,11 @@ pub async fn run(_root: &Path, _project: Option<&Path>) -> Result<()> {
     let units = fsn_deploy::observe::list_fsn_units(&systemd).await?;
 
     if units.is_empty() {
-        println!("No FSN-managed services found.");
+        println!("{}", fsn_i18n::t("status.no-services"));
         return Ok(());
     }
 
-    println!("{:<30} {}", "SERVICE", "STATE");
+    println!("{:<30} {}", fsn_i18n::t("status.header-service"), fsn_i18n::t("status.header-state"));
     println!("{}", "─".repeat(42));
 
     for unit in &units {

@@ -116,11 +116,81 @@ pub enum Command {
     /// Open the terminal UI dashboard
     Tui,
 
+    /// Container management (start/stop/restart/logs/list)
+    Conductor {
+        #[command(subcommand)]
+        cmd: ConductorCommand,
+    },
+
+    /// Module store (search/info/install/update)
+    Store {
+        #[command(subcommand)]
+        cmd: StoreCommand,
+    },
+
     /// Server-level administration (run as root)
     Server {
         #[command(subcommand)]
         cmd: ServerCommand,
     },
+}
+
+#[derive(Subcommand)]
+pub enum ConductorCommand {
+    /// List all containers and their state
+    List {
+        /// Include stopped containers
+        #[arg(short, long)]
+        all: bool,
+    },
+    /// Start a container
+    Start {
+        /// Container name
+        service: String,
+    },
+    /// Stop a container
+    Stop {
+        /// Container name
+        service: String,
+    },
+    /// Restart a container
+    Restart {
+        /// Container name
+        service: String,
+    },
+    /// Show container logs
+    Logs {
+        /// Container name
+        service: String,
+        /// Follow log output (poll every second)
+        #[arg(short, long)]
+        follow: bool,
+        /// Number of lines to show
+        #[arg(short, long, default_value = "50")]
+        tail: u64,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum StoreCommand {
+    /// Search the module catalog
+    Search {
+        /// Search query (leave empty to list all)
+        #[arg(default_value = "")]
+        query: String,
+    },
+    /// Show details for a module
+    Info {
+        /// Module ID (e.g. "iam/kanidm")
+        id: String,
+    },
+    /// Show how to install a module
+    Install {
+        /// Module ID (e.g. "iam/kanidm")
+        id: String,
+    },
+    /// Check for available updates
+    Update,
 }
 
 #[derive(Subcommand)]
@@ -166,6 +236,19 @@ pub async fn run() -> Result<()> {
         Command::Serve { port, bind }      => commands::serve::run(&root, cli.project.as_deref(), &bind, port).await,
         Command::Init                      => commands::init::run(&root).await,
         Command::Tui                       => commands::tui::run(&root).await,
+        Command::Conductor { cmd }         => match cmd {
+            ConductorCommand::List { all }               => commands::conductor::list(all).await,
+            ConductorCommand::Start { service }          => commands::conductor::start(&service).await,
+            ConductorCommand::Stop { service }           => commands::conductor::stop(&service).await,
+            ConductorCommand::Restart { service }        => commands::conductor::restart(&service).await,
+            ConductorCommand::Logs { service, follow, tail } => commands::conductor::logs(&service, follow, tail).await,
+        },
+        Command::Store { cmd }             => match cmd {
+            StoreCommand::Search { query }  => commands::store::search(&query).await,
+            StoreCommand::Info { id }       => commands::store::info(&id).await,
+            StoreCommand::Install { id }    => commands::store::install(&id).await,
+            StoreCommand::Update            => commands::store::update_check().await,
+        },
         Command::Server { cmd }            => match cmd {
             ServerCommand::Setup           => commands::server_setup::run(&root).await,
         },
