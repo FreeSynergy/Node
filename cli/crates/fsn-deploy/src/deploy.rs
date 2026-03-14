@@ -32,6 +32,7 @@ use crate::generate::{env as gen_env, kdl as gen_kdl, quadlet as gen_quadlet};
 use crate::health;
 use crate::hooks::{self, HookContext};
 use crate::module_runner::{ContextBuilder, ModuleRunner};
+use crate::remote;
 
 /// Options for the deploy operation.
 #[derive(Debug, Clone)]
@@ -55,6 +56,9 @@ pub struct DeployOpts {
     /// command are invoked via the process plugin protocol.
     /// When absent, built-in generators are used as fallback.
     pub store_root: Option<PathBuf>,
+
+    /// When set, deploy to this remote host via SSH instead of running locally.
+    pub remote_host: Option<fsn_host::RemoteHost>,
 }
 
 impl DeployOpts {
@@ -66,12 +70,14 @@ impl DeployOpts {
             dry_run:        false,
             health_timeout: Duration::from_secs(120),
             store_root:     None,
+            remote_host:    None,
         }
     }
 }
 
 /// Deploy (or reconcile) the full desired state.
 /// Sub-modules are always started before their parents.
+/// When `opts.remote_host` is set, deploys via SSH instead of running locally.
 pub async fn deploy_all(
     desired:   &DesiredState,
     project:   &ProjectConfig,
@@ -80,6 +86,11 @@ pub async fn deploy_all(
     fsn_root:  &Path,
     data_root: &Path,
 ) -> Result<()> {
+    // Dispatch to remote path when a target host is configured
+    if let Some(host) = &opts.remote_host {
+        return remote::deploy_all_remote(desired, project, vault, opts, fsn_root, data_root, host).await;
+    }
+
     std::fs::create_dir_all(&opts.quadlet_dir)?;
     std::fs::create_dir_all(&opts.state_dir)?;
 

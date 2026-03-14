@@ -33,7 +33,7 @@ pub async fn run(root: &Path) -> Result<()> {
 
     if confirm("Deploy now?")? {
         println!("\nRunning fsn deploy ...");
-        super::deploy::run(root, None, None).await?;
+        super::deploy::run(root, None, None, None).await?;
     } else {
         println!("\nSetup complete. Run `fsn deploy` when ready.");
     }

@@ -13,12 +13,14 @@ use fsn_deploy::{
     observe::observe,
     resolve::resolve_desired,
 };
+use fsn_host::RemoteHost;
 use tracing::info;
 
 pub async fn run(
     root:       &Path,
     project:    Option<&Path>,
     service:    Option<&str>,
+    target_host: Option<&str>,
 ) -> Result<()> {
     // ── Load configs ──────────────────────────────────────────────────────────
     let project_path = find_project(root, project)
@@ -68,8 +70,14 @@ pub async fn run(
         desired
     };
 
-    // ── Deploy ────────────────────────────────────────────────────────────────
-    let opts = DeployOpts::default_for_user();
+    // ── Build DeployOpts (local or remote) ───────────────────────────────────
+    let mut opts = DeployOpts::default_for_user();
+
+    if let Some(host_name) = target_host {
+        let remote = find_remote_host(root, host_name)
+            .with_context(|| format!("Host '{host_name}' not found. Check your *.host.toml files."))?;
+        opts.remote_host = Some(remote);
+    }
 
     deploy_all(&deploy_desired, &proj, &vault, &opts, root, &data_root).await
         .context("Deploy failed")?;
@@ -119,4 +127,52 @@ pub(crate) fn find_host(root: &Path) -> Option<PathBuf> {
                 && name.ends_with(".host.toml")
                 && name != "example.host.toml"
         })
+}
+
+/// Find a RemoteHost config by name from any *.host.toml in the projects tree.
+/// The host name is matched against the `[host].name` field.
+fn find_remote_host(root: &Path, host_name: &str) -> Option<RemoteHost> {
+    let host_path = find_host_by_name(root, host_name)?;
+    let cfg = HostConfig::load(&host_path).ok()?;
+    let h = &cfg.host;
+    Some(RemoteHost {
+        name:         h.meta.name.clone(),
+        address:      h.addr().to_string(),
+        ssh_port:     h.ssh_port,
+        ssh_user:     h.ssh_user.clone(),
+        ssh_key_path: h.ssh_key_path.clone(),
+    })
+}
+
+fn find_host_by_name(root: &Path, name: &str) -> Option<PathBuf> {
+    let projects_dir = root.join("projects");
+    for proj_dir in std::fs::read_dir(&projects_dir).ok()?.flatten().filter(|e| e.path().is_dir()) {
+        for entry in std::fs::read_dir(proj_dir.path()).ok()?.flatten() {
+            let path = entry.path();
+            let fname = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            if fname.ends_with(".host.toml") && fname != "example.host.toml" {
+                if fname.starts_with(&format!("{name}.")) || fname == &format!("{name}.host.toml") {
+                    return Some(path);
+                }
+                // Also try loading and matching the host name field
+                if let Ok(h) = HostConfig::load(&path) {
+                    if h.host.name() == name {
+                        return Some(path);
+                    }
+                }
+            }
+        }
+    }
+    // Fallback: legacy hosts/ directory
+    let hosts = root.join("hosts");
+    for entry in std::fs::read_dir(&hosts).ok()?.flatten() {
+        let path = entry.path();
+        let fname = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+        if fname.ends_with(".host.toml") && fname != "example.host.toml" {
+            if fname.starts_with(&format!("{name}.")) {
+                return Some(path);
+            }
+        }
+    }
+    None
 }

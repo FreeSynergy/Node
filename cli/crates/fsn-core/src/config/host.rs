@@ -55,6 +55,9 @@ pub struct HostMeta {
     #[serde(default = "default_ssh_port")]
     pub ssh_port: u16,
 
+    /// Path to the SSH private key for deploy access (optional, falls back to ~/.ssh/id_ed25519).
+    pub ssh_key_path: Option<String>,
+
     // ── Legacy fields (kept for backward compat) ──────────────────────────────
 
     /// Legacy: IPv4 — prefer `address`.

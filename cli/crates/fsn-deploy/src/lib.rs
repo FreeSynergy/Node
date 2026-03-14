@@ -11,6 +11,7 @@ pub mod health;
 pub mod hooks;
 pub mod module_runner;
 pub mod observe;
+pub mod remote;
 pub mod resolve;
 pub mod setup;
 pub mod store;

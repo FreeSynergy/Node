@@ -36,6 +36,10 @@ pub enum Command {
         /// Deploy only this service instance (e.g. "forgejo")
         #[arg(long)]
         service: Option<String>,
+
+        /// Deploy to this remote host by name (must match a *.host.toml file)
+        #[arg(long)]
+        host: Option<String>,
     },
 
     /// Stop services without removing data
@@ -149,7 +153,7 @@ pub async fn run() -> Result<()> {
         .unwrap_or_else(|| PathBuf::from("."));
 
     match cli.command {
-        Command::Deploy { service }        => commands::deploy::run(&root, cli.project.as_deref(), service.as_deref()).await,
+        Command::Deploy { service, host }    => commands::deploy::run(&root, cli.project.as_deref(), service.as_deref(), host.as_deref()).await,
         Command::Undeploy { service }      => commands::undeploy::run(&root, cli.project.as_deref(), service.as_deref()).await,
         Command::Update { service }        => commands::update::run(&root, cli.project.as_deref(), service.as_deref()).await,
         Command::Restart { service }       => commands::restart::run(&root, cli.project.as_deref(), service.as_deref()).await,
