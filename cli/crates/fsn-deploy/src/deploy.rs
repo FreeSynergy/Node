@@ -25,7 +25,7 @@ use fsn_node_core::{
     config::{ProjectConfig, VaultConfig, service::ServiceType},
     state::desired::{DesiredState, ServiceInstance},
 };
-use fsn_container::SystemdManager;
+use fsn_container::SystemctlManager;
 use tracing::{info, warn};
 
 use crate::generate::{env as gen_env, kdl as gen_kdl, quadlet as gen_quadlet};
@@ -114,8 +114,9 @@ pub async fn deploy_all(
 
     // ── Phase 3: Reload systemd (once, after all files are on disk) ───────────
     info!("Reloading systemd user daemon…");
-    let systemd = SystemdManager::new();
+    let systemd = SystemctlManager::user();
     systemd.daemon_reload().await
+        .map_err(anyhow::Error::from)
         .with_context(|| "systemd daemon-reload failed")?;
 
     // ── Phase 4: Enable + start + health check (sub-modules first) ───────────
@@ -128,6 +129,7 @@ pub async fn deploy_all(
         // will fail with "unit is transient or generated". Best-effort only.
         let _ = systemd.enable(&unit).await;
         systemd.start(&unit).await
+            .map_err(anyhow::Error::from)
             .with_context(|| format!("starting {unit}"))?;
 
         health::wait_for_ready(instance, opts.health_timeout).await
@@ -161,7 +163,7 @@ pub async fn deploy_all(
 ///
 /// Returns the number of services that were undeployed.
 pub async fn undeploy_all(opts: &DeployOpts) -> Result<usize> {
-    let systemd = SystemdManager::new();
+    let systemd = SystemctlManager::user();
     let units = crate::observe::list_fsn_units(&systemd).await?;
     for unit in &units {
         let name = unit.trim_end_matches(".service");
@@ -173,7 +175,7 @@ pub async fn undeploy_all(opts: &DeployOpts) -> Result<usize> {
 /// Stop and remove a single service (keep data directories).
 pub async fn undeploy_instance(name: &str, opts: &DeployOpts) -> Result<()> {
     let unit = format!("{}.service", name);
-    let systemd = SystemdManager::new();
+    let systemd = SystemctlManager::user();
 
     // Best-effort stop/disable (may already be stopped)
     let _ = systemd.stop(&unit).await;
@@ -191,6 +193,7 @@ pub async fn undeploy_instance(name: &str, opts: &DeployOpts) -> Result<()> {
     if marker.exists() { std::fs::remove_file(marker)?; }
 
     systemd.daemon_reload().await
+        .map_err(anyhow::Error::from)
         .with_context(|| "systemd daemon-reload failed")?;
     info!("Removed {}", name);
     Ok(())

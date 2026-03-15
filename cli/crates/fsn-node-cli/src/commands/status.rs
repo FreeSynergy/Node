@@ -1,10 +1,10 @@
 use std::path::Path;
 use anyhow::Result;
-use fsn_container::SystemdManager;
+use fsn_container::SystemctlManager;
 
 /// Print the systemd state of all FSN-managed services.
 pub async fn run(_root: &Path, _project: Option<&Path>) -> Result<()> {
-    let systemd = SystemdManager::new();
+    let systemd = SystemctlManager::user();
     let units = fsn_deploy::observe::list_fsn_units(&systemd).await?;
 
     if units.is_empty() {
@@ -17,7 +17,7 @@ pub async fn run(_root: &Path, _project: Option<&Path>) -> Result<()> {
 
     for unit in &units {
         let name = unit.trim_end_matches(".service");
-        let state = match systemd.status(unit).await {
+        let state = match systemd.service_status(unit).await {
             Ok(s)  => s.active_state.to_string(),
             Err(_) => "error".to_string(),
         };

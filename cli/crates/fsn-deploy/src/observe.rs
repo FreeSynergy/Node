@@ -2,12 +2,12 @@
 // Replaces sync-stack.yml
 
 use anyhow::Result;
-use fsn_container::{SystemdManager, UnitActiveState};
+use fsn_container::{SystemctlManager, UnitActiveState};
 use fsn_node_core::state::{ActualState, HealthStatus, RunState, ServiceStatus};
 
 /// Query the current state of all FSN-managed services on this host.
 pub async fn observe() -> Result<ActualState> {
-    let systemd = SystemdManager::new();
+    let systemd = SystemctlManager::user();
     let unit_names = list_fsn_units(&systemd).await?;
 
     let mut services = Vec::with_capacity(unit_names.len());
@@ -15,7 +15,7 @@ pub async fn observe() -> Result<ActualState> {
         // Strip ".service" suffix to get the instance name.
         let name = unit.trim_end_matches(".service").to_string();
 
-        let run_state = match systemd.status(unit).await {
+        let run_state = match systemd.service_status(unit).await {
             Ok(s) => match s.active_state {
                 UnitActiveState::Active                => RunState::Running,
                 UnitActiveState::Inactive
@@ -42,7 +42,7 @@ pub async fn observe() -> Result<ActualState> {
 /// List all active FSN-managed user units (units loaded by systemd --user).
 ///
 /// Returns only `.service` units — same behaviour as the old `fsn_podman::systemd::list_fsn_units`.
-pub async fn list_fsn_units(systemd: &SystemdManager) -> Result<Vec<String>> {
+pub async fn list_fsn_units(systemd: &SystemctlManager) -> Result<Vec<String>> {
     let output = tokio::process::Command::new("systemctl")
         .args(["--user", "--type=service", "--state=loaded", "--plain", "--no-legend", "--no-pager"])
         .output()

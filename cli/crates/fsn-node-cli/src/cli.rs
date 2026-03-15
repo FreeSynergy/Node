@@ -133,6 +133,34 @@ pub enum Command {
         #[command(subcommand)]
         cmd: ServerCommand,
     },
+
+    /// Install a package from the store into the current project
+    Install {
+        /// Package ID (e.g. "git/forgejo")
+        package: String,
+        /// Preview without applying changes
+        #[arg(long)]
+        dry_run: bool,
+    },
+
+    /// Export all project configuration to a portable TOML bundle
+    Export {
+        /// Output file path
+        #[arg(long, short)]
+        output: std::path::PathBuf,
+    },
+
+    /// Import project configuration from a TOML bundle
+    Import {
+        /// Input bundle file
+        input: std::path::PathBuf,
+    },
+
+    /// Show the dependency graph for a service
+    Deps {
+        /// Service instance name (as declared in the project config)
+        service: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -254,6 +282,18 @@ pub async fn run() -> Result<()> {
         },
         Command::Server { cmd }            => match cmd {
             ServerCommand::Setup           => commands::server_setup::run(&root).await,
+        },
+        Command::Install { package, dry_run } => {
+            commands::install::run(&root, &package, dry_run).await
+        },
+        Command::Export { output } => {
+            commands::export_import::export(&root, cli.project.as_deref(), &output).await
+        },
+        Command::Import { input } => {
+            commands::export_import::import(&root, &input).await
+        },
+        Command::Deps { service } => {
+            commands::deps::run(&root, cli.project.as_deref(), &service).await
         },
     }
 }

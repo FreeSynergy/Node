@@ -1,100 +1,142 @@
-// `fsn conductor` — container management via the Podman socket.
+// `fsn conductor` — container management via systemctl + podman CLI.
 //
-// Wraps PodmanClient (fsn-container) in a Conductor facade so that every
-// operation shares a single client instance instead of constructing one
-// per function call.
+// Uses SystemctlManager (fsn-container) for systemd unit operations and
+// invokes `podman` as a subprocess for container-level queries.
 //
 // For a graphical view, use `fsn tui` (opens fsd-conductor).
 
 use anyhow::{bail, Result};
-use fsn_container::PodmanClient;
-use tokio::time::{sleep, Duration};
+use fsn_container::SystemctlManager;
 
 // ── Conductor (Facade) ────────────────────────────────────────────────────────
 
-/// Facade over PodmanClient for direct container management from the CLI.
+/// Facade over SystemctlManager for direct container management from the CLI.
 pub struct Conductor {
-    client: PodmanClient,
+    systemd: SystemctlManager,
 }
 
 impl Conductor {
+    /// Create a new `Conductor` using the user systemd session.
     pub fn new() -> Result<Self> {
-        Ok(Self { client: PodmanClient::new()? })
+        Ok(Self { systemd: SystemctlManager::user() })
     }
 
     // ── start ─────────────────────────────────────────────────────────────────
 
-    /// Start a stopped container by name.
+    /// Start a stopped service by name.
     pub async fn start(&self, service: &str) -> Result<()> {
-        self.client.start(service).await?;
+        let unit = unit_name(service);
+        self.systemd.start(&unit).await.map_err(anyhow::Error::from)?;
         println!("Started: {service}");
         Ok(())
     }
 
     // ── stop ──────────────────────────────────────────────────────────────────
 
-    /// Stop a running container by name.
+    /// Stop a running service by name.
     pub async fn stop(&self, service: &str) -> Result<()> {
-        self.client.stop(service, None).await?;
+        let unit = unit_name(service);
+        self.systemd.stop(&unit).await.map_err(anyhow::Error::from)?;
         println!("Stopped: {service}");
         Ok(())
     }
 
     // ── restart ───────────────────────────────────────────────────────────────
 
-    /// Restart a container by name.
+    /// Restart a service by name.
     pub async fn restart(&self, service: &str) -> Result<()> {
-        self.client.restart(service).await?;
+        let unit = unit_name(service);
+        self.systemd.restart(&unit).await.map_err(anyhow::Error::from)?;
         println!("Restarted: {service}");
         Ok(())
     }
 
     // ── logs ──────────────────────────────────────────────────────────────────
 
-    /// Print recent log lines for a container.
+    /// Print recent log lines for a container via `podman logs`.
     ///
-    /// When `follow` is `true`, polls for new lines every second until interrupted.
+    /// When `follow` is `true`, passes `--follow` to podman.
     pub async fn logs(&self, service: &str, follow: bool, tail: u64) -> Result<()> {
-        if self.client.inspect(service).await?.is_none() {
+        let container_name = service;
+        let exists = podman_container_exists(container_name).await?;
+        if !exists {
             bail!("container not found: {service}");
         }
 
         if !follow {
-            let lines = self.client.logs(service, Some(tail)).await?;
-            for line in lines {
-                println!("{line}");
-            }
+            let output = tokio::process::Command::new("podman")
+                .args(["logs", "--tail", &tail.to_string(), container_name])
+                .output()
+                .await?;
+            let text = String::from_utf8_lossy(&output.stdout);
+            let err  = String::from_utf8_lossy(&output.stderr);
+            print!("{}{}", text, err);
             return Ok(());
         }
 
-        // Follow mode: print initial batch then poll for new lines.
-        let mut printed = 0usize;
-        loop {
-            let lines = self.client.logs(service, Some(tail.max(printed as u64 + 1))).await?;
-            for line in lines.iter().skip(printed) {
-                println!("{line}");
-            }
-            printed = lines.len();
-            sleep(Duration::from_secs(1)).await;
-        }
+        // Follow mode: run podman logs --follow (blocks until Ctrl-C)
+        let mut child = tokio::process::Command::new("podman")
+            .args(["logs", "--follow", "--tail", &tail.to_string(), container_name])
+            .spawn()?;
+        child.wait().await?;
+        Ok(())
     }
 
     // ── list ──────────────────────────────────────────────────────────────────
 
-    /// List all containers with their current state.
-    pub async fn list(&self, all: bool) -> Result<()> {
-        let containers = self.client.list(all).await?;
+    /// List all FSN-managed services with their current state.
+    pub async fn list(&self, _all: bool) -> Result<()> {
+        let output = tokio::process::Command::new("systemctl")
+            .args([
+                "--user", "--type=service",
+                "--plain", "--no-legend", "--no-pager",
+                "--state=loaded",
+            ])
+            .output()
+            .await?;
 
-        if containers.is_empty() {
-            println!("No containers found.");
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let units: Vec<&str> = stdout
+            .lines()
+            .filter(|l| l.contains("fsn-"))
+            .collect();
+
+        if units.is_empty() {
+            println!("No FSN-managed services found.");
             return Ok(());
         }
 
-        println!("{:<30} {:<12} {}", "NAME", "STATE", "IMAGE");
-        println!("{}", "─".repeat(72));
-        for c in &containers {
-            println!("{:<30} {:<12} {}", c.name, c.state, c.image);
+        println!("{:<32} {:<12} {}", "SERVICE", "ACTIVE", "SUB");
+        println!("{}", "─".repeat(60));
+        for line in units {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() >= 3 {
+                let name   = parts[0].trim_end_matches(".service");
+                let active = parts.get(2).copied().unwrap_or("-");
+                let sub    = parts.get(3).copied().unwrap_or("-");
+                println!("{:<32} {:<12} {}", name, active, sub);
+            }
         }
         Ok(())
     }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/// Convert a service name to a systemd unit name.
+fn unit_name(service: &str) -> String {
+    if service.ends_with(".service") {
+        service.to_string()
+    } else {
+        format!("{}.service", service)
+    }
+}
+
+/// Returns `true` if a podman container with the given name exists.
+async fn podman_container_exists(name: &str) -> Result<bool> {
+    let output = tokio::process::Command::new("podman")
+        .args(["container", "exists", name])
+        .output()
+        .await?;
+    Ok(output.status.success())
 }
