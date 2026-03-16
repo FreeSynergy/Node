@@ -7,7 +7,6 @@
 use anyhow::{Context, Result};
 use fsn_node_core::store::StoreEntry;
 use fsn_store::StoreClient;
-use toml;
 
 // Schema version bundled with this binary — must match Lib's sync_snippets.py SCHEMA_VERSION.
 const BUNDLED_SCHEMA_VERSION: &str = "1.0.0";
@@ -123,47 +122,23 @@ pub async fn update_check() -> Result<()> {
 
 // ── i18n ───────────────────────────────────────────────────────────────────────
 
-/// One entry from `[[languages]]` in the store's `catalog/i18n.toml`.
-#[derive(serde::Deserialize)]
-struct I18nCatalogEntry {
-    code:           String,
-    name:           String,
-    #[serde(default)]
-    completeness:   u8,
-    #[serde(default)]
-    schema_version: String,
-    // file / sha256 / size are used by the updater, not displayed here
-}
-
-#[derive(serde::Deserialize)]
-struct I18nCatalog {
-    #[serde(default, rename = "languages")]
-    languages: Vec<I18nCatalogEntry>,
-}
-
 /// Show all available language packs from the store catalog with completeness.
+///
+/// Reads `[[locales]]` from the main Node `catalog.toml`.
 pub async fn i18n_status() -> Result<()> {
-    let client = StoreClient::node_store();
-    let raw = client
-        .fetch_raw("Node/catalog/i18n.toml")
-        .await
-        .context("fetching i18n catalog")?;
-    let catalog: I18nCatalog = toml::from_str(&raw).context("parsing i18n catalog")?;
+    let catalog = fetch_node_catalog().await?;
 
-    if catalog.languages.is_empty() {
-        println!("No language packs available in the store yet.");
+    if catalog.locales.is_empty() {
+        println!("No language packs listed in the store catalog.");
         return Ok(());
     }
 
-    println!("{:<6} {:<24} {:>5}  {:<8} {}", "CODE", "LANGUAGE", "COMP%", "SCHEMA", "");
-    println!("{}", "─".repeat(58));
-    for e in &catalog.languages {
-        let ok = e.schema_version.is_empty() || e.schema_version == BUNDLED_SCHEMA_VERSION;
-        let marker = if ok { "✓" } else { "⚠ outdated" };
-        let schema = if e.schema_version.is_empty() { BUNDLED_SCHEMA_VERSION } else { &e.schema_version };
-        println!("{:<6} {:<24} {:>4}%  {:<8} {}", e.code, e.name, e.completeness, schema, marker);
+    println!("{:<6} {:<24} {:>5}  {}", "CODE", "LANGUAGE", "COMP%", "DIR");
+    println!("{}", "─".repeat(46));
+    for loc in &catalog.locales {
+        println!("{:<6} {:<24} {:>4}%  {}", loc.code, loc.name, loc.completeness, loc.direction);
     }
-    println!("\nRequired schema: {BUNDLED_SCHEMA_VERSION}  (⚠ = needs update, run `fsn store i18n set <code>`)");
+    println!("\n{} language packs available.", catalog.locales.len());
     Ok(())
 }
 
