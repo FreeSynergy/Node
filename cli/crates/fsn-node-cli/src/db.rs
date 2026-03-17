@@ -1,7 +1,9 @@
 // Database lifecycle management for the FSN CLI.
 //
-// Initializes a SQLite database at ~/.local/share/fsn/fsn.db, runs migrations,
-// and provides a write buffer for async audit persistence.
+// Initializes all Node-side SQLite databases at startup:
+//   fsn.db       — audit log + core migrations (fsn-db Migrator)
+//   fsn-core.db  — hosts, projects, invitations, federation
+//   fsn-bus.db   — event log, subscriptions, routing rules, standing orders
 
 use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
@@ -14,18 +16,18 @@ use tracing::warn;
 static DB: OnceLock<Arc<DbConnection>> = OnceLock::new();
 static WRITE_BUF: OnceLock<Arc<WriteBuffer>> = OnceLock::new();
 
-/// Path to the FSN SQLite database (`~/.local/share/fsn/fsn.db`).
-pub fn db_path() -> PathBuf {
+/// Path to an FSN SQLite database under `~/.local/share/fsn/`.
+pub fn db_path(filename: &str) -> PathBuf {
     let home = std::env::var("HOME").unwrap_or_else(|_| "/root".to_string());
-    PathBuf::from(home).join(".local/share/fsn/fsn.db")
+    PathBuf::from(home).join(".local/share/fsn").join(filename)
 }
 
-/// Initialize the database: connect, run migrations, set up write buffer.
+/// Initialize all Node databases: connect, run migrations, set up write buffer.
 ///
 /// Call once at startup. Non-fatal — the CLI continues without persistence
 /// if DB init fails (e.g. permission error, missing SQLite).
 pub async fn init() -> Result<()> {
-    let path = db_path();
+    let path = db_path("fsn.db");
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
             .with_context(|| format!("creating DB directory {}", parent.display()))?;
@@ -44,6 +46,11 @@ pub async fn init() -> Result<()> {
     let buf = WriteBuffer::with_defaults(conn.inner().clone());
     WRITE_BUF.set(Arc::new(buf)).ok();
     DB.set(Arc::new(conn)).ok();
+
+    // Initialize the two additional Node databases.
+    if let Err(e) = init_core_db().await { warn!("fsn-core.db init failed: {e}"); }
+    if let Err(e) = init_bus_db().await  { warn!("fsn-bus.db init failed: {e}");  }
+
     Ok(())
 }
 
@@ -92,4 +99,121 @@ pub async fn flush() {
             warn!("final DB flush failed: {e}");
         }
     }
+}
+
+// ── Additional Node databases ─────────────────────────────────────────────────
+
+const CORE_SCHEMA: &str = r#"
+CREATE TABLE IF NOT EXISTS hosts (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT    NOT NULL UNIQUE,
+    domain      TEXT    NOT NULL,
+    ip_address  TEXT,
+    ssh_port    INTEGER NOT NULL DEFAULT 22,
+    status      TEXT    NOT NULL DEFAULT 'unknown',
+    project_id  INTEGER,
+    notes       TEXT,
+    created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+    updated_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS projects (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT    NOT NULL UNIQUE,
+    domain      TEXT,
+    status      TEXT    NOT NULL DEFAULT 'draft',
+    description TEXT,
+    created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS invitations (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    token           TEXT    NOT NULL UNIQUE,
+    project_id      INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    role            TEXT    NOT NULL DEFAULT 'member',
+    encrypted_toml  TEXT,
+    port            INTEGER,
+    expires_at      TEXT,
+    used_at         TEXT,
+    created_at      TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS federation_peers (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT    NOT NULL,
+    domain      TEXT    NOT NULL UNIQUE,
+    auth_broker TEXT,
+    status      TEXT    NOT NULL DEFAULT 'pending',
+    joined_at   TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS federation_rights (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    peer_id   INTEGER NOT NULL REFERENCES federation_peers(id) ON DELETE CASCADE,
+    direction TEXT    NOT NULL,
+    right     TEXT    NOT NULL,
+    scope     TEXT    NOT NULL DEFAULT '*'
+)
+"#;
+
+const BUS_SCHEMA: &str = r#"
+CREATE TABLE IF NOT EXISTS event_log (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id     TEXT    NOT NULL UNIQUE,
+    topic        TEXT    NOT NULL,
+    source_role  TEXT    NOT NULL,
+    source_inst  TEXT,
+    payload_json TEXT    NOT NULL DEFAULT '{}',
+    delivery     TEXT    NOT NULL DEFAULT 'fire-and-forget',
+    storage      TEXT    NOT NULL DEFAULT 'no-store',
+    acked_at     TEXT,
+    created_at   TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_event_log_topic  ON event_log (topic);
+CREATE INDEX IF NOT EXISTS idx_event_log_source ON event_log (source_role);
+CREATE TABLE IF NOT EXISTS subscriptions (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    subscriber_role TEXT    NOT NULL,
+    topic_filter    TEXT    NOT NULL,
+    inst_tag        TEXT,
+    granted_read    INTEGER NOT NULL DEFAULT 1,
+    created_at      TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_subs_role ON subscriptions (subscriber_role);
+CREATE TABLE IF NOT EXISTS routing_rules (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    name          TEXT    NOT NULL,
+    topic_pattern TEXT    NOT NULL,
+    source_role   TEXT,
+    delivery      TEXT    NOT NULL DEFAULT 'fire-and-forget',
+    storage       TEXT    NOT NULL DEFAULT 'no-store',
+    priority      INTEGER NOT NULL DEFAULT 0,
+    enabled       INTEGER NOT NULL DEFAULT 1
+);
+CREATE TABLE IF NOT EXISTS standing_orders (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    name          TEXT    NOT NULL,
+    trigger_role  TEXT    NOT NULL,
+    topic         TEXT    NOT NULL,
+    payload_json  TEXT    NOT NULL DEFAULT '{}',
+    enabled       INTEGER NOT NULL DEFAULT 1,
+    created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+)
+"#;
+
+async fn init_core_db() -> anyhow::Result<()> {
+    open_and_apply_schema("fsn-core.db", CORE_SCHEMA).await
+}
+
+async fn init_bus_db() -> anyhow::Result<()> {
+    open_and_apply_schema("fsn-bus.db", BUS_SCHEMA).await
+}
+
+async fn open_and_apply_schema(filename: &str, schema: &str) -> anyhow::Result<()> {
+    let path = db_path(filename);
+    let conn = DbConnection::connect(DbBackend::Sqlite {
+        path: path.to_string_lossy().into_owned(),
+    })
+    .await
+    .map_err(|e| anyhow::anyhow!("{filename} connect: {e}"))?;
+
+    conn.apply_schema(schema)
+        .await
+        .map_err(|e| anyhow::anyhow!("{filename} schema: {e}"))
 }
