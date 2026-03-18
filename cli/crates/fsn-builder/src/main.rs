@@ -12,6 +12,7 @@ mod analyze;
 mod fetch_icon;
 mod publish;
 mod validate;
+mod validate_store;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -54,6 +55,15 @@ enum Command {
         #[arg(long, default_value = "git@github.com:FreeSynergy/Store.git")]
         store: String,
     },
+    /// Validate all packages in a store catalog (checks paths, icons, required fields).
+    ValidateStore {
+        /// Path to the local Store repository root.
+        #[arg(value_name = "STORE_DIR")]
+        store_dir: std::path::PathBuf,
+        /// Namespace to validate (e.g. "node").
+        #[arg(value_name = "NAMESPACE", default_value = "node")]
+        namespace: String,
+    },
     /// Download an SVG icon and store it in the Store repo.
     ///
     /// Sources:
@@ -83,10 +93,11 @@ async fn main() -> Result<()> {
 
     let cli = Cli::parse();
     match cli.command {
-        Command::Analyze { path, format }              => analyze::run(&path, &format),
-        Command::Validate { path }                     => validate::run(&path),
-        Command::Publish { path, store }               => publish::run(&path, &store),
-        Command::FetchIcon { source, name, store_dir } =>
+        Command::Analyze { path, format }                   => analyze::run(&path, &format),
+        Command::Validate { path }                          => validate::run(&path),
+        Command::Publish { path, store }                    => publish::run(&path, &store),
+        Command::ValidateStore { store_dir, namespace }     => validate_store::run(&store_dir, &namespace),
+        Command::FetchIcon { source, name, store_dir }      =>
             fetch_icon::run(&source, &name, &store_dir).await,
     }
 }
