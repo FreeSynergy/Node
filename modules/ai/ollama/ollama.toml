@@ -1,0 +1,80 @@
+[module]
+name        = "ollama"
+alias       = ["llm"]
+type        = "ai"
+author      = "FreeSynergy.Node"
+version     = "0.0.1"
+tags        = ["ai", "llm", "inference", "ollama", "local-ai"]
+description = "Ollama local LLM inference server"
+website     = "https://ollama.com"
+repository  = "https://github.com/ollama/ollama"
+port        = 11434
+health_path = "/"
+health_port = 11434
+
+[module.constraints]
+# Only one Ollama instance per host makes sense unless GPU isolation is used.
+per_host = 1
+
+[vars]
+config_dir = "{{ project_root }}/data/{{ instance_name }}"
+models_dir = "{{ module_vars.config_dir }}/models"
+
+[load.modules]
+[load.services]
+
+[container]
+name      = "{{ instance_name }}"
+image     = "docker.io/ollama/ollama"
+image_tag = "latest"
+volumes   = ["{{ module_vars.models_dir }}:/root/.ollama:Z"]
+
+[container.healthcheck]
+cmd          = "curl -fsS http://localhost:11434/ || exit 1"
+interval     = "30s"
+timeout      = "5s"
+retries      = 3
+start_period = "60s"
+
+[environment]
+# Set OLLAMA_HOST to bind on all interfaces so the proxy can reach it.
+OLLAMA_HOST    = "0.0.0.0:11434"
+# Optional: set to "1" to keep models loaded even when idle (uses more RAM).
+OLLAMA_KEEP_ALIVE = "5m"
+# Optional: limit to a specific GPU (e.g. "0" for the first GPU).
+# NVIDIA_VISIBLE_DEVICES = "all"
+
+[setup]
+
+[[setup.fields]]
+key         = "project_root"
+label       = "Data Directory"
+description = "Base path where service data (downloaded models) is stored"
+field_type  = "string"
+default     = "/srv/fsn"
+skip_if_set = true
+
+[[setup.fields]]
+key         = "service_domain"
+label       = "Domain"
+description = "Domain Ollama is reachable at via the proxy, e.g. ai.example.com"
+field_type  = "string"
+default     = ""
+skip_if_set = true
+
+[[setup.fields]]
+key         = "ollama_keep_alive"
+label       = "Keep-Alive Duration"
+description = "How long to keep models loaded after last request (e.g. 5m, 1h, -1 = always)"
+field_type  = "string"
+default     = "5m"
+skip_if_set = false
+
+[contract]
+upstream_tls = false
+
+[[contract.routes]]
+id          = "api"
+path        = "/"
+strip       = false
+description = "Ollama REST API (generate, chat, pull, list)"

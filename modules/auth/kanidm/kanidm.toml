@@ -9,7 +9,7 @@ description = "Kanidm identity management server"
 website     = "https://kanidm.com"
 repository  = "https://github.com/kanidm/kanidm"
 port        = 8443
-health_path   = "/"
+health_path   = "/status"
 health_port   = 8443
 health_scheme = "https"
 
@@ -42,14 +42,30 @@ retries      = 3
 start_period = "30s"
 
 [environment]
-
-# No required secrets for kanidm – admin setup is done via kanidmd CLI on first start.
-# Use [[setup.fields]] if you add custom vault_ vars in your instance config.
+# No required environment variables for kanidm.
+# Initial admin setup is done via `kanidmd recover-account idm_admin` on first run.
 
 [setup]
 
+[[setup.fields]]
+key         = "service_domain"
+label       = "Domain"
+description = "The domain Kanidm is reachable at, e.g. auth.example.com"
+field_type  = "string"
+default     = ""
+skip_if_set = true
+
+[[setup.fields]]
+key         = "project_root"
+label       = "Data Directory"
+description = "Base path where service data is stored, e.g. /srv/fsn or /home/user/fsn"
+field_type  = "string"
+default     = "/srv/fsn"
+skip_if_set = true
+
 [contract]
 upstream_tls = true
+
 [[contract.routes]]
 id          = "main"
 path        = "/"
