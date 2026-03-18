@@ -195,7 +195,7 @@ async fn handle_i18n(
 
 async fn fetch_catalog() -> Result<fsn_store::Catalog<StoreEntry>> {
     let mut client = StoreClient::node_store();
-    client.fetch_catalog("Node", false).await.map_err(anyhow::Error::from)
+    client.fetch_catalog("node", false).await.map_err(anyhow::Error::from)
 }
 
 fn entry_to_json(e: &StoreEntry) -> serde_json::Value {

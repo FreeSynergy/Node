@@ -1,10 +1,10 @@
-// Integration test: parse all modules from the Node.Store.
+// Integration test: parse all modules from the Store.
 //
-// Loads every .toml in FreeSynergy.Node.Store/Node/modules/ via ServiceRegistry
+// Loads every .toml in FreeSynergy.Store/node/modules/ via ServiceRegistry
 // and asserts that key modules are present and well-formed.
 //
 // The test is skipped gracefully when the store directory does not exist
-// (e.g. in CI without a checked-out Node.Store repo).
+// (e.g. in CI without a checked-out Store repo).
 
 use std::path::PathBuf;
 
@@ -12,16 +12,16 @@ use fsn_node_core::config::registry::ServiceRegistry;
 
 fn store_modules_dir() -> PathBuf {
     // From cli/crates/fsn-core/ go up 4 levels → /home/kal/Server/
-    // then into FreeSynergy.Node.Store/Node/modules/
+    // then into FreeSynergy.Store/node/modules/
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../../FreeSynergy.Node.Store/Node/modules")
+        .join("../../../../FreeSynergy.Store/node/modules")
 }
 
 #[test]
 fn all_store_modules_parse_without_error() {
     let dir = store_modules_dir();
     if !dir.exists() {
-        eprintln!("SKIP: Node.Store not found at {}", dir.display());
+        eprintln!("SKIP: Store not found at {}", dir.display());
         return;
     }
 
@@ -36,7 +36,7 @@ fn all_store_modules_parse_without_error() {
 fn expected_modules_are_present() {
     let dir = store_modules_dir();
     if !dir.exists() {
-        eprintln!("SKIP: Node.Store not found at {}", dir.display());
+        eprintln!("SKIP: Store not found at {}", dir.display());
         return;
     }
 
@@ -66,7 +66,7 @@ fn expected_modules_are_present() {
 fn all_modules_have_container_image() {
     let dir = store_modules_dir();
     if !dir.exists() {
-        eprintln!("SKIP: Node.Store not found at {}", dir.display());
+        eprintln!("SKIP: Store not found at {}", dir.display());
         return;
     }
 
@@ -88,7 +88,7 @@ fn all_modules_have_container_image() {
 fn all_modules_have_healthcheck() {
     let dir = store_modules_dir();
     if !dir.exists() {
-        eprintln!("SKIP: Node.Store not found at {}", dir.display());
+        eprintln!("SKIP: Store not found at {}", dir.display());
         return;
     }
 
@@ -106,7 +106,7 @@ fn all_modules_have_healthcheck() {
 fn plugin_dns_and_acme_plugins_parse() {
     let dir = store_modules_dir();
     if !dir.exists() {
-        eprintln!("SKIP: Node.Store not found at {}", dir.display());
+        eprintln!("SKIP: Store not found at {}", dir.display());
         return;
     }
 

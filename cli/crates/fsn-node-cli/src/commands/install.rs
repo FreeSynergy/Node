@@ -24,7 +24,7 @@ pub async fn run(root: &Path, package: &str, dry_run: bool) -> Result<()> {
     // 1. Fetch store catalog.
     let mut client = StoreClient::node_store();
     let catalog: fsn_store::Catalog<StoreEntry> = client
-        .fetch_catalog("Node", false)
+        .fetch_catalog("node", false)
         .await
         .map_err(anyhow::Error::from)
         .context("fetching module catalog")?;

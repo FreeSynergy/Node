@@ -90,7 +90,7 @@ impl StoreClient {
             };
 
             let mut client = SdkClient::new(source);
-            match client.fetch_catalog::<StoreEntry>("Node", false).await {
+            match client.fetch_catalog::<StoreEntry>("node", false).await {
                 Ok(catalog) => {
                     for mut entry in catalog.packages {
                         if seen.insert(entry.id.clone()) {
@@ -255,8 +255,8 @@ mod tests {
     #[test]
     fn raw_url_to_git_works() {
         assert_eq!(
-            raw_url_to_git("https://raw.githubusercontent.com/FreeSynergy/Node.Store/main"),
-            "https://github.com/FreeSynergy/Node.Store"
+            raw_url_to_git("https://raw.githubusercontent.com/FreeSynergy/Store/main"),
+            "https://github.com/FreeSynergy/Store"
         );
     }
 

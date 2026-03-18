@@ -19,7 +19,7 @@ pub use fsn_store::{CatalogMeta, LocaleEntry};
 // ── StoreCatalog ───────────────────────────────────────────────────────────────
 
 /// FSN's top-level store catalog.
-/// Deserializes `catalog.toml` fetched from `{store_url}/Node/catalog.toml`.
+/// Deserializes `catalog.toml` fetched from `{store_url}/node/catalog.toml`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct StoreCatalog {
     /// Catalog metadata — auto-generated header, informational only.

@@ -1,6 +1,6 @@
 // `fsn store` — browse and manage the FreeSynergy module store and language packs.
 //
-// Uses StoreClient (fsn-store) to fetch the Node.Store catalog and display
+// Uses StoreClient (fsn-store) to fetch the Store catalog and display
 // available modules. Install/update are delegated to `fsn deploy` once
 // the module is added to the project config.
 
@@ -18,7 +18,7 @@ const BUNDLED_SCHEMA_VERSION: &str = "1.0.0";
 /// Fetch the FreeSynergy Node module catalog.
 async fn fetch_node_catalog() -> Result<fsn_store::Catalog<StoreEntry>> {
     let mut client = StoreClient::node_store();
-    client.fetch_catalog("Node", false).await.context("fetching module catalog")
+    client.fetch_catalog("node", false).await.context("fetching module catalog")
 }
 
 // ── search ─────────────────────────────────────────────────────────────────────
