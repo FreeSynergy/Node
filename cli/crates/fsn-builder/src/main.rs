@@ -9,6 +9,7 @@
 //! ```
 
 mod analyze;
+mod fetch_icon;
 mod publish;
 mod validate;
 
@@ -53,17 +54,39 @@ enum Command {
         #[arg(long, default_value = "git@github.com:FreeSynergy/Store.git")]
         store: String,
     },
+    /// Download an SVG icon and store it in the Store repo.
+    ///
+    /// Sources:
+    ///   homarr:<name>    — Homarr Dashboard Icons (MIT)
+    ///   simple:<name>    — Simple Icons (CC0)
+    ///   https://...      — Any HTTPS URL (verify license manually)
+    ///
+    /// Example: fsn-builder fetch-icon homarr:kanidm kanidm --store-dir /path/to/Store
+    FetchIcon {
+        /// Icon source: "homarr:<name>", "simple:<name>", or "https://..."
+        #[arg(value_name = "SOURCE")]
+        source: String,
+        /// Output icon name (without .svg extension).
+        #[arg(value_name = "NAME")]
+        name: String,
+        /// Path to the local Store repository root.
+        #[arg(long, value_name = "DIR", default_value = "../FreeSynergy.Store")]
+        store_dir: std::path::PathBuf,
+    },
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
         .init();
 
     let cli = Cli::parse();
     match cli.command {
-        Command::Analyze { path, format } => analyze::run(&path, &format),
-        Command::Validate { path }        => validate::run(&path),
-        Command::Publish { path, store }  => publish::run(&path, &store),
+        Command::Analyze { path, format }              => analyze::run(&path, &format),
+        Command::Validate { path }                     => validate::run(&path),
+        Command::Publish { path, store }               => publish::run(&path, &store),
+        Command::FetchIcon { source, name, store_dir } =>
+            fetch_icon::run(&source, &name, &store_dir).await,
     }
 }
