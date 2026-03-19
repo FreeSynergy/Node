@@ -70,6 +70,7 @@ fn default_stores() -> Vec<StoreConfig> {
         git_url:    Some("https://github.com/FreeSynergy/Store.git".into()),
         local_path: None,
         enabled:    true,
+        primary:    true,
     }]
 }
 
@@ -102,6 +103,11 @@ pub struct StoreConfig {
     /// Disabled stores are shown in Settings but not used.
     #[serde(default = "default_true")]
     pub enabled: bool,
+
+    /// Whether this is the built-in official store.
+    /// Primary stores can be toggled but not edited or deleted by the user.
+    #[serde(default)]
+    pub primary: bool,
 }
 
 fn default_true() -> bool { true }
