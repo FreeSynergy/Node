@@ -1,0 +1,14 @@
+[package]
+name        = "fsn-store-validator"
+version     = "0.1.0"
+edition     = "2021"
+description = "Standalone store catalog validator — no private lib dependencies, safe for CI"
+
+[[bin]]
+name = "fsn-store-validator"
+path = "src/main.rs"
+
+[dependencies]
+serde   = { version = "1", features = ["derive"] }
+toml    = { version = "0.8" }
+anyhow  = { version = "1" }
