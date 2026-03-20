@@ -261,7 +261,7 @@ fn detect_roles_provided(image: &str) -> Vec<Role> {
     if img.contains("redis") || img.contains("dragonfly") || img.contains("valkey") {
         roles.push(Role::new("cache"));
     }
-    if img.contains("ollama") || img.contains("llamacpp") {
+    if img.contains("mistral") || img.contains("ollama") || img.contains("llamacpp") {
         roles.push(Role::new("llm"));
     }
 

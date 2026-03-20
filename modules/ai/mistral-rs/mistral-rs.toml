@@ -1,0 +1,80 @@
+[module]
+name        = "mistral-rs"
+alias       = ["llm"]
+type        = "ai"
+author      = "FreeSynergy.Node"
+version     = "0.0.1"
+tags        = ["ai", "llm", "inference", "mistral", "local-ai", "rust"]
+description = "mistral.rs — local LLM inference engine in pure Rust, OpenAI-compatible API"
+website     = "https://github.com/EricLBuehler/mistral.rs"
+repository  = "https://github.com/EricLBuehler/mistral.rs"
+port        = 1234
+health_path = "/health"
+health_port = 1234
+
+[module.constraints]
+per_host = 1
+
+[vars]
+config_dir = "{{ project_root }}/data/{{ instance_name }}"
+models_dir = "{{ module_vars.config_dir }}/models"
+
+[load.modules]
+[load.services]
+
+[container]
+name      = "{{ instance_name }}"
+image     = "ghcr.io/ericlbuehler/mistral.rs"
+image_tag = "latest"
+volumes   = ["{{ module_vars.models_dir }}:/data:Z"]
+
+[container.healthcheck]
+cmd          = "curl -fsS http://localhost:1234/health || exit 1"
+interval     = "30s"
+timeout      = "5s"
+retries      = 3
+start_period = "60s"
+
+[environment]
+# Model to load on startup — use a GGUF model name from /data/
+MODEL_ID       = "{{ module_vars.model_id }}"
+# Bind address
+HOST           = "0.0.0.0"
+PORT           = "1234"
+# Optional: number of CPU threads (0 = auto)
+# NUM_THREADS  = "0"
+
+[setup]
+
+[[setup.fields]]
+key         = "project_root"
+label       = "Data Directory"
+description = "Base path where model files are stored"
+field_type  = "string"
+default     = "/srv/fsn"
+skip_if_set = true
+
+[[setup.fields]]
+key         = "service_domain"
+label       = "Domain"
+description = "Domain mistral.rs is reachable at via the proxy, e.g. llm.example.com"
+field_type  = "string"
+default     = ""
+skip_if_set = true
+
+[[setup.fields]]
+key         = "model_id"
+label       = "Model"
+description = "Model to load (e.g. mistralai/Mistral-7B-Instruct-v0.3, or path to local GGUF)"
+field_type  = "string"
+default     = "mistralai/Mistral-7B-Instruct-v0.3"
+skip_if_set = false
+
+[contract]
+upstream_tls = false
+
+[[contract.routes]]
+id          = "api"
+path        = "/v1"
+strip       = false
+description = "OpenAI-compatible REST API (chat/completions, models, embeddings)"
