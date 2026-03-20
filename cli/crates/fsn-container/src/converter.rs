@@ -4,7 +4,7 @@
 // QuadletManager uses to generate .container unit files.
 // Uses fsn-container's existing quadlet generation — no socket, no bollard.
 
-use fsn_container::{HealthCheck, PortBinding, ServiceConfig, Volume};
+use fsn_container_ext::{HealthCheck, PortBinding, ServiceConfig, Volume};
 
 use crate::compose::{ComposeFile, ComposeService};
 

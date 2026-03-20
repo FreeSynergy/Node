@@ -173,6 +173,41 @@ pub enum Command {
         #[command(subcommand)]
         cmd: BusCommand,
     },
+
+    /// Show system information (OS, features, disk, memory, CPU temperature)
+    Sysinfo {
+        /// Show live on-demand data (disk, memory, temperature) instead of cached static info
+        #[arg(long)]
+        live: bool,
+
+        /// Clear the 24-hour cache and re-detect immediately
+        #[arg(long)]
+        refresh: bool,
+
+        /// Check if a specific feature is available (e.g. systemd, podman, git)
+        #[arg(long, value_name = "FEATURE")]
+        check: Option<String>,
+
+        /// Run a continuous alert monitor loop; publish alerts to the bus if reachable
+        #[arg(long)]
+        monitor: bool,
+
+        /// Alert check interval in seconds (only with --monitor, default: 300)
+        #[arg(long, default_value = "300")]
+        interval: u64,
+
+        /// Disk-full alert threshold in percent (default: 90)
+        #[arg(long, default_value = "90")]
+        disk_threshold: f64,
+
+        /// Memory-full alert threshold in percent (default: 90)
+        #[arg(long, default_value = "90")]
+        mem_threshold: f64,
+
+        /// CPU temperature alert threshold in degrees Celsius (default: 85)
+        #[arg(long, default_value = "85")]
+        cpu_threshold: f32,
+    },
 }
 
 #[derive(Subcommand)]
@@ -597,6 +632,24 @@ pub async fn run() -> Result<()> {
                 commands::bus::status().await,
             BusCommand::Publish { topic, source, payload } =>
                 commands::bus::publish_event(&topic, &source, payload.as_deref()).await,
+        },
+        Command::Sysinfo { live, refresh, check, monitor, interval, disk_threshold, mem_threshold, cpu_threshold } => {
+            if let Some(feature) = check {
+                commands::sysinfo::check_feature(&feature).await
+            } else if refresh {
+                commands::sysinfo::refresh().await
+            } else if live {
+                commands::sysinfo::live().await
+            } else if monitor {
+                let thresholds = fsn_sysinfo::AlertThresholds {
+                    disk_full_percent:   disk_threshold,
+                    memory_full_percent: mem_threshold,
+                    cpu_hot_celsius:     cpu_threshold,
+                };
+                commands::sysinfo::monitor(interval, thresholds).await
+            } else {
+                commands::sysinfo::info().await
+            }
         },
     }
 }

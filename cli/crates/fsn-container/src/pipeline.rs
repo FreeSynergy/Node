@@ -5,7 +5,7 @@
 use std::path::Path;
 
 use anyhow::Result;
-use fsn_container::{QuadletManager, ServiceConfig};
+use fsn_container_ext::{QuadletManager, ServiceConfig};
 
 use crate::{
     analysis::{analyze_vars, AnalyzedVar},

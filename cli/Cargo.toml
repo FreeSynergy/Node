@@ -32,17 +32,17 @@ fsn-db        = { path = "../../FreeSynergy.Lib/fsn-db", features = ["sqlite"] }
 fsn-crypto    = { path = "../../FreeSynergy.Lib/fsn-crypto" }
 fsn-bus       = { path = "../../FreeSynergy.Lib/fsn-bus" }
 fsn-inventory = { path = "../../FreeSynergy.Lib/fsn-inventory" }
+fsn-sysinfo   = { path = "../../FreeSynergy.Lib/fsn-sysinfo" }
 
-# FreeSynergy.Lib.UI
-fsn-i18n  = { path = "../../FreeSynergy.Lib.UI/fsn-i18n" }
-fsn-theme = { path = "../../FreeSynergy.Lib.UI/fsn-theme" }
-fsn-help  = { path = "../../FreeSynergy.Lib.UI/fsn-help" }
+# FreeSynergy.Libs.UI
+fsn-i18n  = { path = "../../FreeSynergy.Libs.UI/fsn-i18n" }
+fsn-theme = { path = "../../FreeSynergy.Libs.UI/fsn-theme" }
+fsn-help  = { path = "../../FreeSynergy.Libs.UI/fsn-help" }
 
-# FreeSynergy.Lib.Ext
-fsn-plugin-sdk     = { path = "../../FreeSynergy.Lib.Ext/fsn-plugin-sdk" }
-fsn-plugin-runtime = { path = "../../FreeSynergy.Lib.Ext/fsn-plugin-runtime" }
-fsn-container      = { path = "../../FreeSynergy.Lib.Ext/fsn-container" }
-fsn-store          = { path = "../../FreeSynergy.Lib.Ext/fsn-store" }
+# FreeSynergy.Libs.Ext
+fsn-plugin-sdk     = { path = "../../FreeSynergy.Libs.Ext/fsn-plugin-sdk" }
+fsn-plugin-runtime = { path = "../../FreeSynergy.Libs.Ext/fsn-plugin-runtime" }
+fsn-store          = { path = "../../FreeSynergy.Libs.Ext/fsn-store" }
 
 # Internal crates
 fsn-node-core = { path = "crates/fsn-node-core" }

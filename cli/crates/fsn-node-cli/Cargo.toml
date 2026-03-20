@@ -11,13 +11,14 @@ path = "src/main.rs"
 
 [dependencies]
 fsn-node-core  = { workspace = true }
+fsn-types      = { workspace = true }
 fsn-db         = { workspace = true }
 fsn-deploy     = { workspace = true }
 fsn-dns        = { workspace = true }
 fsn-host       = { workspace = true }
-fsn-container  = { workspace = true }
-fsn-container  = { workspace = true }
+fsn-container = { workspace = true }
 fsn-store      = { workspace = true }
+fsn-sysinfo    = { workspace = true }
 fsn-i18n       = { workspace = true }
 fsn-s3         = { workspace = true }
 fsn-bus        = { workspace = true }
@@ -36,7 +37,7 @@ tower-http     = { workspace = true }
 serde_json     = { workspace = true }
 reqwest        = { workspace = true }
 uuid           = { workspace = true }
-fsn-pkg        = { path = "../../../../FreeSynergy.Lib.Ext/fsn-pkg" }
+fsn-pkg        = { path = "../../../../FreeSynergy.Libs.Ext/fsn-pkg" }
 
 [dev-dependencies]
 tempfile = { workspace = true }

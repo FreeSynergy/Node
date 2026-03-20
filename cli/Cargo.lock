@@ -1641,11 +1641,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "fsn-container-app"
-version = "0.1.0"
+name = "fsn-container"
+version = "0.2.0"
 dependencies = [
  "anyhow",
- "fsn-container",
+ "fsn-container 0.1.0",
  "indexmap 2.13.0",
  "reqwest",
  "serde",
@@ -1683,7 +1683,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "chrono",
- "fsn-container",
+ "fsn-container 0.2.0",
  "fsn-host",
  "fsn-inventory",
  "fsn-node-core",
@@ -1799,8 +1799,7 @@ dependencies = [
  "chrono",
  "clap",
  "fsn-bus",
- "fsn-container",
- "fsn-container-app",
+ "fsn-container 0.2.0",
  "fsn-db",
  "fsn-deploy",
  "fsn-dns",
@@ -1810,6 +1809,8 @@ dependencies = [
  "fsn-pkg",
  "fsn-s3",
  "fsn-store",
+ "fsn-sysinfo",
+ "fsn-types",
  "libc",
  "rand 0.8.5",
  "reqwest",
@@ -1904,6 +1905,20 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+ "toml 0.8.23",
+ "tracing",
+]
+
+[[package]]
+name = "fsn-sysinfo"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "fsn-types",
+ "serde",
+ "sysinfo",
+ "thiserror 2.0.18",
  "toml 0.8.23",
  "tracing",
 ]
@@ -3056,6 +3071,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df9761775871bdef83bee530e60050f7e54b1105350d6884eb0fb4f46c2f9405"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "ntapi"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c3b335231dfd352ffb0f8017f3b6027a4917f7df785ea2143d8af2adc66980ae"
+dependencies = [
+ "winapi",
 ]
 
 [[package]]
@@ -5321,6 +5345,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "sysinfo"
+version = "0.33.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4fc858248ea01b66f19d8e8a6d55f41deaf91e9d495246fd01368d99935c6c01"
+dependencies = [
+ "core-foundation-sys",
+ "libc",
+ "memchr",
+ "ntapi",
+ "rayon",
+ "windows",
+]
+
+[[package]]
 name = "system-interface"
 version = "0.27.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5349,7 +5387,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.2",
  "once_cell",
  "rustix 1.1.4",
  "windows-sys 0.61.2",
@@ -6690,6 +6728,16 @@ dependencies = [
  "wasmparser 0.221.3",
  "wasmtime-cranelift",
  "wasmtime-environ",
+]
+
+[[package]]
+name = "windows"
+version = "0.57.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "12342cb4d8e3b046f3d80effd474a7a02447231330ef77d71daa6fbc40681143"
+dependencies = [
+ "windows-core",
+ "windows-targets 0.52.6",
 ]
 
 [[package]]

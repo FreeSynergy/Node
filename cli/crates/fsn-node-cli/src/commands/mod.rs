@@ -16,6 +16,7 @@ pub mod status;
 pub mod storage;
 pub mod store;
 pub mod sync;
+pub mod sysinfo;
 pub mod tui;
 pub mod undeploy;
 pub mod update;

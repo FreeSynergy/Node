@@ -151,6 +151,7 @@ pub fn analyze_compose(yaml: &str, source_path: &Path) -> Result<ContainerResour
         signature: None,
         status: ValidationStatus::Incomplete,
         source: None,
+        platform: None,
     };
 
     Ok(ContainerResource {

@@ -24,3 +24,10 @@ pub use compose::{parse_file, parse_str, ComposeFile, ComposeService, EnvVar};
 pub use instance::InstanceName;
 pub use pipeline::{analyze, install, AnalyzeResult};
 pub use validation::{validate, IssueLevel, ValidationIssue, ValidationReport};
+
+// Re-export low-level types from fsn-container-ext so dependents don't need
+// a direct dependency on that crate.
+pub use fsn_container_ext::{
+    HealthCheck, PortBinding, QuadletManager, RestartPolicy, ServiceConfig, ServiceStatus,
+    SystemctlManager, UnitActiveState, Volume,
+};
