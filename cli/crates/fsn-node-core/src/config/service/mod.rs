@@ -72,6 +72,11 @@ pub struct ServiceClass {
     #[schemars(schema_with = "schema_any_object")]
     pub manifest: Option<ModuleManifest>,
 
+    /// Documentation entries for environment variables.
+    /// Shown in the Container Manager's Catalog editor view.
+    #[serde(default)]
+    pub variables: Vec<VariableDef>,
+
     /// Lifecycle hooks — what to do on install, update, swap, decommission.
     #[serde(default)]
     pub lifecycle: ServiceLifecycle,
@@ -131,6 +136,34 @@ pub struct HeaderSpec {
     pub name: String,
     /// Header value — Jinja2 templates allowed (e.g. "{{ service_domain }}").
     pub value: String,
+}
+
+// ── Variable documentation ────────────────────────────────────────────────────
+
+/// Documentation entry for a single container environment variable.
+///
+/// Stored under `[[variables]]` in the module TOML.
+/// Shown in the Container Manager's Catalog editor so admins understand
+/// what each env var does and can improve the description via LLM assist.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct VariableDef {
+    /// Environment variable name, e.g. `"DFLY_requirepass"`.
+    pub name: String,
+
+    /// Human-readable explanation shown in the Manager UI.
+    pub description: String,
+
+    /// `true` when the value is sensitive (password, token, API key).
+    /// Masked in the UI; stored in vault rather than plain config.
+    #[serde(default)]
+    pub secret: bool,
+
+    /// `true` when this variable must be set before the container starts.
+    #[serde(default)]
+    pub required: bool,
+
+    /// Informational default value (the actual default lives in the template string).
+    pub default: Option<String>,
 }
 
 // ── Setup wizard types ────────────────────────────────────────────────────────
