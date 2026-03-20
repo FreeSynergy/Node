@@ -193,7 +193,7 @@ mod tests {
             },
             vars: IndexMap::default(),
             load: ServiceLoad::default(),
-            container: ContainerDef {
+            container: Some(ContainerDef {
                 name: name.to_string(),
                 image: format!("docker.io/{name}"),
                 image_tag: "latest".to_string(),
@@ -206,7 +206,10 @@ mod tests {
                 tmpfs: vec![],
                 security_opt: vec![],
                 ulimits: IndexMap::default(),
-            },
+            }),
+            service: None,
+            variables: vec![],
+            lifecycle: Default::default(),
             environment: IndexMap::default(),
             setup: ServiceSetup::default(),
             contract: ServiceContract::default(),
@@ -221,6 +224,7 @@ mod tests {
             class: make_class(name, port, service_types.clone()),
             service_types,
             resolved_env: HashMap::new(),
+            resolved_args: vec![],
             service_domain: domain.to_string(),
             alias_domains: vec![],
             sub_services: vec![],

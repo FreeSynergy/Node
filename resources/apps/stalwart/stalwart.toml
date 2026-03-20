@@ -1,0 +1,87 @@
+# Resource class definition – resources/apps/stalwart/stalwart.toml
+#
+# Field order (MANDATORY per RULES.md):
+#   module → vars → load → service → environment → setup → contract
+#
+# Stalwart is a native Rust mail server — deployed as a systemd service.
+# Each FSN Node runs its own Stalwart instance with its own domain.
+# "Multi-tenancy" = FSN Federation: one instance per federation node.
+
+[module]
+name        = "stalwart"
+alias       = ["mail"]
+type        = "mail"
+author      = "FreeSynergy.Node"
+version     = "0.1.0"
+tags        = ["mail", "smtp", "imap", "jmap", "caldav", "carddav", "native"]
+description = "Stalwart all-in-one mail server — native Rust binary"
+website     = "https://stalw.art"
+repository  = "https://github.com/stalwartlabs/stalwart"
+port        = 443
+health_path   = "/healthz"
+health_port   = 443
+health_scheme = "https"
+
+[module.constraints]
+
+[vars]
+config_dir = "{{ project_root }}/data/{{ instance_name }}"
+binary     = "/usr/local/bin/stalwart"
+
+[load.modules]
+[load.services.kanidm]
+
+[service]
+binary = "{{ module_vars.binary }}"
+args   = ["--config", "{{ module_vars.config_dir }}/config/config.toml"]
+user   = "stalwart"
+group  = "stalwart"
+
+[service.healthcheck]
+cmd          = "curl -fsS https://localhost:443/healthz || exit 1"
+interval     = "30s"
+timeout      = "5s"
+retries      = 3
+start_period = "30s"
+
+[environment]
+# Stalwart uses config.toml + Web Admin for configuration.
+# These env vars are only used on FIRST START for initialization.
+STALWART_HOSTNAME = "{{ service_domain }}"
+STALWART_DOMAINS  = "{{ project_domain }}"
+
+# OIDC: configure via Web Admin UI after first start
+#   Settings > Authentication > OIDC
+#   Issuer URL: https://{{ services.kanidm.domain }}/oauth2/openid/stalwart
+#   Client ID: stalwart
+
+# DNS records required:
+#   MX   priority=10  host={{ host_name }}.{{ project_domain }}
+#   TXT  "v=spf1 mx -all"
+#   SRV  _submission._tcp  587
+#   SRV  _imaps._tcp       993
+
+[setup]
+
+[[setup.fields]]
+key           = "project_root"
+label         = "Data Directory"
+description   = "Base path where service data is stored"
+field_type    = "string"
+default       = "/srv/fsn"
+skip_if_set   = true
+
+[[setup.fields]]
+key           = "stalwart_admin_password"
+label         = "Stalwart admin password"
+field_type    = "secret"
+auto_generate = true
+description   = "Password for the Stalwart web admin UI (https://mail.yourdomain/)"
+
+[contract]
+upstream_tls = true
+[[contract.routes]]
+id          = "webmail"
+path        = "/"
+strip       = false
+description = "Stalwart webmail + admin UI"

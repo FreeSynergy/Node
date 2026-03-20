@@ -150,6 +150,7 @@ pub fn analyze_compose(yaml: &str, source_path: &Path) -> Result<ContainerAppRes
         dependencies: vec![],
         signature: None,
         status: ValidationStatus::Incomplete,
+        source: None,
     };
 
     Ok(ContainerAppResource {

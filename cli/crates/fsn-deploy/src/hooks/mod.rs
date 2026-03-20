@@ -53,11 +53,12 @@ impl<'a> HookContext<'a> {
         self.data_root.join(&self.instance.name)
     }
 
-    /// Path to the module's templates/ directory.
+    /// Path to the resource's templates/ directory.
     pub fn templates_dir(&self) -> PathBuf {
-        // class_key = "auth/kanidm"  →  modules/auth/kanidm/templates/
+        // class_key = "apps/kanidm"        →  resources/apps/kanidm/templates/
+        // class_key = "containers/forgejo"  →  resources/containers/forgejo/templates/
         let parts: Vec<&str> = self.instance.class_key.splitn(3, '/').collect();
-        let mut p = self.fsn_root.join("modules");
+        let mut p = self.fsn_root.join("resources");
         for part in parts { p = p.join(part); }
         p.join("templates")
     }
@@ -89,13 +90,13 @@ type HookFn = for<'a> fn(&'a HookContext<'a>) -> std::pin::Pin<Box<dyn std::futu
 /// Entries are checked in order; the first matching key wins.
 /// If no key matches, `common::ensure_data_dir` is used as the default.
 static HOOK_REGISTRY: &[(&str, HookFn)] = &[
-    ("auth/kanidm",              |ctx| Box::pin(kanidm::run(ctx))),
-    ("git/forgejo",              |ctx| Box::pin(forgejo::run(ctx))),
-    ("mail/stalwart",            |ctx| Box::pin(stalwart::run(ctx))),
-    ("collab/cryptpad",          |ctx| Box::pin(cryptpad::run(ctx))),
-    ("chat/tuwunel",             |ctx| Box::pin(tuwunel::run(ctx))),
-    ("tasks/vikunja",            |ctx| Box::pin(vikunja::run(ctx))),
-    ("observability/openobserver", |ctx| Box::pin(openobserver_hook(ctx))),
+    ("apps/kanidm",               |ctx| Box::pin(kanidm::run(ctx))),
+    ("apps/stalwart",             |ctx| Box::pin(stalwart::run(ctx))),
+    ("apps/tuwunel",              |ctx| Box::pin(tuwunel::run(ctx))),
+    ("containers/forgejo",        |ctx| Box::pin(forgejo::run(ctx))),
+    ("containers/cryptpad",       |ctx| Box::pin(cryptpad::run(ctx))),
+    ("containers/vikunja",        |ctx| Box::pin(vikunja::run(ctx))),
+    ("containers/openobserver",   |ctx| Box::pin(openobserver_hook(ctx))),
 ];
 
 /// Dispatch post-deploy hook for the given instance (if one is registered).

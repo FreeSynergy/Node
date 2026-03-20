@@ -52,7 +52,15 @@ pub struct ServiceClass {
     #[serde(default)]
     pub load: ServiceLoad,
 
-    pub container: ContainerDef,
+    /// Container deployment – present for container-based resources.
+    /// Absent for native apps (those use `service` instead).
+    #[serde(default)]
+    pub container: Option<ContainerDef>,
+
+    /// Native app deployment – present for resources deployed as systemd services.
+    /// Absent for container-based resources (those use `container` instead).
+    #[serde(default)]
+    pub service: Option<NativeServiceDef>,
 
     #[serde(default)]
     pub environment: IndexMap<String, String>,
@@ -394,6 +402,62 @@ pub struct SubServiceRef {
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 pub struct ServiceRef {}
 
+// ── Deployment kind ───────────────────────────────────────────────────────────
+
+/// How a resource is deployed on the host.
+///
+/// Derived from the `ServiceClass` fields, not stored separately.
+/// Used by the deploy engine to decide between Quadlet and systemd unit generation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DeploymentKind {
+    /// Deployed as a Podman container via a Quadlet unit file.
+    Container,
+    /// Deployed as a native binary via a systemd .service (and optional .socket) unit.
+    NativeApp,
+}
+
+impl ServiceClass {
+    /// Deployment kind — derived from which deployment block is present.
+    pub fn deployment_kind(&self) -> DeploymentKind {
+        if self.service.is_some() {
+            DeploymentKind::NativeApp
+        } else {
+            DeploymentKind::Container
+        }
+    }
+}
+
+// ── Native service definition ─────────────────────────────────────────────────
+
+/// Native app deployment — maps to the `[service]` TOML block.
+///
+/// Used for Rust binaries (Zentinel, Stalwart, Kanidm, Tuwunel, mistral.rs, …)
+/// that run directly under systemd instead of inside a Podman container.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct NativeServiceDef {
+    /// Absolute path to the binary (Jinja2 templates allowed).
+    pub binary: String,
+
+    /// Command-line arguments passed to the binary (Jinja2 templates allowed).
+    #[serde(default)]
+    pub args: Vec<String>,
+
+    /// Run the service as this Unix user.
+    pub user: Option<String>,
+
+    /// Run the service as this Unix group.
+    pub group: Option<String>,
+
+    /// Ports to activate via systemd socket activation.
+    /// Required for privileged ports (< 1024) without setcap.
+    /// Generates a companion .socket unit alongside the .service unit.
+    #[serde(default)]
+    pub socket_ports: Vec<u16>,
+
+    /// Health check (same structure as container healthcheck).
+    pub healthcheck: Option<HealthCheck>,
+}
+
 // ── Container Definition ──────────────────────────────────────────────────────
 
 /// Container definition – maps to the `[container]` TOML block.
@@ -674,8 +738,22 @@ impl Resource for ServiceClass {
         if self.meta.version.is_empty() {
             return Err(FsyError::Config("module.version is required".into()));
         }
-        if self.container.image.is_empty() {
-            return Err(FsyError::Config("container.image is required".into()));
+        match (&self.container, &self.service) {
+            (Some(c), _) => {
+                if c.image.is_empty() {
+                    return Err(FsyError::Config("container.image is required".into()));
+                }
+            }
+            (None, Some(s)) => {
+                if s.binary.is_empty() {
+                    return Err(FsyError::Config("service.binary is required".into()));
+                }
+            }
+            (None, None) => {
+                return Err(FsyError::Config(
+                    "either [container] or [service] block is required".into(),
+                ));
+            }
         }
         Ok(())
     }

@@ -195,7 +195,14 @@ fn resolve_instance(
     }
 
     // Expand volume mount strings ({{ module_vars.config_dir }}/data:/data:Z → real path)
-    let resolved_volumes = resolve_volumes(&class.container.volumes, &ctx)?;
+    let container_volumes = class.container.as_ref().map(|c| c.volumes.as_slice()).unwrap_or(&[]);
+    let resolved_volumes = resolve_volumes(container_volumes, &ctx)?;
+
+    // Expand native app args ({{ module_vars.config_dir }}/... → real path)
+    let raw_args = class.service.as_ref().map(|s| s.args.as_slice()).unwrap_or(&[]);
+    let resolved_args = raw_args.iter()
+        .map(|a| crate::template::render(a, &ctx).with_context(|| format!("Expanding arg '{}'", a)))
+        .collect::<Result<Vec<String>>>()?;
 
     // Resolve sub-modules recursively (same cross_vars for the whole project)
     let mut sub_services = Vec::new();
@@ -236,6 +243,7 @@ fn resolve_instance(
         class,
         resolved_env,
         resolved_volumes,
+        resolved_args,
         service_domain,
         alias_domains,
         sub_services,
@@ -294,10 +302,12 @@ pub fn collect_proxy_services(
         let subdomain = entry.subdomain.as_deref().unwrap_or(instance_name.as_str());
         let domain = format!("{}.{}", subdomain, project.project.domain);
 
-        // Resolve container name: replace {{ instance_name }} placeholder.
-        let container = class.container.name
-            .replace("{{ instance_name }}", instance_name)
-            .replace("{{ parent_instance_name }}", instance_name);
+        // Resolve container name (or use instance_name for native apps).
+        let container = class.container.as_ref()
+            .map(|c| c.name
+                .replace("{{ instance_name }}", instance_name)
+                .replace("{{ parent_instance_name }}", instance_name))
+            .unwrap_or_else(|| instance_name.to_string());
 
         let health_path = class.contract.health_path.clone()
             .or_else(|| class.meta.health_path.clone());
@@ -328,16 +338,13 @@ fn collect_plugin_vars(host: &HostConfig, registry: &ServiceRegistry) -> HashMap
     let Some((_, proxy)) = host.proxy.iter().next() else { return vars };
     let plugins = &proxy.load.plugins;
 
-    // Determine service_type from proxy.service_class (e.g. "proxy/zentinel" → "proxy")
-    let service_type = proxy.service_class.split('/').next().unwrap_or("proxy");
-
     // Load DNS plugin vars
-    if let Some(dns_plugin) = registry.get_plugin(service_type, "dns", &plugins.dns) {
+    if let Some(dns_plugin) = registry.get_plugin("dns", &plugins.dns) {
         vars.extend(dns_plugin.vars.clone());
     }
 
     // Load ACME plugin vars
-    if let Some(acme_plugin) = registry.get_plugin(service_type, "acme", &plugins.acme) {
+    if let Some(acme_plugin) = registry.get_plugin("acme", &plugins.acme) {
         vars.extend(acme_plugin.vars.clone());
     }
 

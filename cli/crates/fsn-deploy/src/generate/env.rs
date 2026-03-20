@@ -69,7 +69,7 @@ mod tests {
                 },
                 vars: IndexMap::default(),
                 load: ServiceLoad::default(),
-                container: ContainerDef {
+                container: Some(ContainerDef {
                     name: name.to_string(),
                     image: format!("docker.io/{name}"),
                     image_tag: "latest".to_string(),
@@ -82,7 +82,10 @@ mod tests {
                     tmpfs: vec![],
                     security_opt: vec![],
                     ulimits: IndexMap::default(),
-                },
+                }),
+                service: None,
+                variables: vec![],
+                lifecycle: Default::default(),
                 environment: IndexMap::default(),
                 setup: ServiceSetup::default(),
                 contract: ServiceContract::default(),
@@ -90,6 +93,7 @@ mod tests {
             },
             service_types: vec![ServiceType::Git],
             resolved_env: env,
+            resolved_args: vec![],
             service_domain: format!("{name}.example.com"),
             alias_domains: vec![],
             sub_services: vec![],

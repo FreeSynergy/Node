@@ -1,13 +1,15 @@
 use fsn_error::FsyError;
-// Module + plugin registry – scans modules/ directory and loads all module
+// Resource registry – scans resources/ directory and loads all resource
 // class TOMLs and plugin TOMLs.
 //
-// Module layout:
-//   Depth 3: modules/{type}/{name}/{name}.toml         → key "{type}/{name}"
-//   Depth 4: modules/{type}/{parent}/{name}/{name}.toml → key "{type}/{parent}/{name}"
+// Resource layout:
+//   Depth 3: resources/{kind}/{name}/{name}.toml         → key "{kind}/{name}"
+//   Depth 4: resources/{kind}/{parent}/{name}/{name}.toml → key "{kind}/{parent}/{name}"
+//
+//   {kind} is one of: apps | containers | bots | widgets
 //
 // Plugin layout:
-//   Depth 5: modules/{type}/plugins/{plugin_type}/{name}.toml → key "{type}/{plugin_type}/{name}"
+//   Depth 4: resources/plugins/{plugin_type}/{name}.toml → key "plugins/{plugin_type}/{name}"
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -18,36 +20,38 @@ use crate::config::plugin::PluginConfig;
 use crate::config::service::ServiceClass;
 
 
-/// In-memory index of all available module classes and plugins.
+/// In-memory index of all available resource classes and plugins.
 ///
-/// Module key = "{type}/{name}" (e.g. "auth/kanidm", "git/forgejo")
-/// Plugin key = "{type}/{plugin_type}/{name}" (e.g. "proxy/dns/hetzner")
+/// Class key  = "{kind}/{name}"              (e.g. "apps/zentinel", "containers/forgejo")
+/// Plugin key = "plugins/{plugin_type}/{name}" (e.g. "plugins/dns/hetzner")
 #[derive(Debug, Default)]
 pub struct ServiceRegistry {
     classes: HashMap<String, ServiceClass>,
     plugins: HashMap<String, PluginConfig>,
-    /// Base path of the modules/ directory
-    modules_dir: PathBuf,
+    /// Base path of the resources/ directory
+    resources_dir: PathBuf,
 }
 
 impl ServiceRegistry {
-    /// Scan a modules/ directory and load all class TOMLs.
+    /// Scan a resources/ directory and load all class TOMLs and plugin TOMLs.
     ///
-    /// Two supported layouts:
-    ///   Depth 3: `modules/{type}/{name}/{name}.toml`       → key = `{type}/{name}`
-    ///   Depth 4: `modules/{type}/{parent}/{name}/{name}.toml` → key = `{type}/{parent}/{name}`
+    /// Resource layout (classes):
+    ///   Depth 3: `resources/{kind}/{name}/{name}.toml`            → key = `{kind}/{name}`
+    ///   Depth 4: `resources/{kind}/{parent}/{name}/{name}.toml`   → key = `{kind}/{parent}/{name}`
     ///
-    /// Depth-4 enables sub-modules nested under a parent module
-    /// (e.g. `proxy/zentinel/zentinel-control-plane`).
-    pub fn load(modules_dir: &Path) -> Result<Self, FsyError> {
+    ///   {kind} is one of: apps | containers | bots | widgets
+    ///
+    /// Plugin layout:
+    ///   Depth 4: `resources/plugins/{plugin_type}/{name}.toml`    → key = `plugins/{plugin_type}/{name}`
+    pub fn load(resources_dir: &Path) -> Result<Self, FsyError> {
         let mut registry = Self {
-            classes:     HashMap::new(),
-            plugins:     HashMap::new(),
-            modules_dir: modules_dir.to_path_buf(),
+            classes:      HashMap::new(),
+            plugins:      HashMap::new(),
+            resources_dir: resources_dir.to_path_buf(),
         };
 
-        // ── Module class scan (depth 3–4) ─────────────────────────────────────
-        for entry in WalkDir::new(modules_dir)
+        // ── Resource class scan (depth 3–4) ──────────────────────────────────
+        for entry in WalkDir::new(resources_dir)
             .min_depth(3)
             .max_depth(4)
             .into_iter()
@@ -73,35 +77,33 @@ impl ServiceRegistry {
                 continue;
             }
 
-            // Skip plugin directories (handled separately)
+            // Skip plugin directories (handled separately below)
             if path.components().any(|c| c.as_os_str() == "plugins") {
                 continue;
             }
 
-            // Compute depth relative to modules_dir to pick the right key format
+            // Compute depth relative to resources_dir to pick the right key format
             let depth = path.components().count()
-                .saturating_sub(modules_dir.components().count());
+                .saturating_sub(resources_dir.components().count());
 
             let class_key = if depth == 3 {
-                // modules/{type}/{name}/{name}.toml  →  {type}/{name}
-                let type_name = path
+                // resources/{kind}/{name}/{name}.toml  →  {kind}/{name}
+                let kind = path
                     .parent().and_then(|p| p.parent())
                     .and_then(|p| p.file_name()).and_then(|n| n.to_str())
                     .unwrap_or_default();
-                format!("{type_name}/{file_stem}")
+                format!("{kind}/{file_stem}")
             } else {
-                // modules/{type}/{parent}/{name}/{name}.toml  →  {type}/{parent}/{name}
-                let parent_dir = path
-                    .parent().and_then(|p| p.file_name()).and_then(|n| n.to_str())
-                    .unwrap_or_default();
+                // resources/{kind}/{parent}/{name}/{name}.toml  →  {kind}/{parent}/{name}
                 let grandparent_dir = path
-                    .parent().and_then(|p| p.parent()).and_then(|p| p.file_name()).and_then(|n| n.to_str())
+                    .parent().and_then(|p| p.parent())
+                    .and_then(|p| p.file_name()).and_then(|n| n.to_str())
                     .unwrap_or_default();
-                let type_name = path
+                let kind = path
                     .parent().and_then(|p| p.parent()).and_then(|p| p.parent())
                     .and_then(|p| p.file_name()).and_then(|n| n.to_str())
                     .unwrap_or_default();
-                format!("{type_name}/{grandparent_dir}/{parent_dir}")
+                format!("{kind}/{grandparent_dir}/{file_stem}")
             };
 
             match Self::load_class(path) {
@@ -110,35 +112,31 @@ impl ServiceRegistry {
             }
         }
 
-        // ── Plugin scan (depth 4): modules/{type}/plugins/{plugin_type}/{name}.toml ──
-        for entry in WalkDir::new(modules_dir)
-            .min_depth(4)
-            .max_depth(4)
-            .into_iter()
-            .filter_map(|e| e.ok())
-        {
-            let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()) != Some("toml") {
-                continue;
-            }
+        // ── Plugin scan: resources/plugins/{plugin_type}/{name}.toml ─────────
+        let plugins_dir = resources_dir.join("plugins");
+        if plugins_dir.exists() {
+            for entry in WalkDir::new(&plugins_dir)
+                .min_depth(2)
+                .max_depth(2)
+                .into_iter()
+                .filter_map(|e| e.ok())
+            {
+                let path = entry.path();
+                if path.extension().and_then(|e| e.to_str()) != Some("toml") {
+                    continue;
+                }
 
-            // Must be under a "plugins" directory
-            let is_plugin = path.components().any(|c| c.as_os_str() == "plugins");
-            if !is_plugin { continue; }
+                // Key: "plugins/{plugin_type}/{name}"  e.g. "plugins/dns/hetzner"
+                let name = path.file_stem().and_then(|s| s.to_str()).unwrap_or_default();
+                let plugin_type = path
+                    .parent().and_then(|p| p.file_name()).and_then(|n| n.to_str())
+                    .unwrap_or_default();
+                let plugin_key = format!("plugins/{plugin_type}/{name}");
 
-            // Key: "{type}/{plugin_type}/{name}"  e.g. "proxy/dns/hetzner"
-            let name = path.file_stem().and_then(|s| s.to_str()).unwrap_or_default();
-            let plugin_type = path.parent().and_then(|p| p.file_name()).and_then(|n| n.to_str()).unwrap_or_default();
-            let service_type = path
-                .parent().and_then(|p| p.parent())  // plugins/
-                .and_then(|p| p.parent())             // {type}/
-                .and_then(|p| p.file_name()).and_then(|n| n.to_str())
-                .unwrap_or_default();
-            let plugin_key = format!("{service_type}/{plugin_type}/{name}");
-
-            match Self::load_plugin(path) {
-                Ok(plugin) => { registry.plugins.insert(plugin_key, plugin); }
-                Err(e)     => { eprintln!("Warning: skipping plugin {}: {}", path.display(), e); }
+                match Self::load_plugin(path) {
+                    Ok(plugin) => { registry.plugins.insert(plugin_key, plugin); }
+                    Err(e)     => { eprintln!("Warning: skipping plugin {}: {}", path.display(), e); }
+                }
             }
         }
 
@@ -162,11 +160,11 @@ impl ServiceRegistry {
         self.classes.get(class_key)
     }
 
-    /// Look up a plugin by service type, plugin type, and name.
+    /// Look up a plugin by plugin type and name.
     ///
-    /// Example: `get_plugin("proxy", "dns", "hetzner")`
-    pub fn get_plugin(&self, service_type: &str, plugin_type: &str, name: &str) -> Option<&PluginConfig> {
-        let key = format!("{service_type}/{plugin_type}/{name}");
+    /// Example: `get_plugin("dns", "hetzner")`
+    pub fn get_plugin(&self, plugin_type: &str, name: &str) -> Option<&PluginConfig> {
+        let key = format!("plugins/{plugin_type}/{name}");
         self.plugins.get(&key)
     }
 
@@ -180,8 +178,8 @@ impl ServiceRegistry {
         self.plugins.iter().map(|(k, v)| (k.as_str(), v))
     }
 
-    pub fn modules_dir(&self) -> &Path {
-        &self.modules_dir
+    pub fn resources_dir(&self) -> &Path {
+        &self.resources_dir
     }
 }
 

@@ -13,7 +13,7 @@ host:
 
   proxy:
     zentinel:
-      module_class: "proxy/zentinel"
+      module_class: "apps/zentinel"
       load:
         plugins:
           dns: "hetzner"            # options: hetzner, cloudflare

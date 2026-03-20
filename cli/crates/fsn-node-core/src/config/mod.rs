@@ -21,7 +21,7 @@ pub use manifest::{
 };
 pub use service::{
     Capability, ExportedVarContract,
-    Constraints, ContainerDef, Locality,
+    Constraints, ContainerDef, NativeServiceDef, DeploymentKind, Locality,
     ServiceClass, ServiceMeta, ServiceType,
     ServiceLoad, ServiceSetup, SetupField, FieldType,
     SubServiceRef, ServiceRef,

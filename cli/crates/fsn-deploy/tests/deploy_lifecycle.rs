@@ -75,7 +75,7 @@ fn minimal_service_instance(name: &str) -> ServiceInstance {
             },
             vars: IndexMap::default(),
             load: ServiceLoad::default(),
-            container: ContainerDef {
+            container: Some(ContainerDef {
                 name: name.to_string(),
                 image: "ghcr.io/forgejo/forgejo".to_string(),
                 image_tag: "9".to_string(),
@@ -88,7 +88,10 @@ fn minimal_service_instance(name: &str) -> ServiceInstance {
                 tmpfs: vec![],
                 security_opt: vec![],
                 ulimits: IndexMap::default(),
-            },
+            }),
+            service: None,
+            variables: vec![],
+            lifecycle: Default::default(),
             environment: IndexMap::default(),
             setup: ServiceSetup::default(),
             contract: ServiceContract::default(),
@@ -100,6 +103,7 @@ fn minimal_service_instance(name: &str) -> ServiceInstance {
             m.insert("GIT_HOST".to_string(), "forgejo.example.com".to_string());
             m
         },
+        resolved_args: vec![],
         service_domain: format!("{name}.example.com"),
         alias_domains: vec![],
         sub_services: vec![],
@@ -131,6 +135,7 @@ async fn dry_run_writes_quadlet_and_env_files() {
         health_timeout: Duration::from_secs(1),
         store_root:     None,
         remote_host:    None,
+        inventory_path: None,
     };
 
     deploy_all(&desired, &project, &vault, &opts, tmp.path(), tmp.path())
@@ -165,6 +170,7 @@ async fn dry_run_container_file_contains_image() {
         health_timeout: Duration::from_secs(1),
         store_root:     None,
         remote_host:    None,
+        inventory_path: None,
     };
 
     deploy_all(
@@ -201,6 +207,7 @@ async fn dry_run_env_file_contains_resolved_vars() {
         health_timeout: Duration::from_secs(1),
         store_root:     None,
         remote_host:    None,
+        inventory_path: None,
     };
 
     deploy_all(
@@ -239,6 +246,7 @@ async fn dry_run_sub_services_written_before_parent() {
         health_timeout: Duration::from_secs(1),
         store_root:     None,
         remote_host:    None,
+        inventory_path: None,
     };
 
     deploy_all(

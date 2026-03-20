@@ -1,6 +1,6 @@
 // Integration test: parse all modules from the Store.
 //
-// Loads every .toml in FreeSynergy.Store/node/modules/ via ServiceRegistry
+// Loads every .toml in FreeSynergy.Store/node/resources/ via ServiceRegistry
 // and asserts that key modules are present and well-formed.
 //
 // The test is skipped gracefully when the store directory does not exist
@@ -10,16 +10,16 @@ use std::path::PathBuf;
 
 use fsn_node_core::config::registry::ServiceRegistry;
 
-fn store_modules_dir() -> PathBuf {
+fn store_resources_dir() -> PathBuf {
     // From cli/crates/fsn-core/ go up 4 levels → /home/kal/Server/
-    // then into FreeSynergy.Store/node/modules/
+    // then into FreeSynergy.Store/node/resources/
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../../FreeSynergy.Store/node/modules")
+        .join("../../../../FreeSynergy.Store/node/resources")
 }
 
 #[test]
 fn all_store_modules_parse_without_error() {
-    let dir = store_modules_dir();
+    let dir = store_resources_dir();
     if !dir.exists() {
         eprintln!("SKIP: Store not found at {}", dir.display());
         return;
@@ -34,7 +34,7 @@ fn all_store_modules_parse_without_error() {
 
 #[test]
 fn expected_modules_are_present() {
-    let dir = store_modules_dir();
+    let dir = store_resources_dir();
     if !dir.exists() {
         eprintln!("SKIP: Store not found at {}", dir.display());
         return;
@@ -43,15 +43,15 @@ fn expected_modules_are_present() {
     let registry = ServiceRegistry::load(&dir).expect("ServiceRegistry::load");
 
     let required = [
-        "git/forgejo",
-        "iam/kanidm",
-        "mail/stalwart",
-        "wiki/outline",
-        "chat/tuwunel",
-        "database/postgres",
-        "cache/dragonfly",
-        "monitoring/openobserver",
-        "proxy/zentinel",
+        "containers/forgejo",
+        "apps/kanidm",
+        "apps/stalwart",
+        "containers/outline",
+        "apps/tuwunel",
+        "containers/postgres",
+        "containers/dragonfly",
+        "containers/openobserver",
+        "apps/zentinel",
     ];
 
     for key in &required {
@@ -63,8 +63,8 @@ fn expected_modules_are_present() {
 }
 
 #[test]
-fn all_modules_have_container_image() {
-    let dir = store_modules_dir();
+fn all_container_modules_have_image() {
+    let dir = store_resources_dir();
     if !dir.exists() {
         eprintln!("SKIP: Store not found at {}", dir.display());
         return;
@@ -73,20 +73,23 @@ fn all_modules_have_container_image() {
     let registry = ServiceRegistry::load(&dir).expect("ServiceRegistry::load");
 
     for (key, class) in registry.all() {
+        // Native apps have no container block — skip them.
+        let Some(container) = &class.container else { continue };
+
         assert!(
-            !class.container.image.is_empty(),
+            !container.image.is_empty(),
             "module '{key}' has empty container.image"
         );
         assert!(
-            !class.container.image_tag.is_empty(),
+            !container.image_tag.is_empty(),
             "module '{key}' has empty container.image_tag"
         );
     }
 }
 
 #[test]
-fn all_modules_have_healthcheck() {
-    let dir = store_modules_dir();
+fn all_container_modules_have_healthcheck() {
+    let dir = store_resources_dir();
     if !dir.exists() {
         eprintln!("SKIP: Store not found at {}", dir.display());
         return;
@@ -95,16 +98,19 @@ fn all_modules_have_healthcheck() {
     let registry = ServiceRegistry::load(&dir).expect("ServiceRegistry::load");
 
     for (key, class) in registry.all() {
+        // Native apps have no container block — skip them.
+        let Some(container) = &class.container else { continue };
+
         assert!(
-            class.container.healthcheck.is_some(),
-            "module '{key}' is missing container.healthcheck (required by convention)"
+            container.healthcheck.is_some(),
+            "container module '{key}' is missing container.healthcheck (required by convention)"
         );
     }
 }
 
 #[test]
 fn plugin_dns_and_acme_plugins_parse() {
-    let dir = store_modules_dir();
+    let dir = store_resources_dir();
     if !dir.exists() {
         eprintln!("SKIP: Store not found at {}", dir.display());
         return;
@@ -116,18 +122,17 @@ fn plugin_dns_and_acme_plugins_parse() {
     // At least hetzner + cloudflare + none DNS, and letsencrypt + none ACME
     assert!(plugins.len() >= 5, "expected at least 5 plugins, got {}", plugins.len());
 
+    // New key format: plugins/{plugin_type}/{name}
+    // get_plugin(plugin_type, name) — 2 args
     let required_plugins = [
-        "proxy/dns/hetzner",
-        "proxy/dns/cloudflare",
-        "proxy/acme/letsencrypt",
+        ("dns", "hetzner"),
+        ("dns", "cloudflare"),
+        ("acme", "letsencrypt"),
     ];
-    for key in &required_plugins {
+    for (plugin_type, name) in &required_plugins {
         assert!(
-            registry.get_plugin("proxy",
-                key.split('/').nth(1).unwrap(),
-                key.split('/').nth(2).unwrap(),
-            ).is_some(),
-            "expected plugin '{key}' not found"
+            registry.get_plugin(plugin_type, name).is_some(),
+            "expected plugin 'plugins/{plugin_type}/{name}' not found"
         );
     }
 }

@@ -48,6 +48,10 @@ pub struct ServiceInstance {
     /// Empty when resolved without a data_root (non-deploy contexts).
     pub resolved_volumes: Vec<String>,
 
+    /// Jinja2-expanded command-line arguments for native app services.
+    /// Empty for container-based services.
+    pub resolved_args: Vec<String>,
+
     /// Merged capability set: type defaults + plugin-declared extras.
     /// Empty for sub-services and types without a known capability set.
     pub capabilities: Vec<Capability>,
