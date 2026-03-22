@@ -16,9 +16,6 @@ locality = "same_host"
 [vars]
 config_dir = "{{ project_root }}/data/{{ instance_name }}"
 
-[load.modules]
-[load.services]
-
 [container]
 name         = "{{ instance_name }}"
 image        = "docker.dragonflydb.io/dragonflydb/dragonfly"

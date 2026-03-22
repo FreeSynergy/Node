@@ -19,11 +19,11 @@ Podman Quadlets, managed via a Rust CLI.
 ```
 cli/                  → Rust workspace (CLI + deployment engine)
   crates/
-    fsn-core/         → Node-specific data types + config parsing
-    fsn-deploy/       → Deployment engine (Quadlet generation, Zentinel, reconciliation)
-    fsn-dns/          → DNS provider integrations
-    fsn-host/         → Host management (SSH, remote install, provisioning)
-    fsn-cli/          → CLI binary (clap) — `fsn` command
+    fs-core/         → Node-specific data types + config parsing
+    fs-deploy/       → Deployment engine (Quadlet generation, Zentinel, reconciliation)
+    fs-dns/          → DNS provider integrations
+    fs-host/         → Host management (SSH, remote install, provisioning)
+    fs-cli/          → CLI binary (clap) — `fsn` command
 modules/              → Module definitions (YAML + Templates + Hooks)
 hosts/                → Host files (one per server)
 projects/             → Project files + branding + sites
@@ -33,21 +33,21 @@ projects/             → Project files + branding + sites
 
 ## Library Dependencies (FreeSynergy.Lib)
 
-All shared libraries live in `../FreeSynergy.Lib/`. Never duplicate their logic in fsn-*.
+All shared libraries live in `../FreeSynergy.Lib/`. Never duplicate their logic in fs-*.
 
 | Library         | Purpose |
 |---|---|
-| `fsn-types`     | Resource/Capability traits, Meta, TypeRegistry |
-| `fsn-error`     | FsnError, Repairable trait, ValidationIssue |
-| `fsn-config`    | TOML loader/saver with backup + auto-repair |
-| `fsn-i18n`      | Snippet-based i18n (t(), t_with()) |
-| `fsn-theme`     | Theme system (theme.toml → CSS) |
-| `fsn-help`      | Context-sensitive help topics |
-| `fsn-health`    | Generic health check framework + HealthCheck trait |
-| `fsn-container` | Container abstraction (Podman via bollard) |
-| `fsn-template`  | Tera template engine wrapper |
-| `fsn-plugin-sdk`     | WASM Plugin SDK |
-| `fsn-plugin-runtime` | WASM Host runtime |
+| `fs-types`     | Resource/Capability traits, Meta, TypeRegistry |
+| `fs-error`     | FsError, Repairable trait, ValidationIssue |
+| `fs-config`    | TOML loader/saver with backup + auto-repair |
+| `fs-i18n`      | Snippet-based i18n (t(), t_with()) |
+| `fs-theme`     | Theme system (theme.toml → CSS) |
+| `fs-help`      | Context-sensitive help topics |
+| `fs-health`    | Generic health check framework + HealthCheck trait |
+| `fs-container` | Container abstraction (Podman via bollard) |
+| `fs-template`  | Tera template engine wrapper |
+| `fs-plugin-sdk`     | WASM Plugin SDK |
+| `fs-plugin-runtime` | WASM Host runtime |
 
 ## Module Conventions
 

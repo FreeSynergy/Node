@@ -8,7 +8,7 @@ Installer i18n framework. All user-facing output is now translatable.
 
 ### What's new
 
-- **i18n framework** — `_()` translation function + `load_translations()` embedded in `fsn-install.sh`
+- **i18n framework** — `_()` translation function + `load_translations()` embedded in `fs-install.sh`
 - **German translation** — all ~130 installer strings translated to German (`de`)
 - **Locale auto-detection** — reads `LC_ALL` / `LANG`, strips encoding and region suffix
 - **Translation files** — `locales/en.pot` (template) + `locales/de.po` (German)
@@ -18,7 +18,7 @@ Installer i18n framework. All user-facing output is now translatable.
 
 ### Architecture
 
-Translations are embedded directly in `fsn-install.sh` as `declare -A _TR_xx=(...)` arrays.
+Translations are embedded directly in `fs-install.sh` as `declare -A _TR_xx=(...)` arrays.
 No external downloads. No version mismatch risk. Single self-contained file.
 
 `.po` files in `locales/` are the source of truth for translators.
@@ -79,7 +79,7 @@ Initial public release. Architecture complete, deployment in progress.
 - **Quadlet generation** — container + env file templates
 - **DNS management** — create, remove, and reconcile DNS records (Hetzner DNS)
 - **DNS rename cleanup** — stale records from renamed services are removed automatically
-- **Bootstrap installer** (`fsn-install.sh`) — OS detection, dependency install, setup wizard
+- **Bootstrap installer** (`fs-install.sh`) — OS detection, dependency install, setup wizard
 - **Project/host file schema** — full specification in `RULES.md`
 - **FreeSynergy.Net** reference project — 13 services configured
 

@@ -19,8 +19,6 @@ per_host = 1
 config_dir = "{{ project_root }}/data/{{ instance_name }}"
 models_dir = "{{ module_vars.config_dir }}/models"
 
-[load.modules]
-[load.services]
 
 [container]
 name      = "{{ instance_name }}"

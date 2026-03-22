@@ -1,11 +1,11 @@
 [package]
-name        = "fsn-store-validator"
+name        = "fs-store-validator"
 version     = "0.1.0"
 edition     = "2021"
 description = "Standalone store catalog validator — no private lib dependencies, safe for CI"
 
 [[bin]]
-name = "fsn-store-validator"
+name = "fs-store-validator"
 path = "src/main.rs"
 
 [dependencies]

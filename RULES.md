@@ -642,8 +642,8 @@ Never touches services belonging to other projects.
 
 Entry point:
 ```
-fsn-install.sh    <- Bash: checks Python3 + Ansible only
-    └── fsn-install.yml  <- Ansible: everything else
+fs-install.sh    <- Bash: checks Python3 + Ansible only
+    └── fs-install.yml  <- Ansible: everything else
 ```
 
 First run flow:
@@ -662,7 +662,7 @@ First run flow:
 
 Config file = single source of truth. Second run:
 ```
-fsn-install.sh --config projects/FreeSynergy.Net/freesynergy.project.yml
+fs-install.sh --config projects/FreeSynergy.Net/freesynergy.project.yml
 ```
 No questions. Reads file, deploys. Changed file -> update.
 

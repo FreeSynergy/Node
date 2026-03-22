@@ -21,11 +21,11 @@ min_trust = 2
 [vars]
 config_dir = "{{ project_root }}/data/{{ instance_name }}"
 
+[load]
+peer_services = ["kanidm", "cache"]
+
 [load.modules.postgres]
 module_class = "database/postgres"
-
-[load.services.kanidm]
-[load.services.cache]
 
 [container]
 name      = "{{ instance_name }}"

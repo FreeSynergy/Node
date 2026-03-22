@@ -25,14 +25,14 @@ per_ip   = 1
 [vars]
 config_dir = "{{ project_root }}/data/{{ instance_name }}"
 
+[load]
+peer_services = ["kanidm", "stalwart"]
+
 [load.modules.postgres]
 module_class = "database/postgres"
 
 [load.modules.dragonfly]
 module_class = "cache/dragonfly"
-
-[load.services.kanidm]
-[load.services.stalwart]
 
 [container]
 name      = "{{ instance_name }}"

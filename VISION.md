@@ -44,7 +44,7 @@ Intent("show mails")
   → render MailView with local data
 ```
 
-Groundwork already in place: `ServiceRole` registry in `fsn-core`.
+Groundwork already in place: `ServiceRole` registry in `fs-core`.
 Next step: extend it with an Intent-to-Capability mapping table.
 
 ### 2. Federated Services
@@ -95,8 +95,8 @@ The renderer turns data into a card.
 | Milestone | Status |
 |---|---|
 | Podman Quadlet deployment (CLI) | done — v0.1.0 |
-| ServiceHost / Supervisor | done — `fsn-container/src/supervisor.rs` |
+| ServiceHost / Supervisor | done — `fs-container/src/supervisor.rs` |
 | Intent-Routing (ServiceRole → Intent mapping) | next |
 | Desktop shell (FreeSynergy.Desktop) | in progress |
-| Federation (OIDC + ActivityPub) | planned — `fsn-federation` stub |
+| Federation (OIDC + ActivityPub) | planned — `fs-federation` stub |
 | Spatial canvas Desktop | future |

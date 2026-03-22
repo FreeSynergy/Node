@@ -24,8 +24,8 @@ per_host = 1
 [vars]
 config_dir = "{{ project_root }}/data/{{ instance_name }}"
 
-[load.services.zentinel]
-[load.services.kanidm]
+[load]
+peer_services = ["zentinel", "kanidm"]
 
 [container]
 name      = "{{ instance_name }}"

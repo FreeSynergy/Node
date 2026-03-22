@@ -1,11 +1,11 @@
 [package]
-name    = "fsn-migrate-v1-to-v2"
+name    = "fs-migrate-v1-to-v2"
 version = "0.1.0"
 edition = "2021"
 publish = false
 
 [[bin]]
-name = "fsn-migrate"
+name = "fs-migrate"
 path = "src/main.rs"
 
 [dependencies]

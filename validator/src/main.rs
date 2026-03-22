@@ -1,13 +1,13 @@
-// fsn-store-validator
+// fs-store-validator
 //
 // Standalone store catalog validator.
 // No private FreeSynergy.Lib dependencies — safe to build in CI.
 //
 // Usage:
-//   fsn-store-validator <store-dir> <namespace>
+//   fs-store-validator <store-dir> <namespace>
 //
 // Example:
-//   fsn-store-validator ./Store node
+//   fs-store-validator ./Store node
 
 use std::{env, path::Path, process};
 
@@ -16,7 +16,7 @@ mod validate_store;
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() != 3 {
-        eprintln!("Usage: fsn-store-validator <store-dir> <namespace>");
+        eprintln!("Usage: fs-store-validator <store-dir> <namespace>");
         process::exit(2);
     }
     let store_dir = Path::new(&args[1]);

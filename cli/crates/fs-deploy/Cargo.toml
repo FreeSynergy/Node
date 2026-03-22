@@ -1,0 +1,38 @@
+[package]
+name        = "fs-deploy"
+description = "FreeSynergy.Node – deployment engine (Quadlet generation, Zentinel, reconciliation)"
+version.workspace    = true
+edition.workspace    = true
+license.workspace    = true
+
+[features]
+wasm = ["fs-plugin-runtime/wasm"]
+
+[dependencies]
+fs-store          = { workspace = true }
+fs-inventory      = { workspace = true }
+fs-types          = { workspace = true }
+fs-node-core      = { workspace = true }
+fs-plugin-runtime = { workspace = true }
+fs-plugin-sdk     = { workspace = true }
+fs-template       = { workspace = true }
+fs-container = { workspace = true }
+serde              = { workspace = true }
+serde_json         = { workspace = true }
+toml               = { workspace = true }
+indexmap           = { workspace = true }
+anyhow             = { workspace = true }
+thiserror          = { workspace = true }
+tokio              = { workspace = true }
+reqwest            = { workspace = true }
+tracing            = { workspace = true }
+chrono             = { workspace = true }
+uuid               = { workspace = true }
+fs-host           = { workspace = true }
+
+[dev-dependencies]
+rstest   = { workspace = true }
+insta    = { workspace = true }
+tempfile = { workspace = true }
+tokio    = { workspace = true }
+

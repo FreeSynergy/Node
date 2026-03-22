@@ -1,4 +1,4 @@
-// fuzz_template.rs — Fuzzes Tera template rendering in fsn-deploy.
+// fuzz_template.rs — Fuzzes Tera template rendering in fs-deploy.
 //
 // Run with:
 //   cargo fuzz run fuzz_template

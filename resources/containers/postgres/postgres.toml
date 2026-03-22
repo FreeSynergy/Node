@@ -18,9 +18,6 @@ config_dir = "{{ project_root }}/data/{{ instance_name }}"
 db_name    = "{{ postgres_db_name | default(parent_instance_name) }}"
 db_user    = "{{ postgres_db_user | default(parent_instance_name) }}"
 
-[load.modules]
-[load.services]
-
 [container]
 name      = "{{ instance_name }}"
 image     = "docker.io/library/postgres"

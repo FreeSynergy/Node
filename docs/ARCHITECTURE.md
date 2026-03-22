@@ -6,7 +6,7 @@
 
 ### 1.1 Code-Wiederverwendung
 
-Jede Funktionalität wird zuerst als eigenständige Library gebaut. `fsn-*` Libraries in FreeSynergy.Lib wissen nichts von FreeSynergy.Node — sie sind für Wiki.rs, Decidim.rs und jeden anderen nutzbar.
+Jede Funktionalität wird zuerst als eigenständige Library gebaut. `fs-*` Libraries in FreeSynergy.Lib wissen nichts von FreeSynergy.Node — sie sind für Wiki.rs, Decidim.rs und jeden anderen nutzbar.
 
 ### 1.2 Standards
 
@@ -26,7 +26,7 @@ Desktop, Web und TUI müssen sich **gleich anfühlen**. Gleiche Navigation, glei
 Jeder Befehl ist über **alle drei Interfaces** nutzbar:
 - **CLI**: `fsn conductor start <service>`
 - **TUI**: `fsn conductor` (Dioxus terminal)
-- **GUI**: `fsd-conductor` (Dioxus desktop/web)
+- **GUI**: `fs-conductor` (Dioxus desktop/web)
 
 Core-Logik liegt in der Library. Die drei Frontends sind dünne Wrapper.
 
@@ -37,7 +37,7 @@ Core-Logik liegt in der Library. Die drei Frontends sind dünne Wrapper.
 ```
 FreeSynergy/Lib            ← Wiederverwendbare Bibliotheken (Cargo Workspace)      [eigenes Repo]
 FreeSynergy/Node           ← CLI + Deployment-Engine (Cargo Workspace)             [eigenes Repo]
-FreeSynergy/Desktop        ← Desktop-Umgebung (Cargo Workspace, nutzt fsn-*)       [eigenes Repo]
+FreeSynergy/Desktop        ← Desktop-Umgebung (Cargo Workspace, nutzt fs-*)       [eigenes Repo]
 FreeSynergy/Node.Store     ← Plugin-Registry für Node (Daten, kein Code)           [eigenes Repo]
 FreeSynergy/Wiki.Store     ← Plugin-Registry für Wiki.rs (zukünftig)               [eigenes Repo]
 FreeSynergy/Decidim.Store  ← Plugin-Registry für Decidim.rs (zukünftig)            [eigenes Repo]
@@ -45,40 +45,40 @@ FreeSynergy/Decidim.Store  ← Plugin-Registry für Decidim.rs (zukünftig)     
 
 ### FreeSynergy/Lib — Bibliotheken
 
-Alle Präfixe sind `fsn-` (FreeSynergy Network).
+Alle Präfixe sind `fs-` (FreeSynergy Network).
 
 ```
-fsn-types/              Shared Types (Resource, Meta, TypeSystem, Capability)
-fsn-error/              Fehlerbehandlung + Auto-Repair + Repairable-Trait
-fsn-config/             TOML laden/speichern mit Validierung + Auto-Repair
-fsn-i18n/               Fluent-basierte Schnipsel (actions, nouns, status, errors, ...)
-fsn-sync/               CRDT-Sync (Automerge-Wrapper)
-fsn-store/              Universeller Store-Client (Download, Registry, Suche)
-fsn-plugin-sdk/         WASM Plugin SDK (Traits, wit-bindgen Interfaces)
-fsn-plugin-runtime/     WASM Host (wasmtime)
-fsn-federation/         OIDC + SCIM + ActivityPub + WebFinger
-fsn-auth/               OAuth2 + JWT + Permissions
-fsn-bridge-sdk/         Bridge-Interface-Traits
-fsn-container/          Container-Abstraktion (Podman via bollard)
-fsn-template/           Tera-Wrapper
-fsn-health/             Health-Check Framework
-fsn-crypto/             age-Encryption, mTLS, Key-Management
-fsn-db/                 Datenbank-Abstraktion (SeaORM + rusqlite)
-fsn-theme/              Theme-System (CSS-Variablen, TUI-Farben)
-fsn-help/               Kontextsensitives Hilfe-System
+fs-types/              Shared Types (Resource, Meta, TypeSystem, Capability)
+fs-error/              Fehlerbehandlung + Auto-Repair + Repairable-Trait
+fs-config/             TOML laden/speichern mit Validierung + Auto-Repair
+fs-i18n/               Fluent-basierte Schnipsel (actions, nouns, status, errors, ...)
+fs-sync/               CRDT-Sync (Automerge-Wrapper)
+fs-store/              Universeller Store-Client (Download, Registry, Suche)
+fs-plugin-sdk/         WASM Plugin SDK (Traits, wit-bindgen Interfaces)
+fs-plugin-runtime/     WASM Host (wasmtime)
+fs-federation/         OIDC + SCIM + ActivityPub + WebFinger
+fs-auth/               OAuth2 + JWT + Permissions
+fs-bridge-sdk/         Bridge-Interface-Traits
+fs-container/          Container-Abstraktion (Podman via bollard)
+fs-template/           Tera-Wrapper
+fs-health/             Health-Check Framework
+fs-crypto/             age-Encryption, mTLS, Key-Management
+fs-db/                 Datenbank-Abstraktion (SeaORM + rusqlite)
+fs-theme/              Theme-System (CSS-Variablen, TUI-Farben)
+fs-help/               Kontextsensitives Hilfe-System
 ```
 
 ### FreeSynergy/Node — Deployment-Engine
 
 ```
 cli/crates/
-  fsn-node-core/        Node-spezifische Logik + Datentypen (Config, State, Health, Store)
-  fsn-deploy/           Quadlet-Generation, Zentinel, Reconciliation, Hooks
-  fsn-dns/              DNS-Provider Integrationen (Hetzner, Cloudflare)
-  fsn-host/             Host-Management, SSH, Remote-Install, Provisioning
-  fsn-wizard/           Container-Assistent (Docker Compose → FSN-Modul)
-  fsn-node-cli/         CLI Binary (clap) — `fsn` Kommando, kein UI-Code
-  fsn-installer/        Server-Setup-Tooling (Erstinstallation)
+  fs-node-core/        Node-spezifische Logik + Datentypen (Config, State, Health, Store)
+  fs-deploy/           Quadlet-Generation, Zentinel, Reconciliation, Hooks
+  fs-dns/              DNS-Provider Integrationen (Hetzner, Cloudflare)
+  fs-host/             Host-Management, SSH, Remote-Install, Provisioning
+  fs-wizard/           Container-Assistent (Docker Compose → FSN-Modul)
+  fs-node-cli/         CLI Binary (clap) — `fsn` Kommando, kein UI-Code
+  fs-installer/        Server-Setup-Tooling (Erstinstallation)
 ```
 
 **Kein UI-Code in Node.** Das UI gehört in Desktop.
@@ -87,16 +87,16 @@ cli/crates/
 
 ```
 crates/
-  fsd-shell/            Desktop Shell (Taskbar, Window Manager, Wallpaper)
-  fsd-conductor/        Container/Service/Bot Management (vormals "Admin")
-  fsd-store/            Package Manager (Browser, Install, Updates)
-  fsd-studio/           Plugin/Modul/Sprachdatei-Ersteller (+AI optional)
-  fsd-settings/         System Settings
-  fsd-profile/          User Profile
-  fsd-app/              App-Launcher Binary (startet alles)
+  fs-shell/            Desktop Shell (Taskbar, Window Manager, Wallpaper)
+  fs-conductor/        Container/Service/Bot Management (vormals "Admin")
+  fs-store/            Package Manager (Browser, Install, Updates)
+  fs-studio/           Plugin/Modul/Sprachdatei-Ersteller (+AI optional)
+  fs-settings/         System Settings
+  fs-profile/          User Profile
+  fs-app/              App-Launcher Binary (startet alles)
 ```
 
-Jedes `fsd-*` Crate kann als **eigenständiges Fenster oder Prozess** gestartet werden (Dioxus Multiwindow). `fsd-app` ist das Einstiegsprogramm das die Shell lädt.
+Jedes `fs-*` Crate kann als **eigenständiges Fenster oder Prozess** gestartet werden (Dioxus Multiwindow). `fs-app` ist das Einstiegsprogramm das die Shell lädt.
 
 ---
 
@@ -111,14 +111,14 @@ Nach Analyse aller Optionen ist **SeaORM 2.0 mit rusqlite-Backend** die beste Wa
 - **Migrationen eingebaut**: `sea-orm-cli` für Schema-Migrations
 - **Multi-DB-fähig**: Startet mit SQLite, kann auf Postgres wechseln wenn nötig (Wiki.rs wird Postgres brauchen)
 - **Admin Panel**: SeaORM Pro bietet gratis RBAC-Admin-Panel
-- **Wiederverwendbar**: Dieselbe `fsn-db` Library kann in Node (SQLite), Wiki.rs (Postgres) und Decidim.rs (Postgres) eingesetzt werden
+- **Wiederverwendbar**: Dieselbe `fs-db` Library kann in Node (SQLite), Wiki.rs (Postgres) und Decidim.rs (Postgres) eingesetzt werden
 
 ### Write-Buffering Engine (wie ownCloud)
 
 Für das Problem mit vielen gleichzeitigen Schreibzugriffen (das Du von ownCloud kennst):
 
 ```rust
-/// fsn-db: Write-Buffer für SQLite
+/// fs-db: Write-Buffer für SQLite
 pub struct WriteBuffer {
     queue: Vec<BufferedWrite>,
     flush_interval: Duration,    // z.B. 100ms
@@ -140,10 +140,10 @@ impl WriteBuffer {
 
 Das kombiniert SQLite-Vorteile (embedded, keine Infra) mit Batch-Writes (keine Lock-Contention bei vielen Zugriffen).
 
-### Schema in fsn-db (wiederverwendbar)
+### Schema in fs-db (wiederverwendbar)
 
 ```rust
-// fsn-db bietet Basis-Entities die jedes Projekt erweitern kann
+// fs-db bietet Basis-Entities die jedes Projekt erweitern kann
 pub mod entities {
     pub mod resource;     // Basis-Resource mit Metadaten
     pub mod permission;   // RBAC-Permissions
@@ -167,7 +167,7 @@ pub mod node_entities {
 
 ### 4.1 Übersicht
 
-FreeSynergy.Desktop ist ein **eigenes Programm und eigenes Repository**. Es ist wie ein echter Desktop (KDE-ähnlich), gebaut mit Dioxus Multiwindow. Jede App (`fsd-*`) läuft als eigenständiges Fenster — auf dem Desktop parallel zu anderen, im Web als Tab, im TUI als Panel.
+FreeSynergy.Desktop ist ein **eigenes Programm und eigenes Repository**. Es ist wie ein echter Desktop (KDE-ähnlich), gebaut mit Dioxus Multiwindow. Jede App (`fs-*`) läuft als eigenständiges Fenster — auf dem Desktop parallel zu anderen, im Web als Tab, im TUI als Panel.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -177,8 +177,8 @@ FreeSynergy.Desktop ist ein **eigenes Programm und eigenes Repository**. Es ist 
 │  │  Conductor   │  │  Store                               │    │
 │  │              │  │                                      │    │
 │  │  [Container] │  │  [Paket suchen...]                   │    │
-│  │  [Bots]      │  │  ┌────┐ fsn-nginx    [Installieren] │    │
-│  │  [Ressourcen]│  │  └────┘ fsn-postgres [Installieren] │    │
+│  │  [Bots]      │  │  ┌────┐ fs-nginx    [Installieren] │    │
+│  │  [Ressourcen]│  │  └────┘ fs-postgres [Installieren] │    │
 │  └──────────────┘  └──────────────────────────────────────┘    │
 │                                                                  │
 ├─────────────────────────────────────────────────────────────────┤
@@ -186,7 +186,7 @@ FreeSynergy.Desktop ist ein **eigenes Programm und eigenes Repository**. Es ist 
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### 4.2 Taskbar (fsd-shell)
+### 4.2 Taskbar (fs-shell)
 
 Wie KDE Plasma — immer sichtbar, konfigurierbar:
 
@@ -196,16 +196,16 @@ Wie KDE Plasma — immer sichtbar, konfigurierbar:
 - **Sprachanzeige**: aktive Sprache, wechselbar per Klick
 - **Uhr + Datum**
 
-### 4.3 Apps (fsd-*)
+### 4.3 Apps (fs-*)
 
 | App | Zweck | Standalone? |
 |---|---|---|
-| `fsd-shell` | Taskbar, Window Manager, Wallpaper | Nein (läuft immer) |
-| `fsd-conductor` | Container/Service/Bot Management | Ja |
-| `fsd-store` | Package Manager | Ja |
-| `fsd-studio` | Plugin/Modul/i18n-Ersteller (+AI) | Ja |
-| `fsd-settings` | System Settings | Ja |
-| `fsd-profile` | User Profile | Ja |
+| `fs-shell` | Taskbar, Window Manager, Wallpaper | Nein (läuft immer) |
+| `fs-conductor` | Container/Service/Bot Management | Ja |
+| `fs-store` | Package Manager | Ja |
+| `fs-studio` | Plugin/Modul/i18n-Ersteller (+AI) | Ja |
+| `fs-settings` | System Settings | Ja |
+| `fs-profile` | User Profile | Ja |
 
 Standalone = kann auch ohne Shell als eigenes Fenster/Prozess gestartet werden.
 
@@ -223,7 +223,7 @@ Standalone = kann auch ohne Shell als eigenes Fenster/Prozess gestartet werden.
 ```
 fsn conductor start <service>     ← CLI
 fsn conductor                      ← TUI
-fsd-conductor                      ← GUI
+fs-conductor                      ← GUI
 ```
 
 ### 4.5 Store (Package Manager)
@@ -239,7 +239,7 @@ Wie `apt install` + interaktiver Konfig-Dialog → dann läuft's → Management 
 fsn store search <query>           ← CLI
 fsn store install <package>        ← CLI (triggert Setup-Wizard)
 fsn store update                   ← CLI
-fsd-store                          ← GUI
+fs-store                          ← GUI
 ```
 
 ### 4.6 Studio (Plugin/Modul/i18n-Ersteller)
@@ -253,7 +253,7 @@ Studio ist das Werkzeug um Inhalte für das FSN-Ökosystem zu erstellen:
 
 ```
 fsn studio                         ← TUI
-fsd-studio                         ← GUI
+fs-studio                         ← GUI
 ```
 
 ### 4.7 Settings
@@ -347,7 +347,7 @@ pub trait Scrollable {
 
 Maus-Scrolling + Tastatur (PgUp/PgDn/Home/End) in allen Interfaces.
 
-### 5.4 Hilfe-System (fsn-help)
+### 5.4 Hilfe-System (fs-help)
 
 ```rust
 pub struct HelpSystem {
@@ -379,7 +379,7 @@ Aufruf: **F1** (Desktop/Web), **?** (TUI), Menü, oder Hilfe-Button in jedem Fen
 
 ---
 
-## 6. Theme-System (fsn-theme)
+## 6. Theme-System (fs-theme)
 
 ### 6.1 Eine Datei regiert alles
 
@@ -453,20 +453,20 @@ status_warn  = "yellow"
 ```
 Datei: theme.css
 
-Variablen-Namensschema (Präfix IMMER --fsn-):
-  --fsn-color-primary: #2563eb;
-  --fsn-color-primary-hover: #1d4ed8;
-  --fsn-color-bg-base: #ffffff;
-  --fsn-color-bg-surface: #f8fafc;
-  --fsn-color-text-primary: #0f172a;
-  --fsn-color-success: #22c55e;
-  --fsn-color-warning: #f59e0b;
-  --fsn-color-error: #ef4444;
-  --fsn-font-family: 'Inter', system-ui, sans-serif;
-  --fsn-font-mono: 'JetBrains Mono', monospace;
-  --fsn-font-size-base: 16px;
-  --fsn-spacing-unit: 4px;
-  --fsn-radius-md: 8px;
+Variablen-Namensschema (Präfix IMMER --fs-):
+  --fs-color-primary: #2563eb;
+  --fs-color-primary-hover: #1d4ed8;
+  --fs-color-bg-base: #ffffff;
+  --fs-color-bg-surface: #f8fafc;
+  --fs-color-text-primary: #0f172a;
+  --fs-color-success: #22c55e;
+  --fs-color-warning: #f59e0b;
+  --fs-color-error: #ef4444;
+  --fs-font-family: 'Inter', system-ui, sans-serif;
+  --fs-font-mono: 'JetBrains Mono', monospace;
+  --fs-font-size-base: 16px;
+  --fs-spacing-unit: 4px;
+  --fs-radius-md: 8px;
 
 Liefere NUR :root { ... } — kein Layout, keine Komponenten.
 FreeSynergy.Node konvertiert diese automatisch in theme.toml.
@@ -475,7 +475,7 @@ FreeSynergy.Node konvertiert diese automatisch in theme.toml.
 ### 6.4 Konvertierung
 
 ```rust
-/// fsn-theme: Konvertiert zwischen Formaten
+/// fs-theme: Konvertiert zwischen Formaten
 pub struct ThemeEngine {
     theme: Theme,
 }
@@ -537,9 +537,9 @@ Siehe Plan v2 — unverändert. Zusammenfassung:
 
 ---
 
-## 9. Container-Assistent (fsn-wizard / fsd-studio)
+## 9. Container-Assistent (fs-wizard / fs-studio)
 
-Der Container-Assistent lebt in **fsd-studio** (GUI) und **fsn-wizard** (Library):
+Der Container-Assistent lebt in **fs-studio** (GUI) und **fs-wizard** (Library):
 - YAML/Docker-Compose eingeben (Text, URL, Datei)
 - Automatische Typ-Erkennung (Image-Name, Ports, Volumes)
 - Modul-Generation mit Standard-Werten
@@ -578,7 +578,7 @@ Alle Details aus Plan v2 bleiben bestehen. Hier nur die Entscheidungen:
 
 ### 12.1 Versionierung & Changelog
 
-Jede `fsn-*` Library bekommt **eigene SemVer-Versionierung**. CHANGELOG.md pro Crate, nicht nur global. Nutze `cargo-release` für koordinierte Releases.
+Jede `fs-*` Library bekommt **eigene SemVer-Versionierung**. CHANGELOG.md pro Crate, nicht nur global. Nutze `cargo-release` für koordinierte Releases.
 
 ### 12.2 Feature Flags überall
 
@@ -601,11 +601,11 @@ Das hält die Compile-Zeiten kurz. Wiki.rs braucht vielleicht `federation` + `po
 - **GitHub Actions**: Build, Test, Clippy, Rustfmt auf jedem Push
 - **cargo-deny**: License-Check, Advisory-DB-Check
 - **Dependabot**: Automatische Dependency-Updates
-- **Nightly Fuzzing**: cargo-fuzz auf fsn-config, fsn-sync, fsn-template (alles was User-Input parst)
+- **Nightly Fuzzing**: cargo-fuzz auf fs-config, fs-sync, fs-template (alles was User-Input parst)
 
 ### 12.4 Dokumentation
 
-- **Jede fsn-* Crate**: README.md + `#[doc]` auf allen pub Items
+- **Jede fs-* Crate**: README.md + `#[doc]` auf allen pub Items
 - **docs.rs** automatisch (bei Publish auf crates.io)
 - **Architektur-Docs**: `docs/ARCHITECTURE.md` pro Repo
 - **Beispiele**: `examples/` Verzeichnis in jeder Library
@@ -655,16 +655,16 @@ Plugin-Metadaten und Modul-Konfigurationen bringen ein **JSON-Schema** mit (Form
 ### 12.10 Migration von v1
 
 - Modul-Definitionen → migrieren in Node.Store Format
-- Deployment-Logik → migrieren in fsn-deploy
-- i18n-Strings → migrieren in fsn-i18n Schnipsel-Format
+- Deployment-Logik → migrieren in fs-deploy
+- i18n-Strings → migrieren in fs-i18n Schnipsel-Format
 - Ein `migration/` Verzeichnis mit Skripten die alte Configs konvertieren
 
 ### 12.11 ratatui/rat-salsa entfernen
 
 Da wir auf **Dioxus** umsteigen (hat `dioxus-terminal` für TUI), fällt ratatui komplett weg:
-1. Alle bisherigen TUI-Nodes neu als Dioxus-Komponenten in `fsd-*`
+1. Alle bisherigen TUI-Nodes neu als Dioxus-Komponenten in `fs-*`
 2. `rat-widget`, `ratatui`, `rat-salsa` aus allen `Cargo.toml` entfernen
-3. `fsn-tui` Crate wird aufgelöst — Komponenten wandern in `fsd-shell` oder `fsn-*` Libraries
+3. `fs-tui` Crate wird aufgelöst — Komponenten wandern in `fs-shell` oder `fs-*` Libraries
 
 ---
 
@@ -675,40 +675,40 @@ Da wir auf **Dioxus** umsteigen (hat `dioxus-terminal` für TUI), fällt ratatui
 - [x] `FreeSynergy/Lib` erstellen, CI einrichten
 - [x] `FreeSynergy/Desktop` erstellen, CI einrichten
 - [x] `FreeSynergy/UI` archivieren
-- [x] `FreeSynergy/Node` bereinigen (ratatui/rat-salsa entfernen, fsn-app entfernen)
+- [x] `FreeSynergy/Node` bereinigen (ratatui/rat-salsa entfernen, fs-app entfernen)
 - [x] CLAUDE.md in allen Repos aktualisieren
 
 ### Phase 1: Fundament (FreeSynergy.Lib) ✓
 
-fsn-types, fsn-error, fsn-config, fsn-i18n, fsn-theme, fsn-help, fsn-db, fsn-health
+fs-types, fs-error, fs-config, fs-i18n, fs-theme, fs-help, fs-db, fs-health
 
 ### Phase 2: CRDT + Sync (Stub)
 
-fsn-sync (Automerge) — Stub implementiert, aktive Integration ausstehend
+fs-sync (Automerge) — Stub implementiert, aktive Integration ausstehend
 
 ### Phase 3: Store + Plugins (Stub)
 
-fsn-store, fsn-plugin-sdk, fsn-plugin-runtime — Stubs implementiert
+fs-store, fs-plugin-sdk, fs-plugin-runtime — Stubs implementiert
 
 ### Phase 4: Auth + Federation (Stub)
 
-fsn-auth, fsn-federation, fsn-crypto — Stubs implementiert
+fs-auth, fs-federation, fs-crypto — Stubs implementiert
 
 ### Phase 5: Container + Templates (Stub)
 
-fsn-container, fsn-template, fsn-health — implementiert
+fs-container, fs-template, fs-health — implementiert
 
 ### Phase 6: Node Application ✓
 
-fsn-node-core, fsn-deploy, fsn-host, fsn-wizard, fsn-node-cli, fsn-dns, fsn-installer
+fs-node-core, fs-deploy, fs-host, fs-wizard, fs-node-cli, fs-dns, fs-installer
 
 ### Phase 7: Desktop (FreeSynergy.Desktop)
 
-fsd-shell, fsd-conductor, fsd-store, fsd-settings, fsd-profile, fsd-studio, fsd-app — in Planung
+fs-shell, fs-conductor, fs-store, fs-settings, fs-profile, fs-studio, fs-app — in Planung
 
 ### Phase 8: Bridges (ongoing)
 
-fsn-bridge-sdk + erste WASM-Bridge-Plugins
+fs-bridge-sdk + erste WASM-Bridge-Plugins
 
 ---
 
@@ -791,28 +791,28 @@ fsn-bridge-sdk + erste WASM-Bridge-Plugins
 | Federation | **OIDC + SCIM + ActivityPub** (von Tag 1) |
 | ActivityPub Crate | **activitypub_federation** |
 | Theme-System | **Eine Datei** (theme.toml oder theme.css → konvertierbar) |
-| CSS-Präfix | **--fsn-** (nicht --fsy-) |
+| CSS-Präfix | **--fs-** (nicht --fsy-) |
 | Fenster | **Alle Einblendungen sind Fenster** (OK/Cancel/Apply) |
 | Hilfe | **Immer aufrufbar** (F1, ?, Menü) |
 | Scrolling | **Automatisch** wenn Inhalt > Viewport |
 | TUI-Framework | **Dioxus terminal** (ratatui/rat-salsa entfernt) |
 | Desktop | **Eigenes Repo** (FreeSynergy/Desktop) |
 | Admin-Begriff | **Conductor** (Container/Service/Bot Management) |
-| Wizard | **fsd-studio** (GUI) + **fsn-wizard** (Library) |
-| MIME-Erweiterung | **Service Roles** (fsn-Prefix in TOML) |
-| Package Manager | **fsd-store** (Discovery+Install+Wizard), Conductor für Laufzeit |
-| Crate-Präfix Lib | **fsn-** (nicht fsy-) |
-| Crate-Präfix Desktop | **fsd-** |
+| Wizard | **fs-studio** (GUI) + **fs-wizard** (Library) |
+| MIME-Erweiterung | **Service Roles** (fs-Prefix in TOML) |
+| Package Manager | **fs-store** (Discovery+Install+Wizard), Conductor für Laufzeit |
+| Crate-Präfix Lib | **fs-** (nicht fsy-) |
+| Crate-Präfix Desktop | **fs-** |
 | Sprache im Code | **Englisch** |
 | Sprache hier | **Deutsch** |
 | Lib-Veröffentlichung | **crates.io** (wenn APIs stabil) |
 | Repo-Struktur | **Lib + Node + Desktop + Store-Repos** (je eigenes Repo) |
-| Wiki.rs/Decidim.rs | **Demnächst** — fsn-* Libraries müssen stabil sein |
+| Wiki.rs/Decidim.rs | **Demnächst** — fs-* Libraries müssen stabil sein |
 
 ---
 
 ## Nächster Schritt
 
-Phase 7: FreeSynergy.Desktop — Dioxus-App mit fsd-shell, fsd-conductor (Hosts/Services/Projekte), fsd-store (Plugin-Browser), fsd-studio (Modul-Builder), fsd-settings, fsd-profile, fsd-app.
+Phase 7: FreeSynergy.Desktop — Dioxus-App mit fs-shell, fs-conductor (Hosts/Services/Projekte), fs-store (Plugin-Browser), fs-studio (Modul-Builder), fs-settings, fs-profile, fs-app.
 
-Parallel: Phase 2–4 Stubs in FreeSynergy.Lib aktivieren (fsn-sync Automerge, fsn-auth OIDC, fsn-federation ActivityPub).
+Parallel: Phase 2–4 Stubs in FreeSynergy.Lib aktivieren (fs-sync Automerge, fs-auth OIDC, fs-federation ActivityPub).

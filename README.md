@@ -49,7 +49,7 @@ Vision: Nodes that **voluntarily federate** — with OIDC-based identity sharing
 
 ```bash
 # 1. Run the installer (sets up Podman + builds fsn)
-curl -sSL https://raw.githubusercontent.com/FreeSynergy/Node/master/fsn-install.sh | bash
+curl -sSL https://raw.githubusercontent.com/FreeSynergy/Node/master/fs-install.sh | bash
 
 # 2. Initialize your first node
 fsn wizard
@@ -62,14 +62,14 @@ fsn tui
 
 ```
 .
-├── cli/               # Rust CLI + TUI (fsn binary + fsn-tui logic)
+├── cli/               # Rust CLI + TUI (fsn binary + fs-tui logic)
 ├── hosts/             # Per-server configs (gitignore'd)
 ├── locales/           # i18n files (de + en via Fluent)
 ├── modules/           # Service definitions (TOML + Jinja templates)
 ├── projects/          # Your deployed project instances
 ├── store/             # Bundled store integration
 ├── tools/             # Build & setup scripts
-├── fsn-install.sh     # One-shot bootstrap installer
+├── fs-install.sh     # One-shot bootstrap installer
 └── ...                # CHANGELOG.md · TODO.md · RULES.md · LICENSE
 ```
 

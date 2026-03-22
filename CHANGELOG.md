@@ -6,16 +6,16 @@ was sich geändert hat.
 
 ---
 
-## 2026-03-07 – Claude Code – fsn-tui: Dashboard-Umbau (Sidebar, Projekt-Liste, Edit/Delete)
+## 2026-03-07 – Claude Code – fs-tui: Dashboard-Umbau (Sidebar, Projekt-Liste, Edit/Delete)
 
 ### Geänderte Dateien
-- `cli/crates/fsn-tui/Cargo.toml` – `toml = { workspace = true }` hinzugefügt (TOML-Parsing)
-- `cli/crates/fsn-tui/src/app.rs` – `DashFocus`-Enum, `ProjectInfo`-Struct, `dirty()`-Builder, `edit_slug` in `NewProjectForm`, `NewProjectForm::from_project()`, `AppState` um `projects`/`selected_project`/`dash_focus`/`dash_confirm` erweitert
-- `cli/crates/fsn-tui/src/lib.rs` – `load_projects()` + `parse_project_toml()` lesen `*.project.toml` beim Start
-- `cli/crates/fsn-tui/src/i18n.rs` – Neue Schlüssel: `dash.hint.services`, `dash.hint.confirm`, `dash.no_projects`, `dash.new_project`, `welcome.edit_project`, `form.submit.edit`, `sidebar.projects` (DE+EN)
-- `cli/crates/fsn-tui/src/ui/dashboard.rs` – Komplettumbau: Sidebar (22 Spalten) + Fokus-System (Sidebar/Services), Header zeigt aktives Projekt, Bestätigungsdialog fürs Löschen
-- `cli/crates/fsn-tui/src/ui/new_project.rs` – Edit-Modus: Titel + Submit-Button abhängig von `edit_slug`
-- `cli/crates/fsn-tui/src/events.rs` – `handle_dashboard()` neu mit 2-Fokus-System, `delete_selected_project()`, `submit_project()` lädt Projektliste neu
+- `cli/crates/fs-tui/Cargo.toml` – `toml = { workspace = true }` hinzugefügt (TOML-Parsing)
+- `cli/crates/fs-tui/src/app.rs` – `DashFocus`-Enum, `ProjectInfo`-Struct, `dirty()`-Builder, `edit_slug` in `NewProjectForm`, `NewProjectForm::from_project()`, `AppState` um `projects`/`selected_project`/`dash_focus`/`dash_confirm` erweitert
+- `cli/crates/fs-tui/src/lib.rs` – `load_projects()` + `parse_project_toml()` lesen `*.project.toml` beim Start
+- `cli/crates/fs-tui/src/i18n.rs` – Neue Schlüssel: `dash.hint.services`, `dash.hint.confirm`, `dash.no_projects`, `dash.new_project`, `welcome.edit_project`, `form.submit.edit`, `sidebar.projects` (DE+EN)
+- `cli/crates/fs-tui/src/ui/dashboard.rs` – Komplettumbau: Sidebar (22 Spalten) + Fokus-System (Sidebar/Services), Header zeigt aktives Projekt, Bestätigungsdialog fürs Löschen
+- `cli/crates/fs-tui/src/ui/new_project.rs` – Edit-Modus: Titel + Submit-Button abhängig von `edit_slug`
+- `cli/crates/fs-tui/src/events.rs` – `handle_dashboard()` neu mit 2-Fokus-System, `delete_selected_project()`, `submit_project()` lädt Projektliste neu
 
 ### Was sich geändert hat
 - **Projekt-Sidebar**: Dashboard zeigt alle Projekte aus `projects/*/`. `↑↓` wechselt Projekte, `Tab` springt zur Services-Tabelle
@@ -30,14 +30,14 @@ was sich geändert hat.
 
 ---
 
-## 2026-03-07 – Claude Code – fsn-tui: Dropdown, Button-Fix, Maus-Klick, TOML-Speichern
+## 2026-03-07 – Claude Code – fs-tui: Dropdown, Button-Fix, Maus-Klick, TOML-Speichern
 
 ### Geänderte Dateien
-- `cli/crates/fsn-tui/src/app.rs` – `slugify` public gemacht, `field_value()` + `set_select_by_index()` hinzugefügt
-- `cli/crates/fsn-tui/src/ui/welcome.rs` – Button-Breite dynamisch aus Textlänge berechnet (kein Abschneiden mehr)
-- `cli/crates/fsn-tui/src/ui/new_project.rs` – Dropdown-Overlay für Select-Felder (List-Widget), Sprachname als Klartext (Deutsch, English, …)
-- `cli/crates/fsn-tui/src/events.rs` – Maus-Klick auf Formularfelder + Dropdown-Klick, Submit-Handler schreibt `{slug}.project.toml`, `handle_new_project` bekommt `root`-Parameter
-- `cli/crates/fsn-tui/src/lib.rs` – `project_toml_exists()` erkennt vorhandene Projekte → direkt zum Dashboard
+- `cli/crates/fs-tui/src/app.rs` – `slugify` public gemacht, `field_value()` + `set_select_by_index()` hinzugefügt
+- `cli/crates/fs-tui/src/ui/welcome.rs` – Button-Breite dynamisch aus Textlänge berechnet (kein Abschneiden mehr)
+- `cli/crates/fs-tui/src/ui/new_project.rs` – Dropdown-Overlay für Select-Felder (List-Widget), Sprachname als Klartext (Deutsch, English, …)
+- `cli/crates/fs-tui/src/events.rs` – Maus-Klick auf Formularfelder + Dropdown-Klick, Submit-Handler schreibt `{slug}.project.toml`, `handle_new_project` bekommt `root`-Parameter
+- `cli/crates/fs-tui/src/lib.rs` – `project_toml_exists()` erkennt vorhandene Projekte → direkt zum Dashboard
 
 ### Was sich geändert hat
 - **Dropdown**: Language-Feld zeigt beim Fokus eine Auswahlliste (▶ Deutsch, English, Français, Español, Italiano, Português)
@@ -51,13 +51,13 @@ was sich geändert hat.
 
 ---
 
-## 2026-03-07 – Claude Code – fsn-tui: Form-Umbau, Ctrl-Navigation, Smart Defaults
+## 2026-03-07 – Claude Code – fs-tui: Form-Umbau, Ctrl-Navigation, Smart Defaults
 
 ### Geänderte Dateien
-- `cli/crates/fsn-tui/src/app.rs` – Server-Tab entfernt (2 Tabs: Projekt + Optionen). Description in Projekt-Tab. `dirty`-Flag pro Feld. `on_field_changed()` + `sync_email_from_domain()` für Auto-Defaults. `slugify()`. `ctrl_hint: bool` in AppState
-- `cli/crates/fsn-tui/src/events.rs` – ESC schließt Modal (nicht mehr Tab-by-Tab). Ctrl+←/→ = Tab wechseln. Ohne Ctrl = Cursor im Text. `ctrl_hint` wird bei jedem Tastendruck aktualisiert
-- `cli/crates/fsn-tui/src/i18n.rs` – `form.hint.ctrl` hinzugefügt. `form.hint` aktualisiert (^=Strg). Server-Schlüssel entfernt, `form.project.description` neu
-- `cli/crates/fsn-tui/src/ui/new_project.rs` – Hint-Bar: wechselt auf Ctrl-Shortcuts wenn `ctrl_hint=true`
+- `cli/crates/fs-tui/src/app.rs` – Server-Tab entfernt (2 Tabs: Projekt + Optionen). Description in Projekt-Tab. `dirty`-Flag pro Feld. `on_field_changed()` + `sync_email_from_domain()` für Auto-Defaults. `slugify()`. `ctrl_hint: bool` in AppState
+- `cli/crates/fs-tui/src/events.rs` – ESC schließt Modal (nicht mehr Tab-by-Tab). Ctrl+←/→ = Tab wechseln. Ohne Ctrl = Cursor im Text. `ctrl_hint` wird bei jedem Tastendruck aktualisiert
+- `cli/crates/fs-tui/src/i18n.rs` – `form.hint.ctrl` hinzugefügt. `form.hint` aktualisiert (^=Strg). Server-Schlüssel entfernt, `form.project.description` neu
+- `cli/crates/fs-tui/src/ui/new_project.rs` – Hint-Bar: wechselt auf Ctrl-Shortcuts wenn `ctrl_hint=true`
 - `projects/FreeSynergy.Net/freesynergy.project.yml` – gelöscht (nicht mehr gebraucht)
 - `projects/FreeSynergy.Net/freesynergy.federation.yml` – gelöscht
 
@@ -75,13 +75,13 @@ was sich geändert hat.
 
 ---
 
-## 2026-03-07 – Claude Code – fsn-tui: UX-Verbesserungen (Zentrierung, Maus, Validierung)
+## 2026-03-07 – Claude Code – fs-tui: UX-Verbesserungen (Zentrierung, Maus, Validierung)
 
 ### Geänderte Dateien
-- `cli/crates/fsn-tui/src/ui/welcome.rs` – Sysinfo-Box: `Max(74)` + `Fill(1)` statt Percentage → zentriert. Branding: „FreeSynergy.Node · by KalEl"
-- `cli/crates/fsn-tui/src/app.rs` – `tab_missing_count()`, Event-Loop: `Event::Mouse` → `handle_mouse()`
-- `cli/crates/fsn-tui/src/events.rs` – Maus: ScrollUp/Down für Logs + Select. ESC geht Tab-weise zurück. Tab-Wechsel blockiert wenn Pflichtfelder fehlen
-- `cli/crates/fsn-tui/src/lib.rs` – `EnableMouseCapture` / `DisableMouseCapture`
+- `cli/crates/fs-tui/src/ui/welcome.rs` – Sysinfo-Box: `Max(74)` + `Fill(1)` statt Percentage → zentriert. Branding: „FreeSynergy.Node · by KalEl"
+- `cli/crates/fs-tui/src/app.rs` – `tab_missing_count()`, Event-Loop: `Event::Mouse` → `handle_mouse()`
+- `cli/crates/fs-tui/src/events.rs` – Maus: ScrollUp/Down für Logs + Select. ESC geht Tab-weise zurück. Tab-Wechsel blockiert wenn Pflichtfelder fehlen
+- `cli/crates/fs-tui/src/lib.rs` – `EnableMouseCapture` / `DisableMouseCapture`
 
 ### Was sich geändert hat
 - Sysinfo-Box ist zentriert
@@ -95,14 +95,14 @@ was sich geändert hat.
 
 ---
 
-## 2026-03-07 – Claude Code – fsn-tui: New-Project-Formular vollständig
+## 2026-03-07 – Claude Code – fs-tui: New-Project-Formular vollständig
 
 ### Geänderte Dateien
-- `cli/crates/fsn-tui/src/app.rs` – `Screen::NewProject`, `FormTab`, `FormFieldType`, `FormField`, `NewProjectForm` mit 10 Feldern (3 Tabs), Cursor-Navigation, Select-Cycling, Validierung. Neu: `delete_char()`, `cursor_home()`, `cursor_end()`, `select_prev()`
-- `cli/crates/fsn-tui/src/events.rs` – Vollständiges Tastatur-Handling für `Screen::NewProject`: Tab/BackTab (Feld-Navigation), ←→ (Tab wechseln / Cursor), ↑↓ (Select-Cycling), Enter (nächster Tab / Submit), Backspace/Delete/Home/End, Esc (zurück zu Welcome). Welcome-Screen: Enter → `Screen::NewProject`
-- `cli/crates/fsn-tui/src/ui/new_project.rs` – Neu: Formular mit ratatui `Tabs`-Widget (3 Tabs), Pflichtfeld-Marker `*`, Cursor als `█`, Hinweis-Text, ⚠ auf Tabs mit fehlenden Feldern, Submit-Button auf Options-Tab
-- `cli/crates/fsn-tui/src/ui/welcome.rs` – Sysinfo-Block mit fixer Spaltenbreite (18/18/14 Zeichen), bündig ausgerichtet
-- `cli/crates/fsn-tui/src/i18n.rs` – Alle form.* Schlüssel (DE + EN): `form.tab.*`, `form.project.*`, `form.server.*`, `form.options.*`, `form.hint`, `form.required`, `form.submit`
+- `cli/crates/fs-tui/src/app.rs` – `Screen::NewProject`, `FormTab`, `FormFieldType`, `FormField`, `NewProjectForm` mit 10 Feldern (3 Tabs), Cursor-Navigation, Select-Cycling, Validierung. Neu: `delete_char()`, `cursor_home()`, `cursor_end()`, `select_prev()`
+- `cli/crates/fs-tui/src/events.rs` – Vollständiges Tastatur-Handling für `Screen::NewProject`: Tab/BackTab (Feld-Navigation), ←→ (Tab wechseln / Cursor), ↑↓ (Select-Cycling), Enter (nächster Tab / Submit), Backspace/Delete/Home/End, Esc (zurück zu Welcome). Welcome-Screen: Enter → `Screen::NewProject`
+- `cli/crates/fs-tui/src/ui/new_project.rs` – Neu: Formular mit ratatui `Tabs`-Widget (3 Tabs), Pflichtfeld-Marker `*`, Cursor als `█`, Hinweis-Text, ⚠ auf Tabs mit fehlenden Feldern, Submit-Button auf Options-Tab
+- `cli/crates/fs-tui/src/ui/welcome.rs` – Sysinfo-Block mit fixer Spaltenbreite (18/18/14 Zeichen), bündig ausgerichtet
+- `cli/crates/fs-tui/src/i18n.rs` – Alle form.* Schlüssel (DE + EN): `form.tab.*`, `form.project.*`, `form.server.*`, `form.options.*`, `form.hint`, `form.required`, `form.submit`
 
 ### Was sich geändert hat
 - Welcome → Enter auf „Neues Projekt" → Formular mit 3 Tabs öffnet sich
@@ -123,7 +123,7 @@ was sich geändert hat.
 ## 2026-03-07 – Claude Code – KDL in Deploy-Loop + setup.fields für fehlende Module
 
 ### Geänderte Dateien
-- `cli/crates/fsn-engine/src/deploy.rs` – Phase 5 nach dem Service-Deploy: `write_zentinel_kdl()` schreibt `{data_root}/{proxy_name}/config/zentinel.kdl`. Neue Datei → `generate_full_config()`, vorhandene Datei → `upsert_managed_section()` (nur FSN-Block wird ersetzt)
+- `cli/crates/fs-engine/src/deploy.rs` – Phase 5 nach dem Service-Deploy: `write_zentinel_kdl()` schreibt `{data_root}/{proxy_name}/config/zentinel.kdl`. Neue Datei → `generate_full_config()`, vorhandene Datei → `upsert_managed_section()` (nur FSN-Block wird ersetzt)
 - `modules/chat/tuwunel/tuwunel.toml` – `[[setup.fields]]` für `tuwunel_allow_registration` (bool, default false) und `tuwunel_allow_federation` (bool, default true) hinzugefügt
 - `modules/collab/cryptpad/cryptpad.toml` – `[[setup.fields]]` für `cryptpad_admin_email` (email) hinzugefügt
 - `modules/mail/stalwart/stalwart.toml` – `[[setup.fields]]` für `stalwart_admin_password` (secret, auto_generate) hinzugefügt
@@ -156,27 +156,27 @@ was sich geändert hat.
 
 ---
 
-## 2026-03-07 – Claude Code – fsn-tui: Terminal-UI-Dashboard (ratatui)
+## 2026-03-07 – Claude Code – fs-tui: Terminal-UI-Dashboard (ratatui)
 
 ### Neue Dateien
-- `cli/crates/fsn-tui/Cargo.toml` – neues Crate, Dependencies: ratatui/crossterm/sysinfo/fsn-core/fsn-engine
-- `cli/crates/fsn-tui/src/lib.rs` – Einstieg `run(root)`: Terminal-Init, Service-Erkennung, Event-Loop-Start
-- `cli/crates/fsn-tui/src/app.rs` – `AppState`, `Screen`/`Lang`/`ServiceStatus`-Enums, Event-Loop (`run_loop`)
-- `cli/crates/fsn-tui/src/i18n.rs` – Compile-time DE/EN Strings (`t(lang, key)`), ca. 30 Schlüssel pro Sprache
-- `cli/crates/fsn-tui/src/sysinfo.rs` – `SysInfo::collect()`: Hostname, User, IP, RAM, CPU, Uptime, Podman-Version, Arch
-- `cli/crates/fsn-tui/src/events.rs` – Tastaturhandling: Welcome (Tab=Sprache, Enter, q), Dashboard (↑↓, d/r/x/l, q), Logs-Overlay
-- `cli/crates/fsn-tui/src/ui/mod.rs` – Screen-Dispatch + Overlay-Rendering
-- `cli/crates/fsn-tui/src/ui/welcome.rs` – Welcome-Screen (Header, Systeminfo-Grid 2-spaltig, Buttons)
-- `cli/crates/fsn-tui/src/ui/dashboard.rs` – Dashboard (Header + [DE] Button, Sidebar, Services-Tabelle mit Status-Badges)
-- `cli/crates/fsn-tui/src/ui/logs.rs` – Logs-Overlay (Modal-Popup, Podman-Logs, Scroll)
-- `cli/crates/fsn-tui/src/ui/widgets.rs` – Hilfsfunktionen: `lang_button`, `status_span`, `popup_area`, `button_line`
-- `cli/crates/fsn-cli/src/commands/tui.rs` – `pub async fn run(root) → fsn_tui::run(root)`
+- `cli/crates/fs-tui/Cargo.toml` – neues Crate, Dependencies: ratatui/crossterm/sysinfo/fs-core/fs-engine
+- `cli/crates/fs-tui/src/lib.rs` – Einstieg `run(root)`: Terminal-Init, Service-Erkennung, Event-Loop-Start
+- `cli/crates/fs-tui/src/app.rs` – `AppState`, `Screen`/`Lang`/`ServiceStatus`-Enums, Event-Loop (`run_loop`)
+- `cli/crates/fs-tui/src/i18n.rs` – Compile-time DE/EN Strings (`t(lang, key)`), ca. 30 Schlüssel pro Sprache
+- `cli/crates/fs-tui/src/sysinfo.rs` – `SysInfo::collect()`: Hostname, User, IP, RAM, CPU, Uptime, Podman-Version, Arch
+- `cli/crates/fs-tui/src/events.rs` – Tastaturhandling: Welcome (Tab=Sprache, Enter, q), Dashboard (↑↓, d/r/x/l, q), Logs-Overlay
+- `cli/crates/fs-tui/src/ui/mod.rs` – Screen-Dispatch + Overlay-Rendering
+- `cli/crates/fs-tui/src/ui/welcome.rs` – Welcome-Screen (Header, Systeminfo-Grid 2-spaltig, Buttons)
+- `cli/crates/fs-tui/src/ui/dashboard.rs` – Dashboard (Header + [DE] Button, Sidebar, Services-Tabelle mit Status-Badges)
+- `cli/crates/fs-tui/src/ui/logs.rs` – Logs-Overlay (Modal-Popup, Podman-Logs, Scroll)
+- `cli/crates/fs-tui/src/ui/widgets.rs` – Hilfsfunktionen: `lang_button`, `status_span`, `popup_area`, `button_line`
+- `cli/crates/fs-cli/src/commands/tui.rs` – `pub async fn run(root) → fs_tui::run(root)`
 
 ### Geänderte Dateien
-- `cli/Cargo.toml` – `fsn-tui` zu workspace members; ratatui/crossterm/sysinfo zu workspace.dependencies
-- `cli/crates/fsn-cli/Cargo.toml` – `fsn-tui = { workspace = true }`
-- `cli/crates/fsn-cli/src/cli.rs` – `Command::Tui` + Dispatch zu `commands::tui::run`
-- `cli/crates/fsn-cli/src/commands/mod.rs` – `pub mod tui;`
+- `cli/Cargo.toml` – `fs-tui` zu workspace members; ratatui/crossterm/sysinfo zu workspace.dependencies
+- `cli/crates/fs-cli/Cargo.toml` – `fs-tui = { workspace = true }`
+- `cli/crates/fs-cli/src/cli.rs` – `Command::Tui` + Dispatch zu `commands::tui::run`
+- `cli/crates/fs-cli/src/commands/mod.rs` – `pub mod tui;`
 
 ### Was die TUI kann (Phase 1)
 - **Welcome-Screen** (kein Projekt): Systeminfo (Host, User, IP, RAM, CPU, Podman, Uptime, Arch), Sprachauswahl via Tab (DE/EN live), Buttons „Neues Projekt" / „Vorhandenes Projekt" (ausgegraut)
@@ -201,7 +201,7 @@ was sich geändert hat.
 ## 2026-03-07 – Claude Code – Zentinel KDL-Generator (echtes Pingora-Format)
 
 ### Geänderte Dateien
-- `cli/crates/fsn-engine/src/generate/kdl.rs` – komplett neu geschrieben: echtes Zentinel KDL-Format (Pingora, nicht Caddy), `upstreams {}` und `routes {}` Top-Level-Blöcke, `upsert_managed_section()` (markers-basiertes In-Place-Update), `generate_full_config()` (Erstinstallation mit listeners-Block), `collect_proxy_instances()` (überspringt Database/Cache/Proxy), Alias-Domains bekommen eigene `route`-Blöcke
+- `cli/crates/fs-engine/src/generate/kdl.rs` – komplett neu geschrieben: echtes Zentinel KDL-Format (Pingora, nicht Caddy), `upstreams {}` und `routes {}` Top-Level-Blöcke, `upsert_managed_section()` (markers-basiertes In-Place-Update), `generate_full_config()` (Erstinstallation mit listeners-Block), `collect_proxy_instances()` (überspringt Database/Cache/Proxy), Alias-Domains bekommen eigene `route`-Blöcke
 - `README.md` – Zentinel korrekt als Pingora beschrieben (war noch Caddy-Referenz drin)
 - `CHANGELOG.md` – dieses Update
 
@@ -223,17 +223,17 @@ was sich geändert hat.
 ## 2026-03-07 – Claude Code – Datenstruktur: Module → Service + Ansible-Entfernung + Build-Fix
 
 ### Geänderte Dateien
-- `cli/crates/fsn-core/src/config/service.rs` – neu (umbenannt von `module.rs`): `ServiceType`-Enum (Iam, Proxy, Mail, Git, Wiki, Chat, Collab, Tasks, Tickets, Maps, Monitoring, Database, Cache, Bot, Custom), `ServiceClass.meta` (serde rename „module"), `ServiceMeta.service_type` (serde rename „type"), `ServiceLoad.sub_services` (alias „modules"), Backward-Compat-Aliases für alle umbenannten Felder
-- `cli/crates/fsn-core/src/config/project.rs` – `ServiceSlots` (iam/mail/wiki/git/chat/collab/tasks/monitoring/extra), `ProjectMeta` bekommt `version`/`language`/`languages`, `ProjectLoad.services` (alias „modules"), `ServiceEntry` (war `ModuleRef`) mit alias für `module_class`, `type ModuleRef = ServiceEntry` für Rückwärtskompatibilität
-- `cli/crates/fsn-core/src/state/desired.rs` – `DesiredState.services` (war `.modules`), `ServiceInstance` bekommt `service_type: ServiceType`, `sub_services` (war `sub_modules`)
-- `cli/crates/fsn-core/src/config/mod.rs` – `pub mod service` statt `pub mod module`, alle Exporte aktualisiert
-- `cli/crates/fsn-engine/src/resolve.rs` – `.modules` → `.services`, `.module.alias` → `.meta.alias`, `class.load.services` → `class.load.sub_services`, `service_type` zu `ServiceInstance`-Initializer hinzugefügt
-- `cli/crates/fsn-engine/src/constraints.rs` – Import `config::module::Locality` → `config::service::Locality`
-- `cli/crates/fsn-engine/src/setup.rs` – Import `config::module::SetupField` → `config::service::SetupField`
-- `cli/crates/fsn-web/src/api.rs` – Import `config::module::FieldType` → `config::service::FieldType`
-- `cli/crates/fsn-cli/src/commands/init.rs` – Import `config::module::FieldType` → `config::service::FieldType`
-- `cli/crates/fsn-cli/src/commands/deploy.rs` – `modules`-Variable → `services`, `DesiredState { services, .. }`
-- `cli/Cargo.toml` – `fsn-ansible` aus Workspace entfernt, `libc` hinzugefügt
+- `cli/crates/fs-core/src/config/service.rs` – neu (umbenannt von `module.rs`): `ServiceType`-Enum (Iam, Proxy, Mail, Git, Wiki, Chat, Collab, Tasks, Tickets, Maps, Monitoring, Database, Cache, Bot, Custom), `ServiceClass.meta` (serde rename „module"), `ServiceMeta.service_type` (serde rename „type"), `ServiceLoad.sub_services` (alias „modules"), Backward-Compat-Aliases für alle umbenannten Felder
+- `cli/crates/fs-core/src/config/project.rs` – `ServiceSlots` (iam/mail/wiki/git/chat/collab/tasks/monitoring/extra), `ProjectMeta` bekommt `version`/`language`/`languages`, `ProjectLoad.services` (alias „modules"), `ServiceEntry` (war `ModuleRef`) mit alias für `module_class`, `type ModuleRef = ServiceEntry` für Rückwärtskompatibilität
+- `cli/crates/fs-core/src/state/desired.rs` – `DesiredState.services` (war `.modules`), `ServiceInstance` bekommt `service_type: ServiceType`, `sub_services` (war `sub_modules`)
+- `cli/crates/fs-core/src/config/mod.rs` – `pub mod service` statt `pub mod module`, alle Exporte aktualisiert
+- `cli/crates/fs-engine/src/resolve.rs` – `.modules` → `.services`, `.module.alias` → `.meta.alias`, `class.load.services` → `class.load.sub_services`, `service_type` zu `ServiceInstance`-Initializer hinzugefügt
+- `cli/crates/fs-engine/src/constraints.rs` – Import `config::module::Locality` → `config::service::Locality`
+- `cli/crates/fs-engine/src/setup.rs` – Import `config::module::SetupField` → `config::service::SetupField`
+- `cli/crates/fs-web/src/api.rs` – Import `config::module::FieldType` → `config::service::FieldType`
+- `cli/crates/fs-cli/src/commands/init.rs` – Import `config::module::FieldType` → `config::service::FieldType`
+- `cli/crates/fs-cli/src/commands/deploy.rs` – `modules`-Variable → `services`, `DesiredState { services, .. }`
+- `cli/Cargo.toml` – `fs-ansible` aus Workspace entfernt, `libc` hinzugefügt
 - `playbooks/` – vollständig entfernt (25 Dateien, 11 Unterverzeichnisse)
 - `.ansible-lint`, `.yamllint.yml`, `.ansible/`, `requirements.yml` – entfernt
 - `README.md` – komplett neu geschrieben: Ansible raus, Rust CLI, Services statt Modules, Zentinel korrekt als Pingora, aktueller Status
@@ -256,14 +256,14 @@ was sich geändert hat.
 **Was fehlte / falsch war:**
 - Fedora CoreOS hat `ID=fedora` in `/etc/os-release` → wurde als `dnf` erkannt → `install_pkg` schlug auf CoreOS fehl (kein dnf)
 - Repo wurde **vor** dem Wizard geklont → Benutzer musste warten, bevor er Fragen beantworten konnte
-- Modulauswahl las aus `${FSN_ROOT}/modules/` → benötigte geklontes Repo (Henne-Ei-Problem)
+- Modulauswahl las aus `${FS_ROOT}/modules/` → benötigte geklontes Repo (Henne-Ei-Problem)
 - DNS-Token: kein Feedback nach stiller Eingabe → Benutzer wusste nicht ob Token gespeichert wurde
 - `[?]` Präfix und "Enter to skip" für Pflichtfeld verwirrend
 - Kein Install-Verzeichnis im Wizard gefragt
 - Sub-Module (postgres, dragonfly) in Modulauswahl sichtbar
 
 **Geänderte Dateien:**
-- `fsn-install.sh` – CoreOS-Erkennung via `rpm-ostree` vor OS-Detection; `install_pkg` mit `rpm-ostree`-Case; hardcodierte `FSN_MODULES_BUILTIN`-Liste (kein Repo nötig); Wizard läuft in Phase 1 (vor Downloads); `▸` statt `[?]`; DNS-Token-Bestätigung nach stiller Eingabe; Install-Verzeichnis im Wizard; Sub-Module ausgeblendet; `show_setup_summary` zeigt Token-Status
+- `fs-install.sh` – CoreOS-Erkennung via `rpm-ostree` vor OS-Detection; `install_pkg` mit `rpm-ostree`-Case; hardcodierte `FS_MODULES_BUILTIN`-Liste (kein Repo nötig); Wizard läuft in Phase 1 (vor Downloads); `▸` statt `[?]`; DNS-Token-Bestätigung nach stiller Eingabe; Install-Verzeichnis im Wizard; Sub-Module ausgeblendet; `show_setup_summary` zeigt Token-Status
 
 ---
 
@@ -274,7 +274,7 @@ was sich geändert hat.
 - `vault_hetzner_dns_token` wurde in vault.yml.j2 als `"CHANGE_ME"` gerendert, obwohl der Token aus dem Installer-Wizard bekannt war → manuelle Deployments ohne `-e @secrets.yml` hätten keinen DNS-Token
 
 **Geänderte Dateien:**
-- `fsn-install.sh` – E-Mail-Frage nach Domain-Eingabe; E-Mail in Summary; in `generate_project_yml()` als `project.contact.acme_email` geschrieben; `PROJECT_EMAIL` Default in `main()`
+- `fs-install.sh` – E-Mail-Frage nach Domain-Eingabe; E-Mail in Summary; in `generate_project_yml()` als `project.contact.acme_email` geschrieben; `PROJECT_EMAIL` Default in `main()`
 - `playbooks/templates/vault.yml.j2` – DNS-Tokens nutzen `{{ vault_hetzner_dns_token | default('CHANGE_ME') }}` → echter Token wird bei erstem Install-Lauf direkt eingebaut
 
 ---
@@ -302,7 +302,7 @@ Die Zentinel-Deploy-Hook `deploy-dns.yml` referenziert `project_services`, `dns_
 - `requirements.yml` – Deklariert `ansible.posix` (≥1.5) und `community.general` (≥8.0)
 
 **Geänderte Datei:**
-- `fsn-install.sh` – `install_collections()` Funktion hinzugefügt; wird nach `fetch_platform` aufgerufen
+- `fs-install.sh` – `install_collections()` Funktion hinzugefügt; wird nach `fetch_platform` aufgerufen
 
 **Was das behebt:**
 `setup-server.yml` benutzt `ansible.posix.sysctl` und `community.general.pacman`. Ohne Collections schlägt der Setup-Step komplett fehl. Jetzt werden sie automatisch via `ansible-galaxy collection install -r requirements.yml` installiert.
@@ -435,7 +435,7 @@ Fix: nach dem Sub-Module-Loop werden `module_cfg` neu eingelesen und alle betrof
 - Philosophie und Projektziel (Dezentralisierung, freiwillige Kooperation)
 - Modulübersicht (alle 14 Module mit Kategorie und Beschreibung)
 - Drei-Schichten-Architektur (modules / hosts / projects)
-- Deployment-Flow von fsn-install.sh bis DNS
+- Deployment-Flow von fs-install.sh bis DNS
 - Sicherheitsmodell (rootless, nur Zentinel extern)
 - Projektstatus-Tabelle mit aktuellem Stand
 - Requirements und Quick Start
@@ -485,7 +485,7 @@ Effekt: Service von `chat` → `matrix` umbenennen, `deploy-stack.yml` ausführe
 
 ### Neue / geänderte Dateien
 
-**`fsn-install.sh`** (kompletter Rewrite)
+**`fs-install.sh`** (kompletter Rewrite)
 Interaktiver Setup-Wizard für neue Installationen:
 - `list_available_modules()` – scannt `modules/` Verzeichnis (zeigt alle verfügbaren Module)
 - `select_dns_provider()` – Auswahl Hetzner/Cloudflare + Token-Eingabe via `read -rs`
@@ -624,18 +624,18 @@ dns_ttl:      300                    # optional
 ### Geänderte Dateien (Umbenennung)
 - `CHANGELOG.md`, `CLAUDE.md`, `RULES.md`, `TODO.md` – Titel + alle Vorkommen
 - `hosts/example.host.yml` – Kommentar-Header
-- `fsn-install.sh` – alle Vorkommen + GitHub-URL + Default-Installationspfad
+- `fs-install.sh` – alle Vorkommen + GitHub-URL + Default-Installationspfad
 - `playbooks/*.yml` (10 Dateien) – `name:` Felder
 - `modules/**/*.yml` (15 Dateien) – `author:` Felder
-- `RULES.md` – `/opt/fsn-platform/` → `/opt/FreeSynergy.Node/`, GitHub-URL
+- `RULES.md` – `/opt/fs-platform/` → `/opt/FreeSynergy.Node/`, GitHub-URL
 - Memory-Dateien aktualisiert
 
 ### Nicht geändert
 - `projects/` – Projekt-Konfigurationen bleiben unverändert
-- Historische Pfadangaben `fsn-platform/` in CHANGELOG-Einträgen (korrekte Historie)
+- Historische Pfadangaben `fs-platform/` in CHANGELOG-Einträgen (korrekte Historie)
 
 ### Verzeichnis-Umbenennung
-- `mv /home/kal/Server/fsn-platform → /home/kal/Server/FreeSynergy.Node`
+- `mv /home/kal/Server/fs-platform → /home/kal/Server/FreeSynergy.Node`
 - `/home/kal/Server/.ansible-lint` – Pfade aktualisiert (`FreeSynergy.Node/`)
 - `/home/kal/Server/.vscode/settings.json` – Pfade aktualisiert (`FreeSynergy.Node/`)
 - ansible-lint: 0 Fehler, 0 Warnungen (68 Files, Profile 'production')
@@ -646,14 +646,14 @@ dns_ttl:      300                    # optional
 
 ### Geänderte Dateien
 
-**`fsn-install.sh`**
-- Default-Repo-URL eingebaut: `FSN_DEFAULT_REPO="https://github.com/Lord-KalEl/FreeSynergy.Node"`
+**`fs-install.sh`**
+- Default-Repo-URL eingebaut: `FS_DEFAULT_REPO="https://github.com/Lord-KalEl/FreeSynergy.Node"`
   → Kein interaktives Fragen mehr wenn offizielles Repo gewünscht; override via `--repo`
 - `print_checksum_info()` hinzugefügt:
   - Wenn als Datei ausgeführt: zeigt SHA256 des Scripts + Link zu Releases
   - Wenn via `bash <(curl ...)` gepiped: zeigt 2-Schritt-Verification-Anleitung
 - Header-Kommentar aktualisiert: erklärt Quick-Install vs. Verified-Install
-- Vollständige URL im Header: `https://raw.githubusercontent.com/Lord-KalEl/FreeSynergy.Node/main/fsn-install.sh`
+- Vollständige URL im Header: `https://raw.githubusercontent.com/Lord-KalEl/FreeSynergy.Node/main/fs-install.sh`
 
 **`~/.claude/settings.json`** (Claude Code Permissions)
 - Häufige sichere Operationen auto-approved: `git status/log/diff/show/add/commit/init`,
@@ -662,7 +662,7 @@ dns_ttl:      300                    # optional
 
 ### Konzept-Entscheidungen
 - **Ein öffentliches Repo** für alles (kein privater Projekt-Repo)
-- Standard-Branding = FSN; Forks ersetzen `FSN_DEFAULT_REPO` + Branding
+- Standard-Branding = FSN; Forks ersetzen `FS_DEFAULT_REPO` + Branding
 - Passwörter: `read -s` → `hosts/secrets.yml` (git-ignored, chmod 600)
 - Version-Checks (`check-constraints.yml`): geplant für v0.2, aktuell Stub
 
@@ -672,7 +672,7 @@ dns_ttl:      300                    # optional
 
 ### Neue Dateien
 
-**`fsn-install.sh`** (komplett überarbeitet)
+**`fs-install.sh`** (komplett überarbeitet)
 Funktioniert jetzt als eigenständiges Bootstrap-Script – kann direkt
 vom Server gedownloaded und ausgeführt werden, ohne dass der Repo vorhanden ist.
 
@@ -689,7 +689,7 @@ Neues Verhalten:
 
 Typischer Ablauf (One-Liner):
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/.../fsn-install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/.../fs-install.sh)
 ```
 
 **`playbooks/fetch-modules.yml`** (neu)
@@ -860,11 +860,11 @@ daher Symlinks in `tasks/` → `../../../../../playbooks/tasks/dns-*.yml`.
 
 ### Problem
 Der VSCode-Editor führt ansible-lint aus `/home/kal/Server/` (Workspace-Root) aus,
-nicht aus `fsn-platform/`. Dadurch griff die `.ansible-lint`-Konfiguration im Projektverzeichnis
-nicht, und der Editor zeigte Fehler, obwohl `ansible-lint fsn-platform/` sauber lief.
+nicht aus `fs-platform/`. Dadurch griff die `.ansible-lint`-Konfiguration im Projektverzeichnis
+nicht, und der Editor zeigte Fehler, obwohl `ansible-lint fs-platform/` sauber lief.
 
 ### Geänderte / neue Dateien
-- `/home/kal/Server/.ansible-lint` – Neu erstellt: `kinds:` mit `fsn-platform/`-Prefix-Varianten
+- `/home/kal/Server/.ansible-lint` – Neu erstellt: `kinds:` mit `fs-platform/`-Prefix-Varianten
   für korrekte Datei-Klassifizierung aus dem Workspace-Root heraus
 - `playbooks/tasks/run-module-hooks.yml` – Zweite `name[template]`-Korrektur:
   `{{ instance_name }}` aus den Task-Namen entfernt (zwei Templates mit Text dazwischen = Fehler)
@@ -886,7 +886,7 @@ als struktureller Workaround erstellt.
 
 ### Ergebnis
 - ansible-lint aus `/home/kal/Server/`: **0 Fehler, 0 Warnungen** (67 Dateien, Profile 'production')
-- ansible-lint aus `fsn-platform/`: **0 Fehler, 0 Warnungen**
+- ansible-lint aus `fs-platform/`: **0 Fehler, 0 Warnungen**
 - Editor zeigt keine ansible-lint-Fehler mehr
 
 ### Offene Probleme

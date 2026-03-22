@@ -1,0 +1,18 @@
+[package]
+name        = "fs-wizard"
+description = "Import tool — converts Docker Compose YAML into FSN module TOML (import-only, not runtime)"
+version.workspace    = true
+edition.workspace    = true
+license.workspace    = true
+authors.workspace    = true
+repository.workspace = true
+
+[dependencies]
+fs-error  = { workspace = true }
+serde      = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+toml       = { workspace = true }
+anyhow = { workspace = true }
+
+[dev-dependencies]

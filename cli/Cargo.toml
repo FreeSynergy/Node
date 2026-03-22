@@ -1,15 +1,15 @@
 [workspace]
 members = [
-    "crates/fsn-node-core",
-    "crates/fsn-deploy",
-    "crates/fsn-dns",
-    "crates/fsn-host",
-    "crates/fsn-wizard",
-    "crates/fsn-node-cli",
-    "crates/fsn-installer",
-    "crates/fsn-s3",
-    "crates/fsn-container",
-    "crates/fsn-builder",
+    "crates/fs-node-core",
+    "crates/fs-deploy",
+    "crates/fs-dns",
+    "crates/fs-host",
+    "crates/fs-wizard",
+    "crates/fs-node-cli",
+    "crates/fs-installer",
+    "crates/fs-s3",
+    "crates/fs-container",
+    "crates/fs-builder",
 ]
 resolver = "2"
 
@@ -23,31 +23,31 @@ repository  = "https://github.com/FreeSynergy/Node"
 # ── Shared dependency versions ────────────────────────────────────────────────
 [workspace.dependencies]
 # fs-libs — shared libraries monorepo
-fsn-types     = { path = "../../fs-libs/fsn-types" }
-fsn-error     = { path = "../../fs-libs/fsn-error" }
-fsn-config    = { path = "../../fs-libs/fsn-config" }
-fsn-health    = { path = "../../fs-libs/fsn-health" }
-fsn-template  = { path = "../../fs-libs/fsn-template" }
-fsn-db        = { path = "../../fs-libs/fsn-db", features = ["sqlite"] }
-fsn-crypto    = { path = "../../fs-libs/fsn-crypto" }
-fsn-bus       = { path = "../../fs-libs/fsn-bus" }
-fsn-inventory = { path = "../../fs-libs/fsn-inventory" }
-fsn-sysinfo   = { path = "../../fs-libs/fsn-sysinfo" }
-fsn-i18n      = { path = "../../fs-libs/fsn-i18n" }
-fsn-theme     = { path = "../../fs-libs/fsn-theme" }
-fsn-help      = { path = "../../fs-libs/fsn-help" }
-fsn-plugin-sdk     = { path = "../../fs-libs/fsn-plugin-sdk" }
-fsn-plugin-runtime = { path = "../../fs-libs/fsn-plugin-runtime" }
-fsn-store          = { path = "../../fs-libs/fsn-store" }
+fs-types     = { path = "../../fs-libs/fs-types" }
+fs-error     = { path = "../../fs-libs/fs-error" }
+fs-config    = { path = "../../fs-libs/fs-config" }
+fs-health    = { path = "../../fs-libs/fs-health" }
+fs-template  = { path = "../../fs-libs/fs-template" }
+fs-db        = { path = "../../fs-libs/fs-db", features = ["sqlite"] }
+fs-crypto    = { path = "../../fs-libs/fs-crypto" }
+fs-bus       = { path = "../../fs-libs/fs-bus" }
+fs-inventory = { path = "../../fs-libs/fs-inventory" }
+fs-sysinfo   = { path = "../../fs-libs/fs-sysinfo" }
+fs-i18n      = { path = "../../fs-libs/fs-i18n" }
+fs-theme     = { path = "../../fs-libs/fs-theme" }
+fs-help      = { path = "../../fs-libs/fs-help" }
+fs-plugin-sdk     = { path = "../../fs-libs/fs-plugin-sdk" }
+fs-plugin-runtime = { path = "../../fs-libs/fs-plugin-runtime" }
+fs-store          = { path = "../../fs-libs/fs-store" }
 
 # Internal crates
-fsn-node-core = { path = "crates/fsn-node-core" }
-fsn-deploy    = { path = "crates/fsn-deploy" }
-fsn-dns       = { path = "crates/fsn-dns" }
-fsn-host      = { path = "crates/fsn-host" }
-fsn-wizard    = { path = "crates/fsn-wizard" }
-fsn-s3        = { path = "crates/fsn-s3" }
-fsn-container = { path = "crates/fsn-container" }
+fs-node-core = { path = "crates/fs-node-core" }
+fs-deploy    = { path = "crates/fs-deploy" }
+fs-dns       = { path = "crates/fs-dns" }
+fs-host      = { path = "crates/fs-host" }
+fs-wizard    = { path = "crates/fs-wizard" }
+fs-s3        = { path = "crates/fs-s3" }
+fs-container = { path = "crates/fs-container" }
 
 # Serialization
 serde          = { version = "1",    features = ["derive"] }
@@ -101,7 +101,7 @@ russh-keys     = { version = "0.45" }
 axum           = { version = "0.8", features = ["json", "http1", "tokio"] }
 tower-http     = { version = "0.6", features = ["cors"] }
 
-# S3 server (fsn-s3)
+# S3 server (fs-s3)
 hyper          = { version = "1", features = ["server", "http1", "http2"] }
 hyper-util     = { version = "0.1", features = ["tokio", "server"] }
 opendal        = { version = "0.51", features = ["services-fs"] }

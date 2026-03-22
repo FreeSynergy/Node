@@ -21,8 +21,8 @@ health_port = 3000
 config_dir     = "{{ project_root }}/data/{{ instance_name }}"
 sandbox_domain = "sandbox.{{ project_domain }}"
 
-[load.modules]
-[load.services.kanidm]
+[load]
+peer_services = ["kanidm"]
 
 [container]
 name      = "{{ instance_name }}"

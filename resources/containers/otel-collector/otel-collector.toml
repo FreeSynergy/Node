@@ -29,7 +29,8 @@ per_host = 1
 [vars]
 config_dir = "{{ project_root }}/data/{{ instance_name }}"
 
-[load.services.openobserver]
+[load]
+peer_services = ["openobserver"]
 
 [container]
 name      = "{{ instance_name }}"

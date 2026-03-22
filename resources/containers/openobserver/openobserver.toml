@@ -28,7 +28,8 @@ per_ip   = 1
 [vars]
 config_dir = "{{ project_root }}/data/{{ instance_name }}"
 
-[load.services.kanidm]
+[load]
+peer_services = ["kanidm"]
 
 [container]
 name      = "{{ instance_name }}"

@@ -4,7 +4,7 @@
 #   module → vars → load → container → environment → setup
 #
 # NOTE: pretix requires a CUSTOM Docker image for plugins.
-# Build before deploy: podman build -t fsn-pretix modules/tickets/pretix/
+# Build before deploy: podman build -t fs-pretix modules/tickets/pretix/
 
 [module]
 name        = "pretix"
@@ -35,19 +35,19 @@ pretix_plugins = [
     "pretix-passbook",
 ]
 
+[load]
+peer_services = ["kanidm", "stalwart"]
+
 [load.modules.postgres]
 module_class = "database/postgres"
 
 [load.modules.dragonfly]
 module_class = "cache/dragonfly"
 
-[load.services.kanidm]
-[load.services.stalwart]
-
 [container]
 # Uses CUSTOM built image (not upstream directly)
 name      = "{{ instance_name }}"
-image     = "fsn-pretix"
+image     = "fs-pretix"
 image_tag = "latest"
 user      = "15371:15371"
 volumes   = [

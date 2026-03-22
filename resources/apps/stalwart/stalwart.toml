@@ -28,8 +28,8 @@ health_scheme = "https"
 config_dir = "{{ project_root }}/data/{{ instance_name }}"
 binary     = "/usr/local/bin/stalwart"
 
-[load.modules]
-[load.services.kanidm]
+[load]
+peer_services = ["kanidm"]
 
 [service]
 binary = "{{ module_vars.binary }}"
