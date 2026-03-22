@@ -35,6 +35,8 @@ pub struct ProjectConfig {
 /// Typed service slots at the project level.
 /// Other services and bots use these to find the right instance.
 ///
+/// Stored as an open map — adding new ServiceType variants requires no change here.
+///
 /// In project.toml:
 /// [services]
 /// iam  = "kanidm"
@@ -42,18 +44,7 @@ pub struct ProjectConfig {
 /// wiki = "outline"
 /// git  = "forgejo"
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct ServiceSlots {
-    pub iam:        Option<String>,
-    pub mail:       Option<String>,
-    pub wiki:       Option<String>,
-    pub git:        Option<String>,
-    pub chat:       Option<String>,
-    pub collab:     Option<String>,
-    pub tasks:      Option<String>,
-    pub monitoring: Option<String>,
-    #[serde(default, flatten)]
-    pub extra: IndexMap<String, String>,
-}
+pub struct ServiceSlots(IndexMap<String, String>);
 
 // ── Project Metadata ──────────────────────────────────────────────────────────
 
@@ -88,20 +79,9 @@ fn default_lang() -> String { "en".into() }
 impl ServiceSlots {
     /// Look up which instance fills the given slot by name.
     ///
-    /// Checks the typed fields first, then falls back to `extra`.
     /// Returns `None` when the slot is not assigned in this project.
     pub fn find(&self, slot: &str) -> Option<&str> {
-        match slot {
-            "iam"        => self.iam.as_deref(),
-            "mail"       => self.mail.as_deref(),
-            "wiki"       => self.wiki.as_deref(),
-            "git"        => self.git.as_deref(),
-            "chat"       => self.chat.as_deref(),
-            "collab"     => self.collab.as_deref(),
-            "tasks"      => self.tasks.as_deref(),
-            "monitoring" => self.monitoring.as_deref(),
-            other        => self.extra.get(other).map(String::as_str),
-        }
+        self.0.get(slot).map(String::as_str)
     }
 }
 

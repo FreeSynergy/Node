@@ -19,14 +19,3 @@ pub use resource::{
     ProjectResource, HostResource, ServiceResource, BotResource,
     VarProvider,
 };
-
-// ── Form vocabulary ───────────────────────────────────────────────────────────
-// FormAction is defined here (Node-local canonical definition).
-// SelectionResult lives in fs-tui/nodes/selection_popup.rs (TUI-only).
-
-/// What a form node returns after handling a keyboard or mouse event.
-#[derive(Debug, Clone, PartialEq)]
-pub enum FormAction {
-    Consumed, ValueChanged, FocusNext, FocusPrev, AcceptAndNext,
-    TabNext, TabPrev, Submit, Cancel, LangToggle, Quit, Unhandled,
-}

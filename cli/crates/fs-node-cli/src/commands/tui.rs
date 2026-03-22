@@ -25,9 +25,9 @@ pub async fn run(_root: &Path) -> Result<()> {
     } else {
         eprintln!("FreeSynergy.Desktop (fsd / fs-container-app) not found in PATH.");
         eprintln!("Build it with:");
-        eprintln!("  cd /home/kal/Server/FreeSynergy.Desktop");
-        eprintln!("  cargo build -p fs-app --release");
+        eprintln!("  cargo build -p fs-app --release   (in the fs-desktop repo)");
         eprintln!("  sudo cp target/release/fsd /usr/local/bin/fsd");
+        eprintln!("Or set FS_DESKTOP_DIR=/path/to/fs-desktop for local build fallback.");
         bail!("fsd not installed")
     }
 }
@@ -50,16 +50,20 @@ fn which_desktop_bin() -> Option<std::path::PathBuf> {
         }
     }
 
-    // Check well-known local build locations (development fallback)
-    let home = std::env::var("HOME").unwrap_or_default();
-    let base = format!("{home}/Server/FreeSynergy.Desktop/target");
-    let candidates = [
-        format!("{base}/release/fs-container-app"),
-        format!("{base}/debug/fs-container-app"),
-        format!("{base}/release/fsd"),
-        format!("{base}/debug/fsd"),
-    ];
-    candidates.iter()
-        .map(std::path::PathBuf::from)
-        .find(|p| p.exists())
+    // Check FS_DESKTOP_DIR env var for local build fallback (development only).
+    // Set FS_DESKTOP_DIR to the root of the fs-desktop repo to enable this.
+    if let Ok(desktop_dir) = std::env::var("FS_DESKTOP_DIR") {
+        let base = format!("{desktop_dir}/target");
+        let candidates = [
+            format!("{base}/release/fs-container-app"),
+            format!("{base}/debug/fs-container-app"),
+            format!("{base}/release/fsd"),
+            format!("{base}/debug/fsd"),
+        ];
+        if let Some(p) = candidates.iter().map(std::path::PathBuf::from).find(|p| p.exists()) {
+            return Some(p);
+        }
+    }
+
+    None
 }

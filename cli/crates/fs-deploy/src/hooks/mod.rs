@@ -16,6 +16,7 @@ pub mod cryptpad;
 pub mod forgejo;
 pub mod kanidm;
 pub mod lifecycle;
+pub mod openobserver;
 pub mod stalwart;
 pub mod tuwunel;
 pub mod vikunja;
@@ -96,7 +97,7 @@ static HOOK_REGISTRY: &[(&str, HookFn)] = &[
     ("containers/forgejo",        |ctx| Box::pin(forgejo::run(ctx))),
     ("containers/cryptpad",       |ctx| Box::pin(cryptpad::run(ctx))),
     ("containers/vikunja",        |ctx| Box::pin(vikunja::run(ctx))),
-    ("containers/openobserver",   |ctx| Box::pin(openobserver_hook(ctx))),
+    ("containers/openobserver",   |ctx| Box::pin(openobserver::run(ctx))),
 ];
 
 /// Dispatch post-deploy hook for the given instance (if one is registered).
@@ -110,14 +111,4 @@ pub async fn run_hook(ctx: &HookContext<'_>) -> Result<()> {
         Some(f) => f(ctx).await,
         None    => common::ensure_data_dir(ctx),
     }
-}
-
-/// Hook for openobserver: ensure data dir + log login hint.
-async fn openobserver_hook(ctx: &HookContext<'_>) -> Result<()> {
-    common::ensure_data_dir(ctx)?;
-    tracing::info!(
-        "{}: ready. Login at https://{}  (admin credentials in vault)",
-        ctx.instance.name, ctx.instance.service_domain
-    );
-    Ok(())
 }
