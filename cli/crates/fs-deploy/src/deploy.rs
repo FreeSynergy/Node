@@ -187,7 +187,7 @@ pub async fn deploy_all(
         }
 
         // Lifecycle on_install hooks (declared in [lifecycle] TOML block).
-        if let Err(e) = hooks::lifecycle::run_on_install(&hook_ctx).await {
+        if let Err(e) = hooks::lifecycle::LifecycleRunner::new(&hook_ctx).on_install().await {
             warn!("  lifecycle on_install for {} failed: {:#}", instance.name, e);
         }
 
@@ -220,7 +220,7 @@ pub async fn deploy_all(
                     fs_root,
                 };
                 for hook in &matching {
-                    if let Err(e) = hooks::lifecycle::run_peer_hook_pub(&peer_ctx, hook).await {
+                    if let Err(e) = hooks::lifecycle::LifecycleRunner::new(&peer_ctx).peer_hook(hook).await {
                         warn!(
                             "  lifecycle on_peer_install for {} (trigger: {}) failed: {:#}",
                             peer.name, instance.name, e

@@ -35,125 +35,125 @@ use fs_node_core::{
 const MARKER_START: &str = "# === FSN-MANAGED-START ===";
 const MARKER_END:   &str = "# === FSN-MANAGED-END ===";
 
-// ── Public API ────────────────────────────────────────────────────────────────
+// ── KdlGenerator ─────────────────────────────────────────────────────────────
 
-/// Replace (or insert) the FSN-managed section in an existing Zentinel config.
-/// Everything outside the markers is preserved verbatim.
-pub fn upsert_managed_section(config: &str, desired: &DesiredState) -> String {
-    let managed = generate_managed_section(desired);
-    match (config.find(MARKER_START), config.find(MARKER_END)) {
-        (Some(s), Some(e)) => {
-            let end_of_block = e + MARKER_END.len();
-            format!("{}{}{}", &config[..s], managed, &config[end_of_block..])
+pub struct KdlGenerator;
+
+impl KdlGenerator {
+    /// Replace (or insert) the FSN-managed section in an existing Zentinel config.
+    /// Everything outside the markers is preserved verbatim.
+    pub fn upsert(&self, config: &str, desired: &DesiredState) -> String {
+        let managed = self.managed_section(desired);
+        match (config.find(MARKER_START), config.find(MARKER_END)) {
+            (Some(s), Some(e)) => {
+                let end_of_block = e + MARKER_END.len();
+                format!("{}{}{}", &config[..s], managed, &config[end_of_block..])
+            }
+            _ => format!("{}\n{}\n", config.trim_end(), managed),
         }
-        _ => format!("{}\n{}\n", config.trim_end(), managed),
-    }
-}
-
-/// Generate the complete Zentinel config file from scratch (initial install).
-/// Writes a minimal server + listeners block plus the FSN-managed section.
-pub fn generate_full_config(desired: &DesiredState) -> String {
-    let managed = generate_managed_section(desired);
-    format!(
-        "# Zentinel proxy configuration\n\
-         # Lines outside the FSN-MANAGED block can be edited freely.\n\
-         \n\
-         listeners {{\n\
-         \x20   listener \"http\" {{\n\
-         \x20       address \"0.0.0.0:80\"\n\
-         \x20   }}\n\
-         \x20   listener \"https\" {{\n\
-         \x20       address \"0.0.0.0:443\"\n\
-         \x20   }}\n\
-         }}\n\
-         \n\
-         {managed}\n"
-    )
-}
-
-/// Remove a single service from the managed section.
-/// Pass the filtered `DesiredState` (without the removed service) to regenerate.
-pub fn upsert_without(config: &str, desired: &DesiredState) -> String {
-    upsert_managed_section(config, desired)
-}
-
-// ── Core generation ───────────────────────────────────────────────────────────
-
-/// Build the complete FSN-managed KDL block (upstreams + routes).
-fn generate_managed_section(desired: &DesiredState) -> String {
-    let instances = collect_proxy_instances(desired);
-
-    let mut upstreams = String::new();
-    let mut routes    = String::new();
-
-    for inst in &instances {
-        upstreams.push_str(&upstream_block(inst));
-        routes.push_str(&route_blocks(inst));
     }
 
-    format!(
-        "{MARKER_START}\nupstreams {{\n{upstreams}}}\nroutes {{\n{routes}}}\n{MARKER_END}\n"
-    )
-}
+    /// Generate the complete Zentinel config file from scratch (initial install).
+    /// Writes a minimal server + listeners block plus the FSN-managed section.
+    pub fn full_config(&self, desired: &DesiredState) -> String {
+        let managed = self.managed_section(desired);
+        format!(
+            "# Zentinel proxy configuration\n\
+             # Lines outside the FSN-MANAGED block can be edited freely.\n\
+             \n\
+             listeners {{\n\
+             \x20   listener \"http\" {{\n\
+             \x20       address \"0.0.0.0:80\"\n\
+             \x20   }}\n\
+             \x20   listener \"https\" {{\n\
+             \x20       address \"0.0.0.0:443\"\n\
+             \x20   }}\n\
+             }}\n\
+             \n\
+             {managed}\n"
+        )
+    }
 
-/// Generate one `upstream "name" { targets { target { address "…:port" } } }` block.
-fn upstream_block(inst: &ServiceInstance) -> String {
-    let name = &inst.name;
-    let port = inst.class.meta.port;
-    // Containers reach each other by container name on the internal network.
-    format!(
-        "    upstream \"{name}\" {{\n\
-         \x20       targets {{\n\
-         \x20           target {{\n\
-         \x20               address \"{name}:{port}\"\n\
-         \x20           }}\n\
-         \x20       }}\n\
-         \x20   }}\n"
-    )
-}
+    fn managed_section(&self, desired: &DesiredState) -> String {
+        let instances = self.collect_proxy_instances(desired);
 
-/// Generate `route` blocks for all domains (primary + aliases) of a service.
-fn route_blocks(inst: &ServiceInstance) -> String {
-    let name = &inst.name;
-    let mut all_domains = vec![inst.service_domain.clone()];
-    all_domains.extend(inst.alias_domains.clone());
+        let mut upstreams = String::new();
+        let mut routes    = String::new();
 
-    let mut out = String::new();
-    for domain in &all_domains {
-        // Use domain as route name with dots replaced (KDL names must be unique).
-        let route_name = domain.replace('.', "-");
-        out.push_str(&format!(
-            "    route \"{route_name}\" {{\n\
-             \x20       matches {{\n\
-             \x20           host \"{domain}\"\n\
+        for inst in &instances {
+            upstreams.push_str(&self.upstream_block(inst));
+            routes.push_str(&self.route_blocks(inst));
+        }
+
+        format!(
+            "{MARKER_START}\nupstreams {{\n{upstreams}}}\nroutes {{\n{routes}}}\n{MARKER_END}\n"
+        )
+    }
+
+    fn upstream_block(&self, inst: &ServiceInstance) -> String {
+        let name = &inst.name;
+        let port = inst.class.meta.port;
+        format!(
+            "    upstream \"{name}\" {{\n\
+             \x20       targets {{\n\
+             \x20           target {{\n\
+             \x20               address \"{name}:{port}\"\n\
+             \x20           }}\n\
              \x20       }}\n\
-             \x20       upstream \"{name}\"\n\
              \x20   }}\n"
-        ));
+        )
     }
-    out
+
+    fn route_blocks(&self, inst: &ServiceInstance) -> String {
+        let name = &inst.name;
+        let mut all_domains = vec![inst.service_domain.clone()];
+        all_domains.extend(inst.alias_domains.clone());
+
+        let mut out = String::new();
+        for domain in &all_domains {
+            let route_name = domain.replace('.', "-");
+            out.push_str(&format!(
+                "    route \"{route_name}\" {{\n\
+                 \x20       matches {{\n\
+                 \x20           host \"{domain}\"\n\
+                 \x20       }}\n\
+                 \x20       upstream \"{name}\"\n\
+                 \x20   }}\n"
+            ));
+        }
+        out
+    }
+
+    fn collect_proxy_instances(&self, desired: &DesiredState) -> Vec<ServiceInstance> {
+        let mut out = Vec::new();
+        for inst in &desired.services {
+            self.push_proxy_instance(inst, &mut out);
+        }
+        out
+    }
+
+    fn push_proxy_instance(&self, inst: &ServiceInstance, out: &mut Vec<ServiceInstance>) {
+        if !inst.class.meta.is_internal_only() && !inst.class.meta.has_type(&ServiceType::Proxy) {
+            out.push(inst.clone());
+        }
+        for sub in &inst.sub_services {
+            self.push_proxy_instance(sub, out);
+        }
+    }
 }
 
-// ── Helper ────────────────────────────────────────────────────────────────────
+// ── Public shims (used by deploy.rs) ─────────────────────────────────────────
 
-/// Collect all instances (incl. sub-services) that need an HTTP proxy route.
-/// Excludes internal services (Database, Cache) and the proxy itself.
-fn collect_proxy_instances(desired: &DesiredState) -> Vec<ServiceInstance> {
-    let mut out = Vec::new();
-    for inst in &desired.services {
-        push_proxy_instance(inst, &mut out);
-    }
-    out
+pub fn upsert_managed_section(config: &str, desired: &DesiredState) -> String {
+    KdlGenerator.upsert(config, desired)
 }
 
-fn push_proxy_instance(inst: &ServiceInstance, out: &mut Vec<ServiceInstance>) {
-    // Include services that are user-facing and not the proxy itself.
-    if !inst.class.meta.is_internal_only() && !inst.class.meta.has_type(&ServiceType::Proxy) {
-        out.push(inst.clone());
-    }
-    for sub in &inst.sub_services {
-        push_proxy_instance(sub, out);
-    }
+pub fn generate_full_config(desired: &DesiredState) -> String {
+    KdlGenerator.full_config(desired)
+}
+
+pub fn upsert_without(config: &str, desired: &DesiredState) -> String {
+    KdlGenerator.upsert(config, desired)
 }
 
 #[cfg(test)]
@@ -240,7 +240,7 @@ mod tests {
 
     #[test]
     fn full_config_contains_markers() {
-        let config = generate_full_config(&desired(vec![
+        let config = KdlGenerator.full_config(&desired(vec![
             make_instance("forgejo", "git.example.com", vec![ServiceType::Git], 3000),
         ]));
         assert!(config.contains(MARKER_START));
@@ -249,7 +249,7 @@ mod tests {
 
     #[test]
     fn full_config_contains_upstream_and_route_for_git() {
-        let config = generate_full_config(&desired(vec![
+        let config = KdlGenerator.full_config(&desired(vec![
             make_instance("forgejo", "git.example.com", vec![ServiceType::Git], 3000),
         ]));
         assert!(config.contains(r#"upstream "forgejo""#));
@@ -259,7 +259,7 @@ mod tests {
 
     #[test]
     fn proxy_service_excluded_from_routes() {
-        let config = generate_full_config(&desired(vec![
+        let config = KdlGenerator.full_config(&desired(vec![
             make_instance("zentinel", "example.com", vec![ServiceType::Proxy], 443),
         ]));
         assert!(!config.contains(r#"upstream "zentinel""#));
@@ -267,7 +267,7 @@ mod tests {
 
     #[test]
     fn internal_service_excluded_from_routes() {
-        let config = generate_full_config(&desired(vec![
+        let config = KdlGenerator.full_config(&desired(vec![
             make_instance("postgres", "postgres.internal", vec![ServiceType::Database], 5432),
         ]));
         assert!(!config.contains(r#"upstream "postgres""#));
@@ -275,7 +275,7 @@ mod tests {
 
     #[test]
     fn domain_dots_replaced_in_route_name() {
-        let config = generate_full_config(&desired(vec![
+        let config = KdlGenerator.full_config(&desired(vec![
             make_instance("forgejo", "git.example.com", vec![ServiceType::Git], 3000),
         ]));
         assert!(config.contains(r#"route "git-example-com""#));
@@ -285,7 +285,7 @@ mod tests {
     fn alias_domains_generate_extra_routes() {
         let mut inst = make_instance("forgejo", "git.example.com", vec![ServiceType::Git], 3000);
         inst.alias_domains = vec!["git2.example.com".to_string()];
-        let config = generate_full_config(&desired(vec![inst]));
+        let config = KdlGenerator.full_config(&desired(vec![inst]));
         assert!(config.contains("git.example.com"));
         assert!(config.contains("git2.example.com"));
         assert!(config.contains(r#"route "git2-example-com""#));
@@ -296,7 +296,7 @@ mod tests {
         let existing = format!(
             "# hand-written config\n{MARKER_START}\nold content\n{MARKER_END}\n# after marker\n"
         );
-        let result = upsert_managed_section(&existing, &desired(vec![
+        let result = KdlGenerator.upsert(&existing, &desired(vec![
             make_instance("forgejo", "git.example.com", vec![ServiceType::Git], 3000),
         ]));
         assert!(result.starts_with("# hand-written config\n"));
@@ -308,7 +308,7 @@ mod tests {
     #[test]
     fn upsert_appends_when_no_markers_present() {
         let existing = "# existing config\n";
-        let result = upsert_managed_section(existing, &desired(vec![
+        let result = KdlGenerator.upsert(existing, &desired(vec![
             make_instance("forgejo", "git.example.com", vec![ServiceType::Git], 3000),
         ]));
         assert!(result.starts_with("# existing config"));

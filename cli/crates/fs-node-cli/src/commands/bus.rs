@@ -25,7 +25,7 @@ use axum::{
     routing::{delete, get, post},
 };
 use fs_bus::{
-    BusMessage, Event, MessageBus, RoutingConfig, StandingOrder, Subscription,
+    BusMessage, Event, MessageBus, StandingOrder, Subscription,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -80,6 +80,7 @@ impl BusState {
 // ── Request / response DTOs ───────────────────────────────────────────────────
 
 #[derive(Deserialize)]
+#[allow(dead_code)]
 struct PublishReq {
     topic:   String,
     source:  String,

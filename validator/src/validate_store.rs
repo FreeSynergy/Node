@@ -50,6 +50,59 @@ impl Issues {
     fn error(&mut self, msg: impl Into<String>) { self.errors.push(msg.into()); }
 }
 
+// ── PackageKind ───────────────────────────────────────────────────────────────
+
+/// Discriminated package type that carries its own validation rules.
+///
+/// Replaces the external `match pkg_type` block in `validate_entry`.
+/// New package types add a variant + `validate` arm here.
+enum PackageKind {
+    App,
+    Container,
+    Unknown,
+}
+
+impl PackageKind {
+    fn from_str(s: &str) -> Self {
+        match s {
+            "app"            => Self::App,
+            "container" | "" => Self::Container,
+            _                => Self::Unknown,
+        }
+    }
+
+    fn validate(&self, entry: &PackageEntry, store_dir: &Path, issues: &mut Issues) {
+        match self {
+            Self::App => {
+                if entry.repo.is_none() {
+                    issues.error("app package must have a 'repo' URL");
+                }
+                if entry.distribution.is_none() {
+                    issues.warn("no [distribution] URLs — binary download will not be possible");
+                }
+            }
+            Self::Container => {
+                if let Some(path) = &entry.path {
+                    let manifest_path = store_dir.join(path).join("manifest.toml");
+                    let legacy_toml   = store_dir.join(path);
+                    // Accept manifest.toml in subdir OR the path itself as a .toml
+                    if !manifest_path.exists() && !legacy_toml.with_extension("toml").exists() {
+                        // Try legacy: {category}/{name}.toml
+                        let category = path.split('/').next_back().unwrap_or("");
+                        let legacy = store_dir.join(path).join(format!("{category}.toml"));
+                        if !legacy.exists() {
+                            issues.warn(format!("no manifest.toml found at {}", manifest_path.display()));
+                        }
+                    }
+                } else {
+                    issues.warn("no 'path' declared — store can't locate the package files");
+                }
+            }
+            Self::Unknown => {}
+        }
+    }
+}
+
 fn validate_entry(entry: &PackageEntry, store_dir: &Path, issues: &mut Issues) {
     // Required fields
     if entry.id.as_deref().unwrap_or("").is_empty()          { issues.error("missing id"); }
@@ -75,34 +128,9 @@ fn validate_entry(entry: &PackageEntry, store_dir: &Path, issues: &mut Issues) {
         }
     }
 
-    // Package-type specific checks
-    let pkg_type = entry.pkg_type.as_deref().unwrap_or("");
-    match pkg_type {
-        "app" => {
-            if entry.repo.is_none() {
-                issues.error("app package must have a 'repo' URL");
-            }
-            if entry.distribution.is_none() {
-                issues.warn("no [distribution] URLs — binary download will not be possible");
-            }
-        }
-        "container" | "" => {
-            if let Some(path) = &entry.path {
-                let manifest_path = store_dir.join(path).join("manifest.toml");
-                let legacy_toml = store_dir.join(path);
-                if !manifest_path.exists() && !legacy_toml.with_extension("toml").exists() {
-                    let category = path.split('/').next_back().unwrap_or("");
-                    let legacy = store_dir.join(path).join(format!("{category}.toml"));
-                    if !legacy.exists() {
-                        issues.warn(format!("no manifest.toml found at {}", manifest_path.display()));
-                    }
-                }
-            } else if pkg_type != "app" {
-                issues.warn("no 'path' declared — store can't locate the package files");
-            }
-        }
-        _ => {}
-    }
+    // Package-type specific checks — the kind validates itself
+    PackageKind::from_str(entry.pkg_type.as_deref().unwrap_or(""))
+        .validate(entry, store_dir, issues);
 }
 
 // ── Entry point ───────────────────────────────────────────────────────────────

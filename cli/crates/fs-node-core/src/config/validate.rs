@@ -31,105 +31,115 @@ pub enum TomlKind {
     Generic,
 }
 
-// ── Public entry point ────────────────────────────────────────────────────────
+// ── TomlValidator ─────────────────────────────────────────────────────────────
 
-/// Validate TOML `content` before deserialization.
-/// Chain: size → syntax → safety → schema.
-pub fn validate_toml_content(content: &str, kind: TomlKind, path: &str) -> Result<(), FsyError> {
-    check_size(content, path)?;
-    let doc = check_syntax(content, path)?;
-    check_safety(&doc, path, 0)?;
-    check_schema(&doc, kind, path)?;
-    Ok(())
-}
+pub struct TomlValidator;
 
-// ── Step 1: Size guard ────────────────────────────────────────────────────────
-
-fn check_size(content: &str, path: &str) -> Result<(), FsyError> {
-    if content.len() > MAX_BYTES {
-        return Err(FsyError::Config(format!(
-            "{path}: file too large ({} bytes, max {MAX_BYTES})", content.len()
-        )));
+impl TomlValidator {
+    /// Validate TOML `content` before deserialization.
+    /// Chain: size → syntax → safety → schema.
+    pub fn validate(&self, content: &str, kind: TomlKind, path: &str) -> Result<(), FsyError> {
+        self.check_size(content, path)?;
+        let doc = self.check_syntax(content, path)?;
+        self.check_safety(&doc, path, 0)?;
+        self.check_schema(&doc, kind, path)?;
+        Ok(())
     }
-    Ok(())
-}
 
-// ── Step 2: Syntax check ──────────────────────────────────────────────────────
+    // ── Step 1: Size guard ────────────────────────────────────────────────────
 
-fn check_syntax(content: &str, path: &str) -> Result<Value, FsyError> {
-    toml::from_str::<Value>(content)
-        .map_err(|e| FsyError::Parse(format!("{path}: TOML syntax error: {e}")))
-}
-
-// ── Step 3: Safety scan ───────────────────────────────────────────────────────
-
-fn check_safety(val: &Value, path: &str, depth: usize) -> Result<(), FsyError> {
-    if depth > MAX_DEPTH {
-        return Err(FsyError::Config(format!("{path}: structure too deeply nested")));
-    }
-    match val {
-        Value::String(s) => check_string(s, path)?,
-        Value::Table(t)  => {
-            for v in t.values() { check_safety(v, path, depth + 1)?; }
-        }
-        Value::Array(a) => {
-            for v in a { check_safety(v, path, depth + 1)?; }
-        }
-        _ => {}
-    }
-    Ok(())
-}
-
-fn check_string(s: &str, path: &str) -> Result<(), FsyError> {
-    if s.len() > MAX_STRING_LEN {
-        return Err(FsyError::Config(format!(
-            "{path}: string value too long ({} chars, max {MAX_STRING_LEN})", s.len()
-        )));
-    }
-    if s.contains('\0') {
-        return Err(FsyError::Config(format!("{path}: null byte in string value")));
-    }
-    for pat in &["$(", "`", " && ", " || "] {
-        if s.contains(pat) {
+    fn check_size(&self, content: &str, path: &str) -> Result<(), FsyError> {
+        if content.len() > MAX_BYTES {
             return Err(FsyError::Config(format!(
-                "{path}: potentially unsafe pattern '{}' in string value", pat.trim()
+                "{path}: file too large ({} bytes, max {MAX_BYTES})", content.len()
             )));
         }
+        Ok(())
     }
-    if s.contains("../") || s.contains("..\\") {
-        return Err(FsyError::Config(format!("{path}: path traversal sequence '../'")));
+
+    // ── Step 2: Syntax check ──────────────────────────────────────────────────
+
+    fn check_syntax(&self, content: &str, path: &str) -> Result<Value, FsyError> {
+        toml::from_str::<Value>(content)
+            .map_err(|e| FsyError::Parse(format!("{path}: TOML syntax error: {e}")))
     }
-    Ok(())
-}
 
-// ── Step 4: Schema check ──────────────────────────────────────────────────────
+    // ── Step 3: Safety scan ───────────────────────────────────────────────────
 
-fn check_schema(doc: &Value, kind: TomlKind, path: &str) -> Result<(), FsyError> {
-    match kind {
-        TomlKind::Project  => require_string_field(doc, &["project", "name"], path)?,
-        TomlKind::Host     => require_string_field(doc, &["host", "name"], path)?,
-        TomlKind::Service  => {
-            require_string_field(doc, &["service", "name"], path)?;
-            require_string_field(doc, &["service", "service_class"], path)?;
+    fn check_safety(&self, val: &Value, path: &str, depth: usize) -> Result<(), FsyError> {
+        if depth > MAX_DEPTH {
+            return Err(FsyError::Config(format!("{path}: structure too deeply nested")));
         }
-        TomlKind::Language => require_string_field(doc, &["meta", "language"], path)?,
-        TomlKind::Generic  => {}
+        match val {
+            Value::String(s) => self.check_string(s, path)?,
+            Value::Table(t)  => {
+                for v in t.values() { self.check_safety(v, path, depth + 1)?; }
+            }
+            Value::Array(a) => {
+                for v in a { self.check_safety(v, path, depth + 1)?; }
+            }
+            _ => {}
+        }
+        Ok(())
     }
-    Ok(())
+
+    fn check_string(&self, s: &str, path: &str) -> Result<(), FsyError> {
+        if s.len() > MAX_STRING_LEN {
+            return Err(FsyError::Config(format!(
+                "{path}: string value too long ({} chars, max {MAX_STRING_LEN})", s.len()
+            )));
+        }
+        if s.contains('\0') {
+            return Err(FsyError::Config(format!("{path}: null byte in string value")));
+        }
+        for pat in &["$(", "`", " && ", " || "] {
+            if s.contains(pat) {
+                return Err(FsyError::Config(format!(
+                    "{path}: potentially unsafe pattern '{}' in string value", pat.trim()
+                )));
+            }
+        }
+        if s.contains("../") || s.contains("..\\") {
+            return Err(FsyError::Config(format!("{path}: path traversal sequence '../'")));
+        }
+        Ok(())
+    }
+
+    // ── Step 4: Schema check ──────────────────────────────────────────────────
+
+    fn check_schema(&self, doc: &Value, kind: TomlKind, path: &str) -> Result<(), FsyError> {
+        match kind {
+            TomlKind::Project  => self.require_string_field(doc, &["project", "name"], path)?,
+            TomlKind::Host     => self.require_string_field(doc, &["host", "name"], path)?,
+            TomlKind::Service  => {
+                self.require_string_field(doc, &["service", "name"], path)?;
+                self.require_string_field(doc, &["service", "service_class"], path)?;
+            }
+            TomlKind::Language => self.require_string_field(doc, &["meta", "language"], path)?,
+            TomlKind::Generic  => {}
+        }
+        Ok(())
+    }
+
+    fn require_string_field(&self, doc: &Value, keys: &[&str], path: &str) -> Result<(), FsyError> {
+        let field = keys.join(".");
+        let mut cur = doc;
+        for &key in keys {
+            cur = cur.get(key).ok_or_else(|| FsyError::Config(format!(
+                "{path}: missing required field '{field}'"
+            )))?;
+        }
+        match cur.as_str() {
+            Some(s) if !s.is_empty() => Ok(()),
+            _ => Err(FsyError::Config(format!(
+                "{path}: field '{field}' must be a non-empty string"
+            ))),
+        }
+    }
 }
 
-fn require_string_field(doc: &Value, keys: &[&str], path: &str) -> Result<(), FsyError> {
-    let field = keys.join(".");
-    let mut cur = doc;
-    for &key in keys {
-        cur = cur.get(key).ok_or_else(|| FsyError::Config(format!(
-            "{path}: missing required field '{field}'"
-        )))?;
-    }
-    match cur.as_str() {
-        Some(s) if !s.is_empty() => Ok(()),
-        _ => Err(FsyError::Config(format!(
-            "{path}: field '{field}' must be a non-empty string"
-        ))),
-    }
+// ── Public shim ───────────────────────────────────────────────────────────────
+
+pub fn validate_toml_content(content: &str, kind: TomlKind, path: &str) -> Result<(), FsyError> {
+    TomlValidator.validate(content, kind, path)
 }

@@ -57,47 +57,60 @@ struct InstalledRow {
     installed_at: i64,
 }
 
-// ── run ───────────────────────────────────────────────────────────────────────
+// ── ServeCmd ──────────────────────────────────────────────────────────────────
+
+pub struct ServeCmd<'a> {
+    root:  &'a Path,
+    bind:  &'a str,
+    port:  u16,
+}
+
+impl<'a> ServeCmd<'a> {
+    pub fn new(root: &'a Path, bind: &'a str, port: u16) -> Self {
+        Self { root, bind, port }
+    }
+
+    pub async fn run(&self) -> Result<()> {
+        let addr = format!("{}:{}", self.bind, self.port);
+
+        let s3_config = StorageConfig {
+            enabled:    true,
+            port:       9000,
+            bind:       "127.0.0.1".to_owned(),
+            data_root:  self.root.join("storage"),
+            access_key: "fs_local".to_owned(),
+            secret_key: "changeme_secret_key".to_owned(),
+            sync:       None,
+        };
+        let _s3_handle = S3Server::new(s3_config).start().await?;
+
+        let cors = CorsLayer::new()
+            .allow_origin(Any)
+            .allow_methods(Any)
+            .allow_headers(Any);
+
+        let app = Router::new()
+            .route("/api/store/know/catalog",       get(handle_catalog))
+            .route("/api/store/know/search",        get(handle_search))
+            .route("/api/store/know/package/:id",   get(handle_package))
+            .route("/api/store/know/installed",     get(handle_installed))
+            .route("/api/store/know/i18n",          get(handle_i18n))
+            .layer(cors)
+            .with_state(AppState);
+
+        let listener = tokio::net::TcpListener::bind(&addr).await?;
+        info!("fsn store API listening on http://{addr}");
+        println!("Store API : http://{addr}/api/store/know/");
+        println!("S3 API    : http://127.0.0.1:9000");
+        println!("Press Ctrl+C to stop.");
+
+        axum::serve(listener, app).await?;
+        Ok(())
+    }
+}
 
 pub async fn run(root: &Path, _project: Option<&Path>, bind: &str, port: u16) -> Result<()> {
-    let addr = format!("{bind}:{port}");
-
-    // ── S3 server ─────────────────────────────────────────────────────────────
-    let s3_config = StorageConfig {
-        enabled:    true,
-        port:       9000,
-        bind:       "127.0.0.1".to_owned(),
-        data_root:  root.join("storage"),
-        access_key: "fs_local".to_owned(),
-        secret_key: "changeme_secret_key".to_owned(),
-        sync:       None,
-    };
-    let s3 = S3Server::new(s3_config);
-    let _s3_handle = s3.start().await?;
-
-    // ── HTTP store API ────────────────────────────────────────────────────────
-    let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any);
-
-    let app = Router::new()
-        .route("/api/store/know/catalog",       get(handle_catalog))
-        .route("/api/store/know/search",        get(handle_search))
-        .route("/api/store/know/package/:id",   get(handle_package))
-        .route("/api/store/know/installed",     get(handle_installed))
-        .route("/api/store/know/i18n",          get(handle_i18n))
-        .layer(cors)
-        .with_state(AppState);
-
-    let listener = tokio::net::TcpListener::bind(&addr).await?;
-    info!("fsn store API listening on http://{addr}");
-    println!("Store API : http://{addr}/api/store/know/");
-    println!("S3 API    : http://127.0.0.1:9000");
-    println!("Press Ctrl+C to stop.");
-
-    axum::serve(listener, app).await?;
-    Ok(())
+    ServeCmd::new(root, bind, port).run().await
 }
 
 // ── handlers ──────────────────────────────────────────────────────────────────

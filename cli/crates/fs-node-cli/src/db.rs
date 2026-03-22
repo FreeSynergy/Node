@@ -16,97 +16,133 @@ use tracing::warn;
 static DB: OnceLock<Arc<DbConnection>> = OnceLock::new();
 static WRITE_BUF: OnceLock<Arc<WriteBuffer>> = OnceLock::new();
 
-/// Path to an FSN SQLite database under `~/.local/share/fsn/`.
-pub fn db_path(filename: &str) -> PathBuf {
-    let home = std::env::var("HOME").unwrap_or_else(|_| "/root".to_string());
-    PathBuf::from(home).join(".local/share/fsn").join(filename)
-}
+// ── NodeDb ────────────────────────────────────────────────────────────────────
 
-/// Initialize all Node databases: connect, run migrations, set up write buffer.
-///
-/// Call once at startup. Non-fatal — the CLI continues without persistence
-/// if DB init fails (e.g. permission error, missing SQLite).
-pub async fn init() -> Result<()> {
-    let path = db_path("fsn.db");
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)
-            .with_context(|| format!("creating DB directory {}", parent.display()))?;
+pub struct NodeDb;
+
+impl NodeDb {
+    /// Path to an FSN SQLite database under `~/.local/share/fsn/`.
+    pub fn path(filename: &str) -> PathBuf {
+        let home = std::env::var("HOME").unwrap_or_else(|_| "/root".to_string());
+        PathBuf::from(home).join(".local/share/fsn").join(filename)
     }
 
-    let conn = DbConnection::connect(DbBackend::Sqlite {
-        path: path.to_string_lossy().into_owned(),
-    })
-    .await
-    .map_err(|e| anyhow::anyhow!("DB connect: {e}"))?;
+    /// Initialize all Node databases: connect, run migrations, set up write buffer.
+    ///
+    /// Call once at startup. Non-fatal — the CLI continues without persistence
+    /// if DB init fails (e.g. permission error, missing SQLite).
+    pub async fn init() -> Result<()> {
+        let path = Self::path("fsn.db");
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .with_context(|| format!("creating DB directory {}", parent.display()))?;
+        }
 
-    Migrator::run(conn.inner())
+        let conn = DbConnection::connect(DbBackend::Sqlite {
+            path: path.to_string_lossy().into_owned(),
+        })
         .await
-        .map_err(|e| anyhow::anyhow!("DB migrations: {e}"))?;
+        .map_err(|e| anyhow::anyhow!("DB connect: {e}"))?;
 
-    let buf = WriteBuffer::with_defaults(conn.inner().clone());
-    WRITE_BUF.set(Arc::new(buf)).ok();
-    DB.set(Arc::new(conn)).ok();
+        Migrator::run(conn.inner())
+            .await
+            .map_err(|e| anyhow::anyhow!("DB migrations: {e}"))?;
 
-    // Initialize the two additional Node databases.
-    if let Err(e) = init_core_db().await { warn!("fs-core.db init failed: {e}"); }
-    if let Err(e) = init_bus_db().await  { warn!("fs-bus.db init failed: {e}");  }
+        let buf = WriteBuffer::with_defaults(conn.inner().clone());
+        WRITE_BUF.set(Arc::new(buf)).ok();
+        DB.set(Arc::new(conn)).ok();
 
-    Ok(())
-}
+        if let Err(e) = Self::init_core().await { warn!("fs-core.db init failed: {e}"); }
+        if let Err(e) = Self::init_bus().await  { warn!("fs-bus.db init failed: {e}");  }
 
-/// Spawn the write-buffer auto-flush loop as a background tokio task.
-///
-/// Call after `init()` succeeds. The task runs until the process exits.
-pub fn spawn_flush_loop() {
-    if let Some(buf) = WRITE_BUF.get() {
-        let buf = buf.clone();
-        tokio::spawn(async move { buf.run_auto_flush().await });
+        Ok(())
     }
-}
 
-/// Write an audit entry to the database via the write buffer.
-///
-/// Fire and forget — silently does nothing when the DB was not initialized.
-pub async fn write_audit_entry(entry: &AuditEntry) {
-    let Some(buf) = WRITE_BUF.get() else { return };
-
-    // Escape single quotes for inline SQL (values are internal strings, not user input)
-    let actor  = entry.actor.replace('\'', "''");
-    let action = entry.action.replace('\'', "''");
-    let kind   = entry.resource_kind.replace('\'', "''");
-    let payload = match &entry.detail {
-        Some(d) => format!("'{}'", d.replace('\'', "''")),
-        None    => "NULL".to_string(),
-    };
-
-    let sql = format!(
-        "INSERT INTO audit_logs (actor, action, resource_kind, payload, outcome, created_at) \
-         VALUES ('{actor}', '{action}', '{kind}', {payload}, 'ok', {})",
-        entry.timestamp,
-    );
-
-    if let Err(e) = buf.enqueue(BufferedWrite::statement(sql)).await {
-        warn!("audit write failed: {e}");
-    }
-}
-
-/// Return the active database connection, if initialized.
-pub fn get_conn() -> Option<std::sync::Arc<DbConnection>> {
-    DB.get().cloned()
-}
-
-/// Flush all pending writes to disk.
-///
-/// Call before process exit to ensure the last audit entries are persisted.
-pub async fn flush() {
-    if let Some(buf) = WRITE_BUF.get() {
-        if let Err(e) = buf.flush().await {
-            warn!("final DB flush failed: {e}");
+    /// Spawn the write-buffer auto-flush loop as a background tokio task.
+    ///
+    /// Call after `init()` succeeds. The task runs until the process exits.
+    pub fn spawn_flush_loop() {
+        if let Some(buf) = WRITE_BUF.get() {
+            let buf = buf.clone();
+            tokio::spawn(async move { buf.run_auto_flush().await });
         }
     }
+
+    /// Write an audit entry to the database via the write buffer.
+    ///
+    /// Fire and forget — silently does nothing when the DB was not initialized.
+    pub async fn write_audit(entry: &AuditEntry) {
+        let Some(buf) = WRITE_BUF.get() else { return };
+
+        let actor  = entry.actor.replace('\'', "''");
+        let action = entry.action.replace('\'', "''");
+        let kind   = entry.resource_kind.replace('\'', "''");
+        let payload = match &entry.detail {
+            Some(d) => format!("'{}'", d.replace('\'', "''")),
+            None    => "NULL".to_string(),
+        };
+
+        let sql = format!(
+            "INSERT INTO audit_logs (actor, action, resource_kind, payload, outcome, created_at) \
+             VALUES ('{actor}', '{action}', '{kind}', {payload}, 'ok', {})",
+            entry.timestamp,
+        );
+
+        if let Err(e) = buf.enqueue(BufferedWrite::statement(sql)).await {
+            warn!("audit write failed: {e}");
+        }
+    }
+
+    /// Return the active database connection, if initialized.
+    pub fn conn() -> Option<Arc<DbConnection>> {
+        DB.get().cloned()
+    }
+
+    /// Flush all pending writes to disk.
+    ///
+    /// Call before process exit to ensure the last audit entries are persisted.
+    pub async fn flush() {
+        if let Some(buf) = WRITE_BUF.get() {
+            if let Err(e) = buf.flush().await {
+                warn!("final DB flush failed: {e}");
+            }
+        }
+    }
+
+    async fn init_core() -> anyhow::Result<()> {
+        Self::open_with_schema("fs-core.db", CORE_SCHEMA).await
+    }
+
+    async fn init_bus() -> anyhow::Result<()> {
+        Self::open_with_schema("fs-bus.db", BUS_SCHEMA).await
+    }
+
+    async fn open_with_schema(filename: &str, schema: &str) -> anyhow::Result<()> {
+        let path = Self::path(filename);
+        let conn = DbConnection::connect(DbBackend::Sqlite {
+            path: path.to_string_lossy().into_owned(),
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!("{filename} connect: {e}"))?;
+
+        conn.apply_schema(schema)
+            .await
+            .map_err(|e| anyhow::anyhow!("{filename} schema: {e}"))
+    }
 }
 
-// ── Additional Node databases ─────────────────────────────────────────────────
+// ── Public shims (used by main.rs and command modules) ────────────────────────
+
+#[allow(dead_code)]
+pub fn db_path(filename: &str) -> PathBuf { NodeDb::path(filename) }
+
+pub async fn init() -> Result<()> { NodeDb::init().await }
+pub fn spawn_flush_loop() { NodeDb::spawn_flush_loop() }
+pub async fn write_audit_entry(entry: &AuditEntry) { NodeDb::write_audit(entry).await }
+pub fn get_conn() -> Option<Arc<DbConnection>> { NodeDb::conn() }
+pub async fn flush() { NodeDb::flush().await }
+
+// ── Schemas ───────────────────────────────────────────────────────────────────
 
 const CORE_SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS hosts (
@@ -201,24 +237,3 @@ CREATE TABLE IF NOT EXISTS standing_orders (
     created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
 )
 "#;
-
-async fn init_core_db() -> anyhow::Result<()> {
-    open_and_apply_schema("fs-core.db", CORE_SCHEMA).await
-}
-
-async fn init_bus_db() -> anyhow::Result<()> {
-    open_and_apply_schema("fs-bus.db", BUS_SCHEMA).await
-}
-
-async fn open_and_apply_schema(filename: &str, schema: &str) -> anyhow::Result<()> {
-    let path = db_path(filename);
-    let conn = DbConnection::connect(DbBackend::Sqlite {
-        path: path.to_string_lossy().into_owned(),
-    })
-    .await
-    .map_err(|e| anyhow::anyhow!("{filename} connect: {e}"))?;
-
-    conn.apply_schema(schema)
-        .await
-        .map_err(|e| anyhow::anyhow!("{filename} schema: {e}"))
-}

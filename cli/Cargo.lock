@@ -1707,6 +1707,7 @@ dependencies = [
  "async-trait",
  "backon",
  "chrono",
+ "fs-types",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -1721,6 +1722,7 @@ name = "fs-container"
 version = "0.1.0"
 dependencies = [
  "fs-error",
+ "fs-types",
  "serde",
  "tokio",
  "tracing",
@@ -1929,6 +1931,7 @@ name = "fs-pkg"
 version = "0.1.0"
 dependencies = [
  "fs-error",
+ "fs-types",
  "serde",
  "serde_json",
  "toml 1.0.6+spec-1.1.0",

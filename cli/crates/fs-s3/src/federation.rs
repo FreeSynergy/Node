@@ -22,7 +22,9 @@ use crate::buckets::BucketKind;
 
 pub struct FederatedS3Client {
     endpoint:   String,
+    #[allow(dead_code)]
     access_key: String,
+    #[allow(dead_code)]
     secret_key: String,
 }
 

@@ -143,6 +143,7 @@ fn build_hetzner(config: &StorageConfig) -> Option<Box<dyn SyncBackend>> {
 
 // ── generic opendal backend ───────────────────────────────────────────────────
 
+#[allow(dead_code)]
 struct OdalBackend {
     op: Operator,
 }

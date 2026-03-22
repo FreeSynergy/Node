@@ -13,7 +13,7 @@
 
 use std::{
     env,
-    path::{Path, PathBuf},
+    path::PathBuf,
     process::{Command, Stdio},
 };
 
@@ -42,198 +42,244 @@ struct Args {
     skip_init: bool,
 }
 
-// ── OS detection ──────────────────────────────────────────────────────────────
+// ── Log ───────────────────────────────────────────────────────────────────────
 
-fn detect_os() -> String {
-    if let Ok(content) = std::fs::read_to_string("/etc/os-release") {
-        for line in content.lines() {
-            if let Some(id) = line.strip_prefix("ID=") {
-                return id.trim_matches('"').to_string();
+struct Log;
+
+impl Log {
+    fn info(msg: &str)  { eprintln!("\x1b[1;34m==> \x1b[0m{msg}"); }
+    fn ok(msg: &str)    { eprintln!("\x1b[1;32m✓   \x1b[0m{msg}"); }
+    fn warn(msg: &str)  { eprintln!("\x1b[1;33m!   \x1b[0m{msg}"); }
+}
+
+// ── Installer ─────────────────────────────────────────────────────────────────
+
+struct Installer {
+    repo:       String,
+    target:     PathBuf,
+    bin_path:   PathBuf,
+    skip_build: bool,
+    skip_init:  bool,
+}
+
+impl Installer {
+    fn new(args: Args) -> Self {
+        let home = Self::home();
+        Self {
+            target:     args.target.unwrap_or_else(|| home.join("FreeSynergy.Node")),
+            bin_path:   home.join(".local").join("bin").join("fsn"),
+            repo:       args.repo,
+            skip_build: args.skip_build,
+            skip_init:  args.skip_init,
+        }
+    }
+
+    async fn run(&self) -> Result<()> {
+        let os = self.detect_os();
+        Log::info(&format!("Detected OS: {os}"));
+
+        self.install_deps(&os)?;
+        self.enable_lingering();
+        self.ensure_repo()?;
+
+        if self.skip_build {
+            self.download_binary()?;
+        } else {
+            self.build_binary()?;
+        }
+
+        // Ensure ~/.local/bin is on PATH for the fsn init call
+        let local_bin = Self::home().join(".local").join("bin");
+        let old_path = env::var("PATH").unwrap_or_default();
+        env::set_var("PATH", format!("{}:{old_path}", local_bin.display()));
+
+        match Command::new(&self.bin_path).arg("--version").output() {
+            Ok(out) => {
+                let ver = String::from_utf8_lossy(&out.stdout);
+                Log::ok(&format!("fsn {} ready.", ver.trim()));
+            }
+            Err(e) => bail!("installed fsn binary not executable: {e}"),
+        }
+
+        if !self.skip_init {
+            Log::info("Starting setup wizard…");
+            let status = Command::new(&self.bin_path)
+                .arg("init")
+                .arg("--root")
+                .arg(&self.target)
+                .status()
+                .context("running fsn init")?;
+            if !status.success() {
+                bail!("fsn init exited with {status}");
+            }
+        }
+
+        Ok(())
+    }
+
+    fn detect_os(&self) -> String {
+        if let Ok(content) = std::fs::read_to_string("/etc/os-release") {
+            for line in content.lines() {
+                if let Some(id) = line.strip_prefix("ID=") {
+                    return id.trim_matches('"').to_string();
+                }
+            }
+        }
+        "unknown".to_string()
+    }
+
+    fn install_deps(&self, os: &str) -> Result<()> {
+        let missing: Vec<&str> = ["git", "curl", "podman"]
+            .into_iter()
+            .filter(|cmd| Self::which(cmd).is_none())
+            .collect();
+
+        if !std::path::Path::new("/run/systemd/system").exists() {
+            bail!("systemd is required but not running. FSN uses Podman Quadlets (systemd user units).");
+        }
+
+        if missing.is_empty() {
+            Log::ok("All system dependencies present.");
+            return Ok(());
+        }
+
+        Log::info(&format!("Installing missing packages: {}", missing.join(" ")));
+        let pkgs = missing.join(" ");
+
+        let result = match os {
+            "fedora" | "rhel" | "centos" | "rocky" | "almalinux" => {
+                Self::run_cmd("sudo", &["dnf", "install", "-y", &pkgs])
+            }
+            "debian" | "ubuntu" | "linuxmint" | "pop" => {
+                Self::run_cmd("sudo", &["apt-get", "install", "-y", &pkgs])
+            }
+            "arch" | "manjaro" => {
+                Self::run_cmd("sudo", &["pacman", "-Sy", "--noconfirm", &pkgs])
+            }
+            os if os.starts_with("opensuse") || os == "sles" => {
+                Self::run_cmd("sudo", &["zypper", "install", "-y", &pkgs])
+            }
+            _ => {
+                Log::warn(&format!("Unknown OS – please install manually: {pkgs}"));
+                return Ok(());
+            }
+        };
+
+        result.with_context(|| format!("installing packages: {pkgs}"))
+    }
+
+    fn enable_lingering(&self) {
+        if Self::which("loginctl").is_some() {
+            let user = env::var("USER").unwrap_or_default();
+            if !user.is_empty() {
+                Log::info("Enabling systemd user lingering…");
+                let _ = Command::new("loginctl")
+                    .args(["enable-linger", &user])
+                    .stderr(Stdio::null())
+                    .status();
             }
         }
     }
-    "unknown".to_string()
-}
 
-// ── Print helpers ─────────────────────────────────────────────────────────────
-
-fn info(msg: &str)  { eprintln!("\x1b[1;34m==> \x1b[0m{msg}"); }
-fn ok(msg: &str)    { eprintln!("\x1b[1;32m✓   \x1b[0m{msg}"); }
-fn warn(msg: &str)  { eprintln!("\x1b[1;33m!   \x1b[0m{msg}"); }
-
-// ── System dependency check ───────────────────────────────────────────────────
-
-fn install_deps(os: &str) -> Result<()> {
-    let missing: Vec<&str> = ["git", "curl", "podman"]
-        .into_iter()
-        .filter(|cmd| which(cmd).is_none())
-        .collect();
-
-    if !std::path::Path::new("/run/systemd/system").exists() {
-        bail!("systemd is required but not running. FSN uses Podman Quadlets (systemd user units).");
-    }
-
-    if missing.is_empty() {
-        ok("All system dependencies present.");
-        return Ok(());
-    }
-
-    info(&format!("Installing missing packages: {}", missing.join(" ")));
-
-    let pkgs = missing.join(" ");
-    let result = match os {
-        "fedora" | "rhel" | "centos" | "rocky" | "almalinux" => {
-            run_cmd("sudo", &["dnf", "install", "-y", &pkgs])
-        }
-        "debian" | "ubuntu" | "linuxmint" | "pop" => {
-            run_cmd("sudo", &["apt-get", "install", "-y", &pkgs])
-        }
-        "arch" | "manjaro" => {
-            run_cmd("sudo", &["pacman", "-Sy", "--noconfirm", &pkgs])
-        }
-        os if os.starts_with("opensuse") || os == "sles" => {
-            run_cmd("sudo", &["zypper", "install", "-y", &pkgs])
-        }
-        _ => {
-            warn(&format!("Unknown OS – please install manually: {pkgs}"));
-            return Ok(());
-        }
-    };
-
-    result.with_context(|| format!("installing packages: {pkgs}"))
-}
-
-fn which(cmd: &str) -> Option<PathBuf> {
-    env::var_os("PATH").and_then(|paths| {
-        env::split_paths(&paths).find_map(|dir| {
-            let full = dir.join(cmd);
-            full.is_file().then_some(full)
-        })
-    })
-}
-
-fn run_cmd(prog: &str, args: &[&str]) -> Result<()> {
-    let status = Command::new(prog)
-        .args(args)
-        .status()
-        .with_context(|| format!("running {prog}"))?;
-    anyhow::ensure!(status.success(), "{prog} exited with {status}");
-    Ok(())
-}
-
-// ── Systemd user lingering ────────────────────────────────────────────────────
-
-/// Enable lingering so Podman Quadlet user units survive logout.
-/// Quadlet-based deployment does NOT require the podman.socket API — only
-/// lingering is needed to keep user systemd units alive when no user session is active.
-fn enable_user_lingering() {
-    if which("loginctl").is_some() {
-        let user = env::var("USER").unwrap_or_default();
-        if !user.is_empty() {
-            info("Enabling systemd user lingering…");
-            let _ = Command::new("loginctl")
-                .args(["enable-linger", &user])
-                .stderr(Stdio::null())
-                .status();
+    fn ensure_repo(&self) -> Result<()> {
+        let target = &self.target;
+        if target.join(".git").exists() {
+            Log::info(&format!("Updating existing repo at {}", target.display()));
+            Self::run_cmd("git", &["-C", &target.to_string_lossy(), "pull", "--ff-only"])
+        } else {
+            Log::info(&format!("Cloning FreeSynergy.Node to {}", target.display()));
+            std::fs::create_dir_all(target.parent().unwrap_or(target))?;
+            Self::run_cmd("git", &["clone", "--depth", "1", &self.repo, &target.to_string_lossy()])
         }
     }
-}
 
-// ── Clone / update repo ───────────────────────────────────────────────────────
+    fn build_binary(&self) -> Result<()> {
+        if Self::which("cargo").is_none() {
+            Log::info("Installing Rust toolchain via rustup…");
+            let sh = Self::fetch("https://sh.rustup.rs")?;
+            let tmp = std::env::temp_dir().join("rustup-init.sh");
+            std::fs::write(&tmp, sh)?;
+            Self::run_cmd("sh", &[&tmp.to_string_lossy(), "--", "-y", "--profile", "minimal"])
+                .context("installing rustup")?;
 
-fn ensure_repo(repo_url: &str, target: &Path) -> Result<()> {
-    if target.join(".git").exists() {
-        info(&format!("Updating existing repo at {}", target.display()));
-        run_cmd("git", &["-C", &target.to_string_lossy(), "pull", "--ff-only"])
-    } else {
-        info(&format!("Cloning FreeSynergy.Node to {}", target.display()));
-        std::fs::create_dir_all(target.parent().unwrap_or(target))?;
-        run_cmd("git", &["clone", "--depth", "1", repo_url, &target.to_string_lossy()])
-    }
-}
-
-// ── Build / download binary ───────────────────────────────────────────────────
-
-fn build_binary(target_dir: &Path, bin_path: &Path) -> Result<()> {
-    // Ensure rustup / cargo present
-    if which("cargo").is_none() {
-        info("Installing Rust toolchain via rustup…");
-        let sh = reqwest_blocking_get("https://sh.rustup.rs")?;
-        let tmp = std::env::temp_dir().join("rustup-init.sh");
-        std::fs::write(&tmp, sh)?;
-        run_cmd("sh", &[&tmp.to_string_lossy(), "--", "-y", "--profile", "minimal"])
-            .context("installing rustup")?;
-
-        // Source cargo env (best-effort)
-        let cargo_env = dirs_home().join(".cargo").join("env");
-        if cargo_env.exists() {
-            // Can't `source` in Rust; update PATH manually
-            let cargo_bin = dirs_home().join(".cargo").join("bin");
+            let cargo_bin = Self::home().join(".cargo").join("bin");
             let old_path = env::var("PATH").unwrap_or_default();
             env::set_var("PATH", format!("{}:{old_path}", cargo_bin.display()));
         }
+
+        Log::info("Building fsn binary (this may take a few minutes on first run)…");
+        let cli_dir = self.target.join("cli");
+        Self::run_cmd(
+            "cargo",
+            &["build", "--release", "-p", "fs-node-cli", "--manifest-path",
+              &cli_dir.join("Cargo.toml").to_string_lossy()],
+        ).context("cargo build")?;
+
+        let built = cli_dir.join("target").join("release").join("fsn");
+        std::fs::create_dir_all(self.bin_path.parent().unwrap_or(&self.bin_path))?;
+        std::fs::copy(&built, &self.bin_path)
+            .with_context(|| format!("copying fsn binary to {}", self.bin_path.display()))?;
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&self.bin_path, std::fs::Permissions::from_mode(0o755))?;
+        }
+
+        Log::ok(&format!("Installed fsn to {}", self.bin_path.display()));
+        Ok(())
     }
 
-    info("Building fsn binary (this may take a few minutes on first run)…");
-    let cli_dir = target_dir.join("cli");
-    run_cmd(
-        "cargo",
-        &["build", "--release", "-p", "fs-node-cli", "--manifest-path",
-          &cli_dir.join("Cargo.toml").to_string_lossy()],
-    ).context("cargo build")?;
+    fn download_binary(&self) -> Result<()> {
+        let arch = std::env::consts::ARCH;
+        let url = format!("{}/releases/latest/download/fs-{arch}-unknown-linux-musl", self.repo);
+        Log::info(&format!("Downloading pre-built fsn binary from {url}…"));
 
-    let built = cli_dir.join("target").join("release").join("fsn");
-    std::fs::create_dir_all(bin_path.parent().unwrap_or(bin_path))?;
-    std::fs::copy(&built, bin_path)
-        .with_context(|| format!("copying fsn binary to {}", bin_path.display()))?;
+        let bytes = Self::fetch(&url)?;
+        std::fs::create_dir_all(self.bin_path.parent().unwrap_or(&self.bin_path))?;
+        std::fs::write(&self.bin_path, bytes)?;
 
-    // Set executable bit
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(bin_path, std::fs::Permissions::from_mode(0o755))?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&self.bin_path, std::fs::Permissions::from_mode(0o755))?;
+        }
+
+        Log::ok(&format!("Downloaded fsn to {}", self.bin_path.display()));
+        Ok(())
     }
 
-    ok(&format!("Installed fsn to {}", bin_path.display()));
-    Ok(())
-}
-
-fn download_binary(repo_url: &str, bin_path: &Path) -> Result<()> {
-    let arch = std::env::consts::ARCH;
-    let url = format!("{repo_url}/releases/latest/download/fs-{arch}-unknown-linux-musl");
-    info(&format!("Downloading pre-built fsn binary from {url}…"));
-
-    let bytes = reqwest_blocking_get(&url)?;
-    std::fs::create_dir_all(bin_path.parent().unwrap_or(bin_path))?;
-    std::fs::write(bin_path, bytes)?;
-
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(bin_path, std::fs::Permissions::from_mode(0o755))?;
-    }
-
-    ok(&format!("Downloaded fsn to {}", bin_path.display()));
-    Ok(())
-}
-
-// ── HTTP helper (blocking via reqwest) ───────────────────────────────────────
-
-fn reqwest_blocking_get(url: &str) -> Result<Vec<u8>> {
-    // We're inside a Tokio runtime (main is async), use block_in_place.
-    tokio::task::block_in_place(|| {
-        tokio::runtime::Handle::current().block_on(async {
-            let client = reqwest::Client::builder()
-                .https_only(true)
-                .build()?;
-            let resp = client.get(url).send().await?.error_for_status()?;
-            Ok(resp.bytes().await?.to_vec())
+    fn which(cmd: &str) -> Option<PathBuf> {
+        env::var_os("PATH").and_then(|paths| {
+            env::split_paths(&paths).find_map(|dir| {
+                let full = dir.join(cmd);
+                full.is_file().then_some(full)
+            })
         })
-    })
-}
+    }
 
-fn dirs_home() -> PathBuf {
-    env::var_os("HOME").map(PathBuf::from).unwrap_or_else(|| PathBuf::from("."))
+    fn run_cmd(prog: &str, args: &[&str]) -> Result<()> {
+        let status = Command::new(prog)
+            .args(args)
+            .status()
+            .with_context(|| format!("running {prog}"))?;
+        anyhow::ensure!(status.success(), "{prog} exited with {status}");
+        Ok(())
+    }
+
+    fn fetch(url: &str) -> Result<Vec<u8>> {
+        tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                let client = reqwest::Client::builder().https_only(true).build()?;
+                let resp = client.get(url).send().await?.error_for_status()?;
+                Ok(resp.bytes().await?.to_vec())
+            })
+        })
+    }
+
+    fn home() -> PathBuf {
+        env::var_os("HOME").map(PathBuf::from).unwrap_or_else(|| PathBuf::from("."))
+    }
 }
 
 // ── main ──────────────────────────────────────────────────────────────────────
@@ -244,50 +290,5 @@ async fn main() -> Result<()> {
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
 
-    let args = Args::parse();
-
-    let target = args.target.unwrap_or_else(|| dirs_home().join("FreeSynergy.Node"));
-    let bin_path = dirs_home().join(".local").join("bin").join("fsn");
-
-    let os = detect_os();
-    info(&format!("Detected OS: {os}"));
-
-    install_deps(&os)?;
-    enable_user_lingering();
-    ensure_repo(&args.repo, &target)?;
-
-    if args.skip_build {
-        download_binary(&args.repo, &bin_path)?;
-    } else {
-        build_binary(&target, &bin_path)?;
-    }
-
-    // Ensure ~/.local/bin is on PATH for the fsn init call below
-    let local_bin = dirs_home().join(".local").join("bin");
-    let old_path = env::var("PATH").unwrap_or_default();
-    env::set_var("PATH", format!("{}:{old_path}", local_bin.display()));
-
-    // Verify binary runs
-    match Command::new(&bin_path).arg("--version").output() {
-        Ok(out) => {
-            let ver = String::from_utf8_lossy(&out.stdout);
-            ok(&format!("fsn {} ready.", ver.trim()));
-        }
-        Err(e) => bail!("installed fsn binary not executable: {e}"),
-    }
-
-    if !args.skip_init {
-        info("Starting setup wizard…");
-        let status = Command::new(&bin_path)
-            .arg("init")
-            .arg("--root")
-            .arg(&target)
-            .status()
-            .context("running fsn init")?;
-        if !status.success() {
-            bail!("fsn init exited with {status}");
-        }
-    }
-
-    Ok(())
+    Installer::new(Args::parse()).run().await
 }

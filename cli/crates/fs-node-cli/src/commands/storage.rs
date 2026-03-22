@@ -9,12 +9,12 @@
 //   sync pull <url>       – pull from a remote node (federation)
 //   sync push <url>       – push to a remote node (federation)
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anyhow::{Context, Result};
 use chrono::Utc;
 use fs_s3::{
-    BucketKind, FederatedS3Client, NodeProfile, ProfileStore, S3Server, StorageConfig,
+    BucketKind, FederatedS3Client, NodeProfile, ProfileStore, StorageConfig,
     buckets::BucketInfo,
 };
 

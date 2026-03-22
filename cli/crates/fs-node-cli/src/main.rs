@@ -29,7 +29,7 @@ async fn main() -> Result<()> {
     }));
 
     // Active language: user-set marker file → system env → "en"
-    let lang = commands::store::active_lang();
+    let lang = commands::store::I18nCmd::active_lang();
 
     // Build locale list: EN always present as fallback; add cached pack if available
     let cached = load_cached_lang(&lang);
@@ -56,6 +56,6 @@ async fn main() -> Result<()> {
 /// Returns None if not found.
 fn load_cached_lang(lang: &str) -> Option<String> {
     if lang == "en" { return None; }
-    let path = commands::store::i18n_cache_dir().join(format!("{lang}.toml"));
+    let path = commands::store::I18nCmd::cache_dir().join(format!("{lang}.toml"));
     std::fs::read_to_string(path).ok()
 }
