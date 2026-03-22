@@ -24,7 +24,7 @@ cli/                  → Rust workspace (CLI + deployment engine)
     fs-dns/          → DNS provider integrations
     fs-host/         → Host management (SSH, remote install, provisioning)
     fs-cli/          → CLI binary (clap) — `fsn` command
-modules/              → Module definitions (YAML + Templates + Hooks)
+containers/           → Container definitions (TOML + Templates)
 hosts/                → Host files (one per server)
 projects/             → Project files + branding + sites
 ```
@@ -49,11 +49,11 @@ All shared libraries live in `../FreeSynergy.Lib/`. Never duplicate their logic 
 | `fs-plugin-sdk`     | WASM Plugin SDK |
 | `fs-plugin-runtime` | WASM Host runtime |
 
-## Module Conventions
+## Container Conventions
 
-- Path: `modules/{type}/{name}/{name}.toml`
+- Path: `containers/{name}/{name}.toml`
 - Block order: `module` → `vars` → `load` → `container` → `environment`
-- `container.healthcheck` is required for every module
+- `container.healthcheck` is required for every container
 - `container.published_ports: []` for all except Zentinel
 - `container.networks: []` is set automatically by the deployer
 

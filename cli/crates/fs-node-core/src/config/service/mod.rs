@@ -1,5 +1,5 @@
 use fs_error::FsyError;
-// Service class definition – maps to modules/{type}/{name}/{name}.toml
+// Service class definition – maps to containers/{name}/{name}.toml
 //
 // Design Pattern: Module split:
 //   types.rs     — ServiceType enum + de_service_types (role classification)
@@ -36,7 +36,7 @@ use crate::resource::Resource;
 // ── Service Class ─────────────────────────────────────────────────────────────
 
 /// A service class definition (the template/blueprint for a service).
-/// Loaded from modules/{type}/{name}/{name}.toml.
+/// Loaded from containers/{name}/{name}.toml.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ServiceClass {
     /// Metadata block – TOML key is `[module]` for file compatibility.

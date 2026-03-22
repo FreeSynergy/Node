@@ -28,7 +28,7 @@ pub struct AppSettings {
     pub preferred_lang: Option<String>,
 
     /// Module IDs that have been installed (local copy synced from store).
-    /// Example: ["proxy/zentinel", "iam/kanidm"]
+    /// Example: ["zentinel", "kanidm"]
     #[serde(default)]
     pub installed_modules: Vec<String>,
 
@@ -149,21 +149,20 @@ fn settings_path() -> PathBuf {
 
 // ── Container Plugins directory ────────────────────────────────────────────────
 
-/// Resolve the directory that holds container plugin definitions (formerly "modules/").
+/// Resolve the directory that holds container definitions.
 ///
 /// Priority (first match wins):
 ///   1. `FS_PLUGINS_DIR` environment variable — explicit override.
-///   2. First enabled store with a `local_path` set → `{local_path}/Node/`.
-///   3. Legacy fallback: `{node_root}/modules/`.
+///   2. First enabled store with a `local_path` set → `{local_path}/node/containers/`.
+///   3. Fallback: `{node_root}/containers/`.
 ///
-/// Callers pass the FSN workspace root so the legacy path always resolves
+/// Callers pass the FSN workspace root so the fallback path always resolves
 /// even when no settings file or env var is present.
 pub fn resolve_plugins_dir(node_root: &std::path::Path) -> PathBuf {
     if let Some(dir) = resolve_plugins_dir_no_fallback() {
         return dir;
     }
-    // Legacy bundled modules directory.
-    node_root.join("modules")
+    node_root.join("containers")
 }
 
 /// Resolve the plugins directory without requiring a `node_root` fallback.
@@ -181,7 +180,7 @@ pub fn resolve_plugins_dir_no_fallback() -> Option<PathBuf> {
     if let Ok(settings) = AppSettings::load() {
         if let Some(store) = settings.stores.iter().find(|s| s.enabled && s.local_path.is_some()) {
             let base = PathBuf::from(store.local_path.as_deref().unwrap());
-            return Some(base.join("Node").join("modules"));
+            return Some(base.join("node").join("containers"));
         }
     }
     None

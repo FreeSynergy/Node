@@ -1,5 +1,4 @@
 // fsn sync – show what would change without applying anything.
-// Replaces: ansible-playbook playbooks/sync-stack.yml
 
 use std::path::Path;
 use anyhow::Result;

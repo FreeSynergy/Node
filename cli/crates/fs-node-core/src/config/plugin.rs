@@ -3,8 +3,8 @@
 // Plugins are NOT modules. They provide type-level configuration
 // (e.g. DNS providers, ACME providers) that all modules of the same type can use.
 //
-// File layout:  modules/{type}/plugins/{plugin_type}/{name}.toml
-// Example key:  "proxy/dns/hetzner"
+// File layout:  containers/{name}/plugins/{plugin_type}/{name}.toml
+// Example key:  "zentinel/dns/hetzner"
 //
 // Field order (mandatory): plugin → vars
 

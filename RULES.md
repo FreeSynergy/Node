@@ -23,13 +23,13 @@ is designed the way it is.
 ```
 FreeSynergy.Node = Modular, decentralized Podman/Quadlet deployment system
 │
-├── modules/       Git-tracked: reusable module classes (templates)
+├── containers/    Git-tracked: container definitions (TOML + Templates)
 ├── hosts/         Git-tracked: one file per host (infrastructure layer)
 ├── projects/      Mixed: project files git-tracked, data/configs git-ignored
 │   ├── {name}.project.yml       local deployment (this machine)
 │   └── {name}.{hostname}.yml    remote deployment (other machine, same project)
 │
-└── Ansible reads everything -> generates Quadlets -> deploys
+└── fsn CLI reads everything -> generates Quadlets -> deploys
 ```
 
 ---
@@ -38,63 +38,38 @@ FreeSynergy.Node = Modular, decentralized Podman/Quadlet deployment system
 
 ```
 /opt/FreeSynergy.Node/
-├── modules/
-│   ├── proxy/
-│   │   ├── plugins/                       # plugins belong to the TYPE
+├── containers/
+│   ├── zentinel/                          # container = directory
+│   │   ├── zentinel.toml                  # class file (same name as dir)
+│   │   ├── plugins/                       # plugins belong to their container
 │   │   │   ├── dns/
-│   │   │   │   ├── hetzner.yml
-│   │   │   │   └── cloudflare.yml
+│   │   │   │   ├── hetzner.toml
+│   │   │   │   └── cloudflare.toml
 │   │   │   └── acme/
-│   │   │       ├── letsencrypt.yml
-│   │   │       └── smallstep-ca.yml
-│   │   └── zentinel/                      # module = directory
-│   │       ├── zentinel.yml               # class file (same name as dir)
-│   │       ├── playbooks/
-│   │       │   ├── deploy-dns.yml
-│   │       │   ├── deploy-kdl.yml
-│   │       │   └── undeploy-dns.yml
-│   │       ├── templates/
-│   │       │   └── zentinel.kdl.j2
-│   │       └── zentinel-control-plane/
-│   │           └── zentinel-control-plane.yml
-│   ├── auth/
-│   │   └── kanidm/
-│   │       ├── kanidm.yml
-│   │       ├── playbooks/deploy-setup.yml
-│   │       └── templates/kanidm.toml.j2
-│   ├── mail/stalwart/
-│   ├── git/forgejo/
-│   ├── wiki/outline/
-│   ├── collab/cryptpad/
-│   ├── database/postgres/
-│   └── cache/dragonfly/
+│   │   │       ├── letsencrypt.toml
+│   │   │       └── zerossl.toml
+│   │   ├── templates/
+│   │   │   └── zentinel.kdl.j2
+│   │   └── zentinel-control-plane/
+│   │       └── zentinel-control-plane.toml
+│   ├── kanidm/
+│   │   ├── kanidm.toml
+│   │   └── templates/kanidm.toml.j2
+│   ├── stalwart/
+│   ├── forgejo/
+│   ├── outline/
+│   ├── cryptpad/
+│   ├── postgres/
+│   └── dragonfly/
 │
 ├── hosts/
-│   └── hetzner-1.host.yml                 # one file per host
-│
-├── playbooks/
-│   ├── install-project.yml
-│   ├── deploy-stack.yml
-│   ├── undeploy-stack.yml
-│   ├── update-stack.yml
-│   ├── restart-stack.yml
-│   ├── clean-stack.yml
-│   ├── remove-stack.yml
-│   ├── generate-config-examples.yml
-│   ├── templates/
-│   │   ├── container.quadlet.j2
-│   │   └── container.env.j2
-│   └── tasks/
-│       ├── generate-quadlet.yml
-│       ├── generate-single-example.yml
-│       ├── run-module-hooks.yml
-│       └── record-deployed-version.yml
+│   └── hetzner-1.host.toml                # one file per host
 │
 └── projects/
     └── FreeSynergy.Net/
-        ├── freesynergy.project.yml        # git-tracked (local modules)
-        ├── freesynergy.turbo.yml          # git-tracked (remote host modules)
-        ├── freesynergy.federation.yml     # git-tracked (federation config)
+        ├── freesynergy.project.toml       # git-tracked (local containers)
+        ├── freesynergy.turbo.toml         # git-tracked (remote host containers)
+        ├── freesynergy.federation.toml    # git-tracked (federation config)
         ├── configs/                       # git-ignored (instance secrets)
         └── data/                          # git-ignored (container volumes)
 ```
@@ -136,7 +111,7 @@ host:
 
   proxy:
     zentinel:
-      module_class: "proxy/zentinel"
+      module_class: "zentinel"
       load:
         plugins:
           dns: "hetzner"
@@ -153,7 +128,7 @@ hosts/
 ```
 
 Key rules:
-- `external: false` = Ansible can connect and deploy
+- `external: false` = fsn CLI can connect and deploy
 - `external: true` = no deployment, only config variables are read
 - The proxy lives in the host file, not in any project file
 - The proxy collects routes automatically from all projects on this host
@@ -167,7 +142,7 @@ is defined at host level and collects its routes automatically.
 ### Proxy KDL Management (Marker-Based)
 
 The proxy KDL config can be modified by two sources: the deployer
-(Ansible) and the Control-Plane (manual/API). To prevent conflicts,
+(`fsn`) and the Control-Plane (manual/API). To prevent conflicts,
 the deployer uses markers to identify its managed sections:
 
 ```
@@ -212,15 +187,15 @@ project:
 load:
   modules:
     "kanidm":
-      module_class: "auth/kanidm"
+      module_class: "kanidm"
     "stalwart":
-      module_class: "mail/stalwart"
+      module_class: "stalwart"
     "forgejo":
-      module_class: "git/forgejo"
+      module_class: "forgejo"
     "outline":
-      module_class: "wiki/outline"
+      module_class: "outline"
     "cryptpad":
-      module_class: "collab/cryptpad"
+      module_class: "cryptpad"
 ```
 
 Branding files live in the project directory (git-tracked):
@@ -263,7 +238,7 @@ host:
 load:
   modules:
     their-wiki:
-      module_class: "wiki/outline"
+      module_class: "outline"
       external: true    # no container created, only connection vars used
 ```
 
@@ -344,7 +319,7 @@ projects/{ProjectName}/
 ```
 
 - Directory name = instance name (not module class name)
-- `data/wiki/` if instance is named "wiki", even if module_class is wiki/outline
+- `data/wiki/` if instance is named "wiki", even if module_class is `outline`
 - One `tar` of the project directory = complete backup
 - `config_dir` in every module: `{{ project_root }}/data/{{ instance_name }}`
 
@@ -372,7 +347,7 @@ Rule: `vault_` only when the value must never appear in logs or plain text.
 
 ### Module vs Service
 
-A **module** is a class/template: `auth/kanidm`, `git/forgejo`. It is a
+A **container class** is a template: `kanidm`, `forgejo`. It is a
 blueprint. A **service** is a running instance created from a module. It
 has a name, a subdomain, a port. The proxy knows services. DNS knows
 services. Everything outside of `load:` operates on services.
@@ -408,65 +383,64 @@ shared networks when needed.
 
 ### Plugins
 
-Plugins are NOT modules. They are helper configurations per type, with
-their own permissions scope. Examples: DNS providers, ACME providers.
-They live in `modules/{type}/plugins/{plugin_type}/`.
+Plugins are NOT containers. They are helper configurations specific to a
+container. Examples: DNS providers, ACME providers for the proxy.
+They live in `containers/{name}/plugins/{plugin_type}/`.
 
 ### Plugin Convention
 
-Plugins belong to a **type**, not to a specific module. All modules
-of the same type can use the same plugins. For example, all proxy
-modules (zentinel, traefik, nginx) can use the same DNS and ACME plugins.
+Plugins belong to their container directory. For example, zentinel's
+DNS and ACME plugins live inside the zentinel container directory.
 
 Directory structure:
 ```
-modules/{type}/plugins/{plugin_type}/{name}.yml
+containers/{name}/plugins/{plugin_type}/{name}.toml
 ```
 
 Example:
 ```
-modules/proxy/plugins/
+containers/zentinel/plugins/
 ├── dns/
-│   ├── hetzner.yml
-│   └── cloudflare.yml
+│   ├── hetzner.toml
+│   └── cloudflare.toml
 └── acme/
-    ├── letsencrypt.yml
-    └── smallstep-ca.yml
+    ├── letsencrypt.toml
+    └── zerossl.toml
 ```
 
 #### Plugin Interface
 
-```yaml
-# modules/proxy/plugins/dns/hetzner.yml
-plugin:
-  name: "hetzner"
-  type: "dns"
-  description: "Hetzner DNS API provider"
+```toml
+# containers/zentinel/plugins/dns/hetzner.toml
+[plugin]
+name        = "hetzner"
+type        = "dns"
+description = "Hetzner DNS API provider"
 
-vars:
-  dns_provider: "hetzner"
-  dns_api_url: "https://dns.hetzner.com/api/v1"
-  dns_api_token: "{{ vault_dns_api_token }}"
-  dns_ttl: 300
+[vars]
+dns_provider  = "hetzner"
+dns_api_url   = "https://dns.hetzner.com/api/v1"
+dns_api_token = "{{ vault_dns_api_token }}"
+dns_ttl       = 300
 ```
 
-```yaml
-# modules/proxy/plugins/acme/letsencrypt.yml
-plugin:
-  name: "letsencrypt"
-  type: "acme"
-  description: "Let's Encrypt ACME provider"
+```toml
+# containers/zentinel/plugins/acme/letsencrypt.toml
+[plugin]
+name        = "letsencrypt"
+type        = "acme"
+description = "Let's Encrypt ACME provider"
 
-vars:
-  acme_provider: "letsencrypt"
-  acme_ca_url: "https://acme-v02.api.letsencrypt.org/directory"
-  acme_email: "{{ acme_contact_email }}"
+[vars]
+acme_provider = "letsencrypt"
+acme_ca_url   = "https://acme-v02.api.letsencrypt.org/directory"
+acme_email    = "{{ acme_contact_email }}"
 ```
 
 Field order: `plugin` → `vars`
 
-Plugins have NO `load:`, `container:`, or `environment:` blocks.
-They are purely variable collections. The module decides what to do
+Plugins have NO `load`, `container`, or `environment` blocks.
+They are purely variable collections. The container decides what to do
 with the variables in its own templates.
 
 #### Plugin Loading
@@ -474,21 +448,21 @@ with the variables in its own templates.
 Plugins are loaded in the host file via `load:` on the proxy:
 
 ```yaml
-# hosts/hetzner-1.host.yml
+# hosts/hetzner-1.host.toml
 host:
   name: "hetzner-1"
   ip: "1.2.3.4"
 
   proxy:
     zentinel:
-      module_class: "proxy/zentinel"
+      module_class: "zentinel"
       load:
         plugins:
           dns: "hetzner"
           acme: "letsencrypt"
 ```
 
-The module resolves `dns: "hetzner"` to `modules/proxy/plugins/dns/hetzner.yml`
+The deployer resolves `dns: "hetzner"` to `containers/zentinel/plugins/dns/hetzner.toml`
 and loads its vars.
 
 #### Plugin Secrets
@@ -509,11 +483,11 @@ vault_dns_api_token: "my-secret-token"
 Different hosts can use the same plugin with different secrets, because
 each host has its own instance config directory.
 
-```yaml
-# modules/{type}/{name}/{name}.yml
+```toml
+# containers/{name}/{name}.toml
 
-module:
-  name: "{name}"
+[module]
+name = "{name}"
   alias: []               # optional -> CNAME records
   dns: {}                 # ONLY for type: mail (mx, srv, txt)
   type: "{type}"
@@ -561,18 +535,17 @@ environment:
 
 ---
 
-## Module Hook Convention
+## Container Lifecycle Hooks
 
-Hooks in `modules/{type}/{name}/playbooks/`:
+Hooks are declared in `[[lifecycle.on_install]]`, `[[lifecycle.on_update]]`, etc.
+within the container TOML. See `ServiceLifecycle` in `service/mod.rs` for full spec.
 
-| Glob | Triggered by | When |
+| Hook | Triggered by | When |
 |------|-------------|------|
-| `deploy-*.yml` | `deploy-stack.yml` | after container start |
-| `undeploy-*.yml` | `undeploy-stack.yml` | before container stop |
-| `update-*.yml` | `update-stack.yml` | after module update |
-| `restart-*.yml` | `restart-stack.yml` | after restart |
-| `clean-*.yml` | `clean-stack.yml` | during cleanup |
-| `remove-*.yml` | `remove-stack.yml` | before removal |
+| `on_install` | `fsn deploy` | after container start |
+| `on_configure` | `fsn deploy` | during configure phase |
+| `on_update` | `fsn update` | after image pull |
+| `on_decommission` | `fsn remove` | before removal |
 
 Auto-discovery via glob. File exists = runs. Missing = skipped silently.
 
@@ -580,38 +553,37 @@ Auto-discovery via glob. File exists = runs. Missing = skipped silently.
 
 ## Version Management
 
-One Git repo, version in module class:
-```yaml
-module:
-  version: "1.2.0"   # increment to trigger update-stack
+One Git repo, version in container class:
+```toml
+[module]
+version = "1.2.0"   # increment to trigger update
 ```
 
-`update-stack.yml` compares `module.version` vs `instance.deployed_version`.
+The deployer compares `module.version` vs `instance.deployed_version`.
 After deploy, `deployed_version` is written to the instance config.
 
 ---
 
-## Global Playbooks
+## CLI Commands
 
-| Playbook | Purpose |
-|----------|---------|
-| `install-project.yml` | Setup + generate config examples |
-| `sync-stack.yml` | Compare desired vs actual state across all hosts (read-only) |
-| `deploy-stack.yml` | Sync + apply changes (calls sync-stack internally) |
-| `undeploy-stack.yml` | undeploy hooks + stop |
-| `update-stack.yml` | Version check + redeploy changed modules |
-| `restart-stack.yml` | Stop + start + restart hooks |
-| `clean-stack.yml` | Remove orphaned resources across all project hosts |
-| `remove-stack.yml` | remove hooks + delete everything |
+| Command | Purpose |
+|---------|---------|
+| `fsn deploy` | Reconcile desired state, start/update containers |
+| `fsn sync` | Show what would change (read-only) |
+| `fsn update` | Pull new images + redeploy changed containers |
+| `fsn stop` | Stop containers (data retained) |
+| `fsn remove` | Run decommission hooks + delete everything |
+| `fsn status` | Show running containers and health |
 
-### deploy-stack options
+### deploy options
 ```
-deploy-stack.yml                   -> all hosts (local + remote)
-deploy-stack.yml --local           -> only this host
-deploy-stack.yml --host turbo      -> only host turbo
+fsn deploy                 → all hosts (local + remote)
+fsn deploy --local         → only this host
+fsn deploy --host turbo    → only host turbo
+fsn deploy --service wiki  → only the wiki container
 ```
 
-### sync-stack logic
+### sync logic
 ```
 1. Read all project files: *.project.yml (local) + *.{hostname}.yml (remote)
 2. Together = desired state of the entire project
@@ -620,67 +592,38 @@ deploy-stack.yml --host turbo      -> only host turbo
 5. No changes made (read-only)
 ```
 
-### deploy-stack logic
+### deploy logic
 ```
-1. Run sync-stack (compare desired vs actual)
+1. Run sync (compare desired vs actual)
 2. For each host:
-   - Missing module → deploy
+   - Missing container → deploy
    - Config diverged → update config + restart
    - Extra (not in any project file) → remove
    - Matching → skip
 3. Result: entire project consistent across all hosts
 ```
 
-### clean-stack rules
-Cleans across all hosts belonging to this project.
-Removes orphaned resources (services no longer in any project file).
-Never touches services belonging to other projects.
-
 ---
 
-## Installer Design
+## Available Containers
 
-Entry point:
-```
-fs-install.sh    <- Bash: checks Python3 + Ansible only
-    └── fs-install.yml  <- Ansible: everything else
-```
-
-First run flow:
-```
-1. New project or update existing?
-2. Local or remote host?
-   (hint: "you can also manage other servers from here")
-3. Project name -> creates projects/{name}/ directory
-4. Connection: SSH key path, user (path saved, never the key itself)
-5. Domain, IPs, module repo URL
-   (default: github.com/Lord-KalEl/FreeSynergy.Node)
-6. Generate project file with ALL variables (empty strings for unset)
-7. Open $EDITOR (fallback: vi) -> user fills in values
-8. After editor closes: validate + deploy
-```
-
-Config file = single source of truth. Second run:
-```
-fs-install.sh --config projects/FreeSynergy.Net/freesynergy.project.yml
-```
-No questions. Reads file, deploys. Changed file -> update.
-
----
-
-## Available Modules
-
-| Class path | Port | Constraints | Hooks |
-|-----------|------|-------------|-------|
-| `proxy/zentinel` | 443 | per_host:1, per_ip:1 | deploy-dns, deploy-kdl, deploy-firewall, undeploy-dns, undeploy-firewall |
-| `proxy/zentinel/zentinel-control-plane` | 8080 | - | - |
-| `auth/kanidm` | 8443 | - | deploy-setup |
-| `mail/stalwart` | 443 | - | deploy-dns, undeploy-dns |
-| `git/forgejo` | 3000 | - | - |
-| `wiki/outline` | 3000 | - | - |
-| `collab/cryptpad` | 3000 | - | deploy-setup |
-| `database/postgres` | 5432 | locality:same_host | - |
-| `cache/dragonfly` | 6379 | locality:same_host | - |
+| Name | Port | Constraints | Notes |
+|------|------|-------------|-------|
+| `zentinel` | 443 | per_host:1, per_ip:1 | proxy, DNS+ACME plugins |
+| `zentinel-control-plane` | 8080 | - | sub-container of zentinel |
+| `kanidm` | 8443 | - | IAM / OIDC / LDAP |
+| `stalwart` | 443 | - | all-in-one mail server |
+| `forgejo` | 3000 | - | Git forge |
+| `outline` | 3000 | - | wiki / knowledge base |
+| `cryptpad` | 3000 | - | encrypted collab suite |
+| `postgres` | 5432 | locality:same_host | relational database |
+| `dragonfly` | 6379 | locality:same_host | Redis-compatible cache |
+| `vikunja` | 3456 | - | task manager |
+| `pretix` | 80 | - | event ticketing |
+| `umap` | 8000 | - | OpenStreetMap sharing |
+| `openobserver` | 5080 | - | observability platform |
+| `otel-collector` | 4318 | per_host:1 | OpenTelemetry collector |
+| `tuwunel` | 8448 | - | Matrix homeserver |
 
 ---
 
@@ -688,47 +631,43 @@ No questions. Reads file, deploys. Changed file -> update.
 
 ### MUST
 ```
-✅ Module = directory: modules/{type}/{name}/{name}.yml
-✅ Class file same name as directory
-✅ Shared sub-modules (postgres, dragonfly) at type level
+✅ Container = directory: containers/{name}/{name}.toml
+✅ TOML file has same name as directory
 ✅ config_dir: project_root/data/instance_name
 ✅ vault_ prefix ONLY for real secrets
 ✅ module.version always set
 ✅ module.port always set
-✅ module.constraints set for proxy and locality-bound modules
-✅ Field order: module -> vars -> load -> container -> environment
-✅ Hook names: {phase}-{resource}.yml
+✅ module.constraints set for proxy and locality-bound containers
+✅ Field order: module → vars → load → container → environment
 ✅ Host file ALWAYS required, even for localhost
 ✅ Unique service names per project (duplicate = error, abort)
 ✅ Proxy defined in host file, not project file
-✅ Filename: {name}.project.yml = local, {name}.{host}.yml = remote
-✅ Filename: {name}.federation.yml = federation config
+✅ Filename: {name}.project.toml = local, {name}.{host}.toml = remote
+✅ Filename: {name}.federation.toml = federation config
 ✅ Federation provider list must be signed (Ed25519)
 ✅ net.ipv4.ip_unprivileged_port_start=80 on every host
-✅ Plugins belong to type level: modules/{type}/plugins/{plugin_type}/
-✅ Plugin field order: plugin -> vars (no load, container, environment)
+✅ Plugins inside their container: containers/{name}/plugins/{type}/
+✅ Plugin field order: plugin → vars (no load, container, environment)
 ✅ Plugin secrets via vault_ variables in instance config
 ✅ Firewall ports opened on deploy, closed on undeploy (proxy only)
 ✅ Comments in files: English only
 ✅ Chat: German
-✅ yamllint: max 160 chars, single space after colon
 ```
 
 ### FORBIDDEN
 ```
-❌ published_ports on any module (proxy is the only exception)
+❌ published_ports on any container (proxy is the only exception)
 ❌ networks: set manually (auto-generated)
 ❌ Secrets in GIT
-❌ dns: block on non-mail modules
-❌ ip in module class
+❌ dns: block on non-mail containers
+❌ ip in container class
 ❌ vault_ on non-secret variables
 ❌ Jinja2 in directory names
 ❌ Duplicate service names within a project
 ❌ Proxy in project file
-❌ Cross-host module references inside a single project file
-❌ Plugins inside a module directory (belong to type level)
-❌ Plugins with load:, container:, or environment: blocks
-❌ Firewall ports opened by any module other than the proxy
+❌ Cross-host container references inside a single project file
+❌ Plugins with load, container, or environment blocks
+❌ Firewall ports opened by any container other than the proxy
 ❌ Any service communicating directly with the internet
 ```
 
@@ -850,9 +789,9 @@ federation:
       services: [kanidm, stalwart]
       modules:
         "forgejo":
-          module_class: "git/forgejo"
+          module_class: "forgejo"
         "outline":
-          module_class: "wiki/outline"
+          module_class: "outline"
       status: active
 ```
 
@@ -914,19 +853,19 @@ Read RULES.md and continue building the FreeSynergy.Node.
 
 Current state:
 - Philosophy: decentralized, self-hosted, voluntary cooperation
-- Structure: modules/ + hosts/ + projects/
-- File convention: {name}.project.yml = local, {name}.{host}.yml = remote
-- Proxy lives in host file, not project file
+- Structure: containers/ + hosts/ + projects/
+- Deployment: Rust CLI (fsn), Podman Quadlets — no Ansible
+- File convention: {name}.project.toml = local, {name}.{host}.toml = remote
+- Proxy (zentinel) lives in host file, not project file
 - external: flag on host or instance level
 - Security: net.ipv4.ip_unprivileged_port_start=80, no published_ports except proxy
 - All services isolated: only Zentinel has external access
 - Zentinel forwards SMTP/IMAP via Layer-4 TCP to Stalwart
-- Modules: proxy/zentinel (+control-plane, dns-hetzner), auth/kanidm,
-  mail/stalwart, git/forgejo, wiki/outline, collab/cryptpad,
-  database/postgres, cache/dragonfly
-- Module constraints: per_host, per_ip, locality (enforced by deployer)
-- Installer: Bash bootstrap -> Ansible, editor-based config
-- DNS: projectname=domain, modulename=subdomain, alias=CNAME
+- Containers: zentinel (+control-plane, plugins), kanidm, stalwart, forgejo,
+  outline, cryptpad, postgres, dragonfly, vikunja, pretix, umap,
+  openobserver, otel-collector, tuwunel, mistral
+- Container constraints: per_host, per_ip, locality (enforced by deployer)
+- DNS: projectname=domain, containername=subdomain, alias=CNAME
 - Federation: signed provider list, OIDC trust between nodes,
   priority-based failover, invite tokens (Ed25519 signed)
 

@@ -1,5 +1,4 @@
 // fsn deploy – reconcile desired state and start/update services.
-// Replaces: ansible-playbook playbooks/deploy-stack.yml
 
 use std::path::Path;
 
