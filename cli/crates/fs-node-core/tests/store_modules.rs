@@ -11,10 +11,10 @@ use std::path::PathBuf;
 use fs_node_core::config::registry::ServiceRegistry;
 
 fn store_resources_dir() -> PathBuf {
-    // From cli/crates/fs-core/ go up 4 levels → /home/kal/Server/
-    // then into FreeSynergy.Store/node/resources/
+    // From cli/crates/fs-node-core/ go up 4 levels → /home/kal/Server/
+    // then into fs-store/node/resources/
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../../FreeSynergy.Store/node/resources")
+        .join("../../../../fs-store/node/resources")
 }
 
 #[test]

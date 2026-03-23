@@ -4,7 +4,7 @@ alias       = ["llm"]
 type        = "ai"
 author      = "FreeSynergy.Node"
 version     = "0.0.1"
-tags        = ["ai", "llm", "inference", "mistral", "local-ai", "rust"]
+tags        = ["ai", "llm", "inference", "mistral", "local-ai", "rust", "native"]
 description = "mistral.rs — local LLM inference engine in pure Rust, OpenAI-compatible API"
 website     = "https://github.com/EricLBuehler/mistral.rs"
 repository  = "https://github.com/EricLBuehler/mistral.rs"
@@ -18,15 +18,20 @@ per_host = 1
 [vars]
 config_dir = "{{ project_root }}/data/{{ instance_name }}"
 models_dir = "{{ module_vars.config_dir }}/models"
+binary     = "/usr/local/bin/mistralrs"
 
+[service]
+binary = "{{ module_vars.binary }}"
+args   = [
+    "serve",
+    "--port", "{{ module.port }}",
+    "--host", "127.0.0.1",
+    "-m", "{{ model_id | default('mistralai/Mistral-7B-Instruct-v0.3') }}",
+]
+user  = "{{ run_user | default('fsn') }}"
+group = "{{ run_user | default('fsn') }}"
 
-[container]
-name      = "{{ instance_name }}"
-image     = "ghcr.io/ericlbuehler/mistral.rs"
-image_tag = "latest"
-volumes   = ["{{ module_vars.models_dir }}:/data:Z"]
-
-[container.healthcheck]
+[service.healthcheck]
 cmd          = "curl -fsS http://localhost:1234/health || exit 1"
 interval     = "30s"
 timeout      = "5s"
@@ -34,13 +39,9 @@ retries      = 3
 start_period = "60s"
 
 [environment]
-# Model to load on startup — use a GGUF model name from /data/
-MODEL_ID       = "{{ module_vars.model_id }}"
-# Bind address
-HOST           = "0.0.0.0"
-PORT           = "1234"
-# Optional: number of CPU threads (0 = auto)
-# NUM_THREADS  = "0"
+MODEL_ID = "{{ model_id | default('mistralai/Mistral-7B-Instruct-v0.3') }}"
+HOST     = "127.0.0.1"
+PORT     = "1234"
 
 [setup]
 

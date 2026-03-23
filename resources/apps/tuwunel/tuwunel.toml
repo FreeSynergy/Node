@@ -1,0 +1,90 @@
+# Resource class definition – resources/apps/tuwunel/tuwunel.toml
+#
+# Field order (MANDATORY per RULES.md):
+#   module → vars → load → service → environment → setup → contract
+#
+# Tuwunel is a native Rust Matrix homeserver — deployed as a systemd service.
+# Distributed as a compiled binary from FreeSynergy/fs-tuwunel fork.
+
+[module]
+name        = "tuwunel"
+alias       = ["matrix", "chat"]
+type        = "chat"
+author      = "FreeSynergy.Node"
+version     = "0.1.0"
+tags        = ["chat", "matrix", "messaging", "federation", "native"]
+description = "Tuwunel Matrix homeserver — native Rust binary"
+website     = "https://matrix-construct.github.io/tuwunel/"
+repository  = "https://github.com/matrix-construct/tuwunel"
+port        = 8008
+health_path = "/_matrix/client/versions"
+health_port = 8008
+
+[module.constraints]
+
+[module.federation]
+enabled   = true
+min_trust = 2
+
+[vars]
+config_dir  = "{{ project_root }}/data/{{ instance_name }}"
+binary      = "/usr/local/bin/tuwunel"
+server_name = "{{ project_domain }}"
+
+[load]
+peer_services = ["kanidm"]
+
+[service]
+binary = "{{ module_vars.binary }}"
+args   = ["--config", "{{ module_vars.config_dir }}/config/tuwunel.toml"]
+user   = "tuwunel"
+group  = "tuwunel"
+
+[service.healthcheck]
+cmd          = "curl -fsS http://localhost:8008/_matrix/client/versions || exit 1"
+interval     = "30s"
+timeout      = "5s"
+retries      = 3
+start_period = "30s"
+
+[environment]
+TUWUNEL_SERVER_NAME                 = "{{ vars.server_name }}"
+TUWUNEL_DATABASE_PATH               = "{{ module_vars.config_dir }}/data"
+TUWUNEL_PORT                        = "{{ module.port }}"
+TUWUNEL_ADDRESS                     = "0.0.0.0"
+TUWUNEL_ALLOW_REGISTRATION          = "false"
+TUWUNEL_REGISTRATION_TOKEN_REQUIRED = "true"
+TUWUNEL_ALLOW_GUEST_REGISTRATION    = "false"
+TUWUNEL_ALLOW_FEDERATION            = "true"
+TUWUNEL_WELL_KNOWN_CLIENT           = "https://{{ service_domain }}"
+TUWUNEL_WELL_KNOWN_SERVER           = "{{ service_domain }}:443"
+TUWUNEL_LOG                         = "info"
+
+[setup]
+
+[[setup.fields]]
+key         = "project_root"
+label       = "Data Directory"
+description = "Base path where service data is stored"
+field_type  = "string"
+default     = "/srv/fsn"
+skip_if_set = true
+
+[[setup.fields]]
+key        = "tuwunel_allow_registration"
+label      = "Allow new user registration"
+field_type = "bool"
+default    = "false"
+
+[[setup.fields]]
+key        = "tuwunel_allow_federation"
+label      = "Enable Matrix federation with other homeservers"
+field_type = "bool"
+default    = "true"
+
+[contract]
+[[contract.routes]]
+id          = "matrix"
+path        = "/"
+strip       = false
+description = "Matrix homeserver + Element web client"

@@ -9,8 +9,8 @@ alias       = []
 type        = "proxy"
 author      = "FreeSynergy.Node"
 version     = "0.0.1"
-tags        = ["proxy", "control-plane", "management"]
-description = "Zentinel Control Plane for proxy management"
+tags        = ["proxy", "control-plane", "management", "native"]
+description = "Zentinel Control Plane for proxy management — native Rust binary"
 website     = "https://github.com/zentinelproxy/zentinel"
 repository  = "https://github.com/zentinelproxy/zentinel"
 port        = 8080
@@ -23,28 +23,26 @@ per_host = 1
 
 [vars]
 config_dir = "{{ project_root }}/data/{{ instance_name }}"
+binary     = "/usr/local/bin/zentinel-control-plane"
 
 [load]
 peer_services = ["zentinel", "kanidm"]
 
-[container]
-name      = "{{ instance_name }}"
-image     = "ghcr.io/zentinelproxy/zentinel-control-plane"
-image_tag = "latest"
-volumes   = [
-    "{{ module_vars.config_dir }}/data:/data:Z",
-]
+[service]
+binary = "{{ module_vars.binary }}"
+args   = ["--config", "{{ module_vars.config_dir }}/config/control-plane.toml"]
+user   = "zentinel"
+group  = "zentinel"
 
-[container.healthcheck]
-cmd          = "wget -qO- http://localhost:8080/health || exit 1"
+[service.healthcheck]
+cmd          = "curl -fsS http://localhost:8080/health || exit 1"
 interval     = "30s"
 timeout      = "5s"
 retries      = 3
 start_period = "15s"
 
 [environment]
-# parent_instance_name = the Zentinel instance (e.g. "zentinel")
-ZENTINEL_API_URL    = "http://{{ parent_instance_name }}:443"
+ZENTINEL_API_URL    = "http://localhost:443"
 ZENTINEL_CP_PORT    = "8080"
 OIDC_ENABLED        = "{{ zentinel_cp_oidc_enabled | default('true') }}"
 # IAM cross-service var — falls back gracefully if no IAM service is configured

@@ -1,0 +1,71 @@
+# Resource class definition – resources/apps/kanidm/kanidm.toml
+#
+# Field order (MANDATORY per RULES.md):
+#   module → vars → load → service → environment → setup → contract
+#
+# Kanidm is a native Rust IAM server — deployed as a systemd service.
+# Distributed as a compiled binary from FreeSynergy/fs-kanidm fork.
+
+[module]
+name          = "kanidm"
+alias         = ["auth", "iam"]
+type          = "iam_provider"
+capabilities  = ["iam_ldap", "iam_scim"]
+author        = "FreeSynergy.Node"
+version       = "0.1.0"
+tags          = ["iam", "identity", "oidc", "ldap", "scim", "webauthn", "native"]
+description   = "Kanidm identity management server — native Rust binary"
+website       = "https://kanidm.com"
+repository    = "https://github.com/kanidm/kanidm"
+port          = 8443
+health_path   = "/"
+health_port   = 8443
+health_scheme = "https"
+
+[module.constraints]
+
+[module.federation]
+enabled   = true
+min_trust = 1
+
+[vars]
+config_dir = "{{ project_root }}/data/{{ instance_name }}"
+binary     = "/usr/local/bin/kanidmd"
+
+[load]
+# No peer service dependencies
+
+[service]
+binary = "{{ module_vars.binary }}"
+args   = ["server", "--config", "{{ module_vars.config_dir }}/config/server.toml"]
+user   = "kanidm"
+group  = "kanidm"
+
+[service.healthcheck]
+cmd          = "curl -fsS https://localhost:8443/ -k || exit 1"
+interval     = "30s"
+timeout      = "5s"
+retries      = 3
+start_period = "30s"
+
+[environment]
+# Kanidm admin setup is done via kanidmd CLI on first start.
+# Domain is configured in server.toml — generated at deploy time.
+
+[setup]
+
+[[setup.fields]]
+key         = "project_root"
+label       = "Data Directory"
+description = "Base path where service data is stored"
+field_type  = "string"
+default     = "/srv/fsn"
+skip_if_set = true
+
+[contract]
+upstream_tls = true
+[[contract.routes]]
+id          = "main"
+path        = "/"
+strip       = false
+description = "Kanidm web UI + REST API"
