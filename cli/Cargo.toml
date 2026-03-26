@@ -10,6 +10,8 @@ members = [
     "crates/fs-s3",
     "crates/fs-container",
     "crates/fs-builder",
+    "crates/fs-auth",
+    "crates/fs-federation",
 ]
 resolver = "2"
 
@@ -25,13 +27,13 @@ repository  = "https://github.com/FreeSynergy/Node"
 # fs-libs — shared libraries monorepo
 fs-types     = { path = "../../fs-libs/fs-types" }
 fs-error     = { path = "../../fs-libs/fs-error" }
-fs-config    = { path = "../../fs-libs/fs-config" }
+fs-config    = { path = "../../fs-config" }
 fs-health    = { path = "../../fs-libs/fs-health" }
 fs-template  = { path = "../../fs-libs/fs-template" }
-fs-db        = { path = "../../fs-libs/fs-db", features = ["sqlite"] }
+fs-db        = { path = "../../fs-db", features = ["sqlite"] }
 fs-crypto    = { path = "../../fs-libs/fs-crypto" }
-fs-bus       = { path = "../../fs-libs/fs-bus" }
-fs-inventory = { path = "../../fs-libs/fs-inventory" }
+fs-bus       = { path = "../../fs-bus" }
+fs-inventory = { path = "../../fs-inventory" }
 fs-sysinfo   = { path = "../../fs-libs/fs-sysinfo" }
 fs-i18n      = { path = "../../fs-libs/fs-i18n" }
 fs-theme     = { path = "../../fs-libs/fs-theme" }
@@ -45,7 +47,16 @@ fs-dns       = { path = "crates/fs-dns" }
 fs-host      = { path = "crates/fs-host" }
 fs-wizard    = { path = "crates/fs-wizard" }
 fs-s3        = { path = "crates/fs-s3" }
-fs-container = { path = "crates/fs-container" }
+fs-container  = { path = "crates/fs-container" }
+fs-auth       = { path = "crates/fs-auth" }
+fs-federation = { path = "crates/fs-federation" }
+
+# Auth / Federation
+jsonwebtoken          = { version = "10" }
+oauth2                = { version = "5" }
+activitypub_federation = { version = "0.6", default-features = false }
+url                   = { version = "2" }
+urlencoding           = { version = "2" }
 
 # Serialization
 serde          = { version = "1",    features = ["derive"] }
