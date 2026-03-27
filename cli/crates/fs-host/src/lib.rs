@@ -1,3 +1,4 @@
+#![deny(clippy::all, clippy::pedantic, warnings)]
 //! Host management — SSH connections, remote install, and server provisioning.
 //!
 //! # Usage

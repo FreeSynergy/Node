@@ -7,6 +7,7 @@ pub struct ActualState {
 }
 
 impl ActualState {
+    #[must_use]
     pub fn find(&self, name: &str) -> Option<&ServiceStatus> {
         self.services.iter().find(|s| s.name == name)
     }
@@ -42,6 +43,7 @@ pub enum RunState {
 impl RunState {
     /// i18n key for human-readable status label.
     /// Defined here (not in fs-tui) so any consumer can translate without reimplementing.
+    #[must_use]
     pub fn i18n_key(self) -> &'static str {
         match self {
             RunState::Running => "status.running",

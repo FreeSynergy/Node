@@ -44,6 +44,7 @@ pub struct SyncStats {
 
 /// Build the configured sync backend from the node config.
 /// Returns `None` if sync is disabled or not configured.
+#[must_use]
 pub fn build(config: &StorageConfig) -> Option<Box<dyn SyncBackend>> {
     let sync = config.sync.as_ref()?;
     match sync.backend {
@@ -60,6 +61,11 @@ pub struct LocalBackend {
 }
 
 impl LocalBackend {
+    /// Create a local filesystem backend rooted at `root`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the opendal operator cannot be initialized.
     pub fn new(root: &Path) -> Result<Self> {
         let builder = opendal::services::Fs::default().root(&root.to_string_lossy());
         let op = Operator::new(builder)?.finish();

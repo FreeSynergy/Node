@@ -1,4 +1,5 @@
-//! FreeSynergy Container App Manager — compose YAML → Podman Quadlet pipeline.
+#![deny(clippy::all, clippy::pedantic, warnings)]
+//! `FreeSynergy` Container App Manager — compose YAML → Podman Quadlet pipeline.
 //!
 //! # Pipeline
 //!

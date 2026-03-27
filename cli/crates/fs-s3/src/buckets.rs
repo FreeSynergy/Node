@@ -23,6 +23,7 @@ pub enum BucketKind {
 }
 
 impl BucketKind {
+    #[must_use]
     pub fn name(self) -> &'static str {
         match self {
             BucketKind::Profiles => "profiles",
@@ -34,10 +35,12 @@ impl BucketKind {
     }
 
     /// Whether remote nodes may read from this bucket without auth.
+    #[must_use]
     pub fn is_public(self) -> bool {
         matches!(self, BucketKind::Profiles)
     }
 
+    #[must_use]
     pub fn all() -> &'static [BucketKind] {
         &[
             BucketKind::Profiles,
@@ -48,6 +51,7 @@ impl BucketKind {
         ]
     }
 
+    #[must_use]
     pub fn path(self, root: &Path) -> PathBuf {
         root.join(self.name())
     }
@@ -65,6 +69,7 @@ pub struct BucketInfo {
 }
 
 impl BucketInfo {
+    #[must_use]
     pub fn collect(kind: BucketKind, root: &Path) -> BucketInfo {
         let path = kind.path(root);
         let (object_count, size_bytes) = du(&path);
@@ -81,6 +86,10 @@ impl BucketInfo {
 // ── initialization ────────────────────────────────────────────────────────────
 
 /// Create all bucket directories under `root` (idempotent).
+///
+/// # Errors
+///
+/// Returns an error if any bucket directory cannot be created.
 pub async fn ensure_buckets(root: &Path) -> Result<()> {
     for kind in BucketKind::all() {
         let dir = kind.path(root);

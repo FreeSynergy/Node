@@ -20,6 +20,10 @@ pub struct ExecOutput {
 
 impl ExecOutput {
     /// Returns Ok if exit code is 0, else Err with stderr message.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the exit code is non-zero.
     pub fn into_result(self) -> Result<String> {
         if self.exit_code == 0 {
             Ok(self.stdout)
@@ -74,6 +78,10 @@ pub struct SshSession {
 impl SshSession {
     /// Open an SSH connection to `host`.
     /// Authentication order: key file (if set) → SSH agent.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the TCP connection or authentication fails.
     pub async fn connect(host: &RemoteHost) -> Result<Self> {
         info!(
             "SSH connect → {}@{}:{}",
@@ -111,6 +119,10 @@ impl SshSession {
     }
 
     /// Execute a shell command on the remote host.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the SSH channel cannot be opened or the command fails to execute.
     pub async fn exec(&self, cmd: &str) -> Result<ExecOutput> {
         debug!("SSH exec: {cmd}");
         let guard = self.handle.lock().await;
@@ -148,6 +160,10 @@ impl SshSession {
     }
 
     /// Write `content` to `remote_path` on the remote host (via `cat >` shell redirect).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the SSH channel cannot be opened or the file write fails.
     pub async fn write_file(&self, remote_path: &str, content: &[u8]) -> Result<()> {
         debug!("SSH write_file → {remote_path}");
         let guard = self.handle.lock().await;
@@ -186,6 +202,10 @@ impl SshSession {
     }
 
     /// Close the SSH connection gracefully.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the disconnect message cannot be sent.
     pub async fn close(self) -> Result<()> {
         let guard = self.handle.lock().await;
         guard

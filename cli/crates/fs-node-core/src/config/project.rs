@@ -35,7 +35,7 @@ pub struct ProjectConfig {
 /// Typed service slots at the project level.
 /// Other services and bots use these to find the right instance.
 ///
-/// Stored as an open map — adding new ServiceType variants requires no change here.
+/// Stored as an open map — adding new `ServiceType` variants requires no change here.
 ///
 /// In project.toml:
 /// [services]
@@ -125,7 +125,7 @@ pub struct ProjectLoad {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServiceEntry {
     /// Service class path, e.g. "git/forgejo".
-    /// Alias "module_class" accepted for backward compatibility.
+    /// Alias "`module_class`" accepted for backward compatibility.
     #[serde(alias = "module_class")]
     pub service_class: String,
 
@@ -178,7 +178,7 @@ pub struct ServiceInstanceConfig {
     pub vars: IndexMap<String, Value>,
 
     /// Optional human-readable comments for each var, keyed by var name.
-    /// Written as [vars_comments] in the TOML file; UI-only, not used by the deployer.
+    /// Written as [`vars_comments`] in the TOML file; UI-only, not used by the deployer.
     #[serde(default)]
     pub vars_comments: IndexMap<String, String>,
 }
@@ -222,6 +222,11 @@ pub struct ServiceInstanceMeta {
 }
 
 impl ServiceInstanceConfig {
+    /// Load a service instance config from a TOML file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be read, is invalid TOML, or fails schema validation.
     pub fn load(path: &std::path::Path) -> Result<Self, fs_error::FsyError> {
         crate::config::load_toml_validated(path, crate::config::validate::TomlKind::Service)
     }
@@ -274,6 +279,11 @@ impl ServiceResource for ServiceInstanceConfig {
 }
 
 impl ProjectConfig {
+    /// Load a project config from a TOML file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be read, is invalid TOML, or fails schema validation.
     pub fn load(path: &Path) -> Result<Self, FsyError> {
         crate::config::load_toml_validated(path, crate::config::validate::TomlKind::Project)
     }
@@ -334,6 +344,7 @@ impl ProjectConfig {
     ///
     /// Uses `ServiceType::from_class_prefix()` + `ServiceType::exported_contract()`
     /// as the single source of truth — no local match block.
+    #[must_use]
     pub fn cross_service_vars(&self) -> HashMap<String, String> {
         let mut vars = HashMap::new();
 

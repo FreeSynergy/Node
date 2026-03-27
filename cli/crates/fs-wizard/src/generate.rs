@@ -1,6 +1,7 @@
 // generate.rs — Generate FSN module TOML from a detected ComposeService.
 
 use std::collections::HashMap;
+use std::fmt::Write as _;
 
 use crate::compose::ComposeService;
 use crate::detect::ServiceTypeHint;
@@ -22,20 +23,21 @@ pub struct ModuleToml {
 
 impl ModuleToml {
     /// Serialise to TOML text in FSN module format.
+    #[must_use]
     pub fn to_toml(&self) -> String {
         let mut out = String::new();
 
         out.push_str("[module]\n");
-        out.push_str(&format!("name        = {:?}\n", self.name));
-        out.push_str(&format!("class       = {:?}\n", self.class));
-        out.push_str(&format!("description = {:?}\n", self.description));
+        let _ = writeln!(out, "name        = {:?}", self.name);
+        let _ = writeln!(out, "class       = {:?}", self.class);
+        let _ = writeln!(out, "description = {:?}", self.description);
         out.push('\n');
 
         out.push_str("[container]\n");
-        out.push_str(&format!("image = {:?}\n", self.image));
+        let _ = writeln!(out, "image = {:?}", self.image);
 
         if let Some(hp) = &self.health_path {
-            out.push_str(&format!("health_path = {:?}\n", hp));
+            let _ = writeln!(out, "health_path = {hp:?}");
         }
 
         // healthcheck block
@@ -50,7 +52,7 @@ impl ModuleToml {
             out.push('\n');
             out.push_str("[container.published_ports]\n");
             for p in &self.ports {
-                out.push_str(&format!("# {p}\n"));
+                let _ = writeln!(out, "# {p}");
             }
         }
 
@@ -58,7 +60,7 @@ impl ModuleToml {
             out.push('\n');
             out.push_str("# volumes:\n");
             for v in &self.volumes {
-                out.push_str(&format!("#   {v}\n"));
+                let _ = writeln!(out, "#   {v}");
             }
         }
 
@@ -69,7 +71,7 @@ impl ModuleToml {
             keys.sort();
             for k in keys {
                 let v = &self.env[k];
-                out.push_str(&format!("{k} = {:?}\n", v));
+                let _ = writeln!(out, "{k} = {v:?}");
             }
         }
 
@@ -80,6 +82,7 @@ impl ModuleToml {
 // ── Generator ─────────────────────────────────────────────────────────────────
 
 /// Generate a `ModuleToml` from a `ComposeService` and its detected type hint.
+#[must_use]
 pub fn generate(svc: &ComposeService, hint: &ServiceTypeHint) -> ModuleToml {
     let class = if hint.class == "unknown" {
         // Default fallback
@@ -104,12 +107,9 @@ pub fn generate(svc: &ComposeService, hint: &ServiceTypeHint) -> ModuleToml {
 
 fn guess_health_path(class: &str) -> Option<String> {
     match class.split('/').next().unwrap_or("") {
-        "proxy" => Some("/health".to_owned()),
         "mail" => None,
-        "git" => Some("/health".to_owned()),
         "wiki" => Some("/healthcheck".to_owned()),
         "iam" => Some("/status".to_owned()),
-        "chat" => Some("/health".to_owned()),
         "monitoring" => Some("/-/health".to_owned()),
         _ => Some("/health".to_owned()),
     }

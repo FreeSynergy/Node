@@ -11,7 +11,7 @@ pub struct CapabilityBinding {
     pub capability: String,
     /// Name of the service fulfilling this capability, e.g. "kanidm".
     pub service_name: String,
-    /// Base URL where the service is reachable, e.g. "https://auth.example.com".
+    /// Base URL where the service is reachable, e.g. "<https://auth.example.com>".
     pub url: String,
 }
 
@@ -44,6 +44,7 @@ pub struct CapabilityMatcher {
 
 impl CapabilityMatcher {
     /// Create an empty `CapabilityMatcher`.
+    #[must_use]
     pub fn new() -> Self {
         Self { bindings: vec![] }
     }
@@ -58,6 +59,7 @@ impl CapabilityMatcher {
     ///
     /// When multiple services fulfill the same capability the first registered
     /// one wins. Override ordering by inserting preferred bindings first.
+    #[must_use]
     pub fn resolve(&self, capability: &str) -> Option<&CapabilityBinding> {
         self.bindings.iter().find(|b| b.capability == capability)
     }
@@ -71,12 +73,13 @@ impl CapabilityMatcher {
     /// - `{capability}_service`      → the service name
     ///
     /// Capabilities that have no registered binding are silently skipped.
+    #[must_use]
     pub fn auto_fill(&self, required_capabilities: &[&str]) -> HashMap<String, String> {
         let mut vars = HashMap::new();
         for cap in required_capabilities {
             if let Some(binding) = self.resolve(cap) {
-                vars.insert(format!("{}_url", cap), binding.url.clone());
-                vars.insert(format!("{}_service", cap), binding.service_name.clone());
+                vars.insert(format!("{cap}_url"), binding.url.clone());
+                vars.insert(format!("{cap}_service"), binding.service_name.clone());
             }
         }
         vars

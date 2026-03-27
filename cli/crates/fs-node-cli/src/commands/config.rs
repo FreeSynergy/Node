@@ -22,7 +22,7 @@ async fn run_show(root: &Path, project: Option<&Path>) -> Result<()> {
     let path = resolve_project(root, project)?;
     let content =
         std::fs::read_to_string(&path).with_context(|| format!("Reading {}", path.display()))?;
-    println!("{}", content);
+    println!("{content}");
     Ok(())
 }
 
@@ -32,9 +32,9 @@ pub async fn run_edit(root: &Path, project: Option<&Path>) -> Result<()> {
     let status = std::process::Command::new(&editor)
         .arg(&path)
         .status()
-        .with_context(|| format!("Launching editor '{}'", editor))?;
+        .with_context(|| format!("Launching editor '{editor}'"))?;
     if !status.success() {
-        anyhow::bail!("Editor exited with status {}", status);
+        anyhow::bail!("Editor exited with status {status}");
     }
     Ok(())
 }

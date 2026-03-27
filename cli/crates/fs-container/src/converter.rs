@@ -17,6 +17,7 @@ impl ComposeConverter {
     ///
     /// `instance_prefix` is prepended to every service name when it differs from
     /// the bare service name (multi-service compose files get namespaced).
+    #[must_use]
     pub fn convert(compose: &ComposeFile, instance_prefix: &str) -> Vec<ServiceConfig> {
         compose
             .services
@@ -149,7 +150,7 @@ impl ComposeConverter {
     /// Strip Docker `CMD` / `CMD-SHELL` prefix from healthcheck test arrays.
     fn strip_cmd_prefix(test: &[String]) -> Vec<String> {
         match test.first().map(String::as_str) {
-            Some("CMD") | Some("CMD-SHELL") => test[1..].to_vec(),
+            Some("CMD" | "CMD-SHELL") => test[1..].to_vec(),
             _ => test.to_vec(),
         }
     }
@@ -157,6 +158,7 @@ impl ComposeConverter {
 
 // ── Public shim ───────────────────────────────────────────────────────────────
 
+#[must_use]
 pub fn convert(compose: &ComposeFile, instance_prefix: &str) -> Vec<ServiceConfig> {
     ComposeConverter::convert(compose, instance_prefix)
 }

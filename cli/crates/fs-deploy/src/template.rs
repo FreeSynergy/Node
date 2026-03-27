@@ -135,13 +135,13 @@ pub struct FsTemplateContext<'a> {
     pub cross_vars: CrossVars,
     /// Pre-computed `[vars]` block from the module TOML.
     pub module_vars: ModuleVars,
-    /// Expanded plugin vars (dns_provider, acme_email, acme_ca_url, …).
+    /// Expanded plugin vars (`dns_provider`, `acme_email`, `acme_ca_url`, …).
     pub plugin_vars: PluginVars,
     /// Services that need proxy routing — available as `{{ proxy_services }}`.
     pub proxy_services: Vec<ProxyServiceSpec>,
 }
 
-impl<'a> FsTemplateContext<'a> {
+impl FsTemplateContext<'_> {
     /// Convert to a [`LibCtx`] ready for rendering.
     ///
     /// Each variable group injects itself via [`InjectIntoContext`] — no

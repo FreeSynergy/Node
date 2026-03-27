@@ -6,10 +6,10 @@ use std::path::Path;
 pub async fn run(_root: &Path, _project: Option<&Path>, service: Option<&str>) -> Result<()> {
     let systemd = SystemctlManager::user();
     if let Some(name) = service {
-        let unit = format!("{}.service", name);
+        let unit = format!("{name}.service");
         systemd.stop(&unit).await.map_err(anyhow::Error::from)?;
         systemd.start(&unit).await.map_err(anyhow::Error::from)?;
-        println!("Restarted {}", name);
+        println!("Restarted {name}");
     } else {
         let units = fs_deploy::observe::list_fs_units(&systemd).await?;
         for unit in &units {

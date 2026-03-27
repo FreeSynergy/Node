@@ -72,8 +72,7 @@ pub async fn run(ctx: &HookContext<'_>) -> Result<()> {
         let content = format!(
             "# Kanidm initial credentials – KEEP SECRET\n\
              # Change via: kanidm account change-password --name admin\n\
-             admin: {}\nidm_admin: {}\n",
-            admin_pw, idm_pw
+             admin: {admin_pw}\nidm_admin: {idm_pw}\n",
         );
         std::fs::write(&creds_path, &content)?;
         std::fs::set_permissions(
@@ -95,11 +94,9 @@ pub async fn run(ctx: &HookContext<'_>) -> Result<()> {
     Ok(())
 }
 
-/// Register OAuth2 clients in Kanidm for every module that uses Kanidm OIDC.
+/// Register `OAuth2` clients in Kanidm for every module that uses Kanidm OIDC.
 async fn register_oauth2_clients(ctx: &HookContext<'_>) -> Result<()> {
     let name = &ctx.instance.name;
-    let _domain = &ctx.project.project.domain;
-
     // Collect all instances (and sub-modules) that load kanidm as a service
     let oidc_clients = collect_oidc_clients(ctx);
 

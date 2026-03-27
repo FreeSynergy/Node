@@ -42,8 +42,9 @@ pub struct KdlGenerator;
 impl KdlGenerator {
     /// Replace (or insert) the FSN-managed section in an existing Zentinel config.
     /// Everything outside the markers is preserved verbatim.
+    #[must_use]
     pub fn upsert(&self, config: &str, desired: &DesiredState) -> String {
-        let managed = self.managed_section(desired);
+        let managed = Self::managed_section(desired);
         match (config.find(MARKER_START), config.find(MARKER_END)) {
             (Some(s), Some(e)) => {
                 let end_of_block = e + MARKER_END.len();
@@ -55,8 +56,9 @@ impl KdlGenerator {
 
     /// Generate the complete Zentinel config file from scratch (initial install).
     /// Writes a minimal server + listeners block plus the FSN-managed section.
+    #[must_use]
     pub fn full_config(&self, desired: &DesiredState) -> String {
-        let managed = self.managed_section(desired);
+        let managed = Self::managed_section(desired);
         format!(
             "# Zentinel proxy configuration\n\
              # Lines outside the FSN-MANAGED block can be edited freely.\n\
@@ -74,8 +76,8 @@ impl KdlGenerator {
         )
     }
 
-    fn managed_section(&self, desired: &DesiredState) -> String {
-        let instances = self.collect_proxy_instances(desired);
+    fn managed_section(desired: &DesiredState) -> String {
+        let instances = Self::collect_proxy_instances(desired);
 
         let mut upstreams = String::new();
         let mut routes = String::new();
@@ -105,6 +107,7 @@ impl KdlGenerator {
     }
 
     fn route_blocks(inst: &ServiceInstance) -> String {
+        use std::fmt::Write as _;
         let name = &inst.name;
         let mut all_domains = vec![inst.service_domain.clone()];
         all_domains.extend(inst.alias_domains.clone());
@@ -112,46 +115,50 @@ impl KdlGenerator {
         let mut out = String::new();
         for domain in &all_domains {
             let route_name = domain.replace('.', "-");
-            out.push_str(&format!(
+            let _ = write!(
+                out,
                 "    route \"{route_name}\" {{\n\
                  \x20       matches {{\n\
                  \x20           host \"{domain}\"\n\
                  \x20       }}\n\
                  \x20       upstream \"{name}\"\n\
                  \x20   }}\n"
-            ));
+            );
         }
         out
     }
 
-    fn collect_proxy_instances(&self, desired: &DesiredState) -> Vec<ServiceInstance> {
+    fn collect_proxy_instances(desired: &DesiredState) -> Vec<ServiceInstance> {
         let mut out = Vec::new();
         for inst in &desired.services {
-            self.push_proxy_instance(inst, &mut out);
+            Self::push_proxy_instance(inst, &mut out);
         }
         out
     }
 
-    fn push_proxy_instance(&self, inst: &ServiceInstance, out: &mut Vec<ServiceInstance>) {
+    fn push_proxy_instance(inst: &ServiceInstance, out: &mut Vec<ServiceInstance>) {
         if !inst.class.meta.is_internal_only() && !inst.class.meta.has_type(&ServiceType::Proxy) {
             out.push(inst.clone());
         }
         for sub in &inst.sub_services {
-            self.push_proxy_instance(sub, out);
+            Self::push_proxy_instance(sub, out);
         }
     }
 }
 
 // ── Public shims (used by deploy.rs) ─────────────────────────────────────────
 
+#[must_use]
 pub fn upsert_managed_section(config: &str, desired: &DesiredState) -> String {
     KdlGenerator.upsert(config, desired)
 }
 
+#[must_use]
 pub fn generate_full_config(desired: &DesiredState) -> String {
     KdlGenerator.full_config(desired)
 }
 
+#[must_use]
 pub fn upsert_without(config: &str, desired: &DesiredState) -> String {
     KdlGenerator.upsert(config, desired)
 }
@@ -161,8 +168,8 @@ mod tests {
     use super::*;
     use fs_node_core::{
         config::service::{
-            Constraints, ContainerDef, ServiceClass, ServiceContract, ServiceLoad, ServiceMeta,
-            ServiceSetup, ServiceType,
+            Constraints, ContainerDef, ModuleRoles, ModuleUi, ServiceClass, ServiceContract,
+            ServiceLifecycle, ServiceLoad, ServiceMeta, ServiceSetup, ServiceType,
         },
         state::desired::{DesiredState, ServiceInstance},
     };
@@ -188,8 +195,8 @@ mod tests {
                 health_port: None,
                 health_scheme: None,
                 capabilities: vec![],
-                roles: Default::default(),
-                ui: Default::default(),
+                roles: ModuleRoles::default(),
+                ui: ModuleUi::default(),
             },
             vars: IndexMap::default(),
             load: ServiceLoad::default(),
@@ -209,7 +216,7 @@ mod tests {
             }),
             service: None,
             variables: vec![],
-            lifecycle: Default::default(),
+            lifecycle: ServiceLifecycle::default(),
             environment: IndexMap::default(),
             setup: ServiceSetup::default(),
             contract: ServiceContract::default(),

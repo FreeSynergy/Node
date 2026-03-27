@@ -36,6 +36,7 @@ pub struct TemplateValidator {
 
 impl TemplateValidator {
     /// Create an empty validator (no declared variables).
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -65,6 +66,10 @@ impl TemplateValidator {
     ///
     /// [`declare`]: TemplateValidator::declare
     /// [`require`]: TemplateValidator::require
+    ///
+    /// # Errors
+    ///
+    /// Currently infallible; reserved for future parse errors.
     pub fn validate_str(&self, template: &str) -> Result<Vec<String>, FsError> {
         let vars = extract_variables(template);
         let unknown: Vec<String> = vars
@@ -78,6 +83,7 @@ impl TemplateValidator {
     ///
     /// Use this before calling `TemplateEngine::render_str` to catch missing
     /// inputs early with a descriptive error instead of a Tera render error.
+    #[must_use]
     pub fn check_required(&self, ctx: &TemplateContext) -> Vec<String> {
         self.required
             .iter()
@@ -87,6 +93,8 @@ impl TemplateValidator {
     }
 
     /// Combine `validate_str` and `check_required` into a single call.
+    ///
+    /// # Errors
     ///
     /// Returns `Err` if there are unknown variables in the template OR if
     /// required variables are missing from the context.
@@ -147,8 +155,7 @@ fn is_ident(s: &str) -> bool {
     !s.is_empty()
         && s.chars()
             .next()
-            .map(|c| c.is_alphabetic() || c == '_')
-            .unwrap_or(false)
+            .is_some_and(|c| c.is_alphabetic() || c == '_')
         && s.chars().all(|c| c.is_alphanumeric() || c == '_')
 }
 

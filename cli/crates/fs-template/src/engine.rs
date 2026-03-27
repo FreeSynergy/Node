@@ -16,6 +16,7 @@ pub struct TemplateEngine {
 
 impl TemplateEngine {
     /// Create an engine for ad-hoc string rendering only.
+    #[must_use]
     pub fn new() -> Self {
         let mut tera = tera::Tera::default();
         Self::register_filters(&mut tera);
@@ -26,8 +27,11 @@ impl TemplateEngine {
     ///
     /// Globbing pattern: `{dir}/**/*.tera` and `{dir}/**/*.j2`.
     ///
-    /// Returns an error if the directory doesn't exist or templates fail to parse.
     /// If no templates are found, an empty (string-rendering-only) engine is returned.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the directory doesn't exist or templates fail to parse.
     pub fn from_dir(dir: impl AsRef<std::path::Path>) -> Result<Self, FsError> {
         let dir = dir.as_ref();
 
@@ -60,7 +64,7 @@ impl TemplateEngine {
         if let Err(e) = tera.add_template_files(
             glob::glob(&j2_glob)
                 .map_err(|e| FsError::internal(format!("glob error: {e}")))?
-                .filter_map(|p| p.ok())
+                .filter_map(std::result::Result::ok)
                 .map(|p| (p, None::<String>))
                 .collect::<Vec<_>>(),
         ) {
@@ -75,6 +79,10 @@ impl TemplateEngine {
     }
 
     /// Add or replace a named template from a string.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the template fails to parse.
     pub fn add_template(
         &mut self,
         name: impl Into<String>,
@@ -88,6 +96,10 @@ impl TemplateEngine {
     }
 
     /// Render a template string directly (not registered by name).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the template fails to render.
     pub fn render_str(&self, template: &str, ctx: &TemplateContext) -> Result<String, FsError> {
         // tera::Tera::one_off is a free function for one-shot rendering
         tera::Tera::one_off(template, &ctx.to_tera(), false)
@@ -98,6 +110,10 @@ impl TemplateEngine {
     ///
     /// [`from_dir`]: TemplateEngine::from_dir
     /// [`add_template`]: TemplateEngine::add_template
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the template is not found or fails to render.
     pub fn render(&self, name: &str, ctx: &TemplateContext) -> Result<String, FsError> {
         self.tera
             .render(name, &ctx.to_tera())
@@ -105,6 +121,7 @@ impl TemplateEngine {
     }
 
     /// List all registered template names.
+    #[must_use]
     pub fn template_names(&self) -> Vec<&str> {
         self.tera.get_template_names().collect()
     }

@@ -53,7 +53,8 @@ impl LifecycleHookExt for LifecycleHook {
             }
             LifecycleHook::Backup { target } => run_backup(ctx, target.as_deref()).await,
             LifecycleHook::Export { target, format } => {
-                run_export(ctx, target.as_deref(), format.as_deref()).await
+                run_export(ctx, target.as_deref(), format.as_deref());
+                Ok(())
             }
         }
     }
@@ -171,9 +172,11 @@ async fn run_shell(ctx: &HookContext<'_>, command: Option<&str>) -> Result<()> {
 async fn run_backup(ctx: &HookContext<'_>, target: Option<&str>) -> Result<()> {
     let src = ctx.instance_data_dir();
     let ts = chrono::Local::now().format("%Y%m%d-%H%M%S");
-    let dst = target
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(|| src.with_file_name(format!("{}-backup-{}", ctx.instance.name, ts)));
+    let name = &ctx.instance.name;
+    let dst = target.map_or_else(
+        || src.with_file_name(format!("{name}-backup-{ts}")),
+        std::path::PathBuf::from,
+    );
 
     info!("[lifecycle:backup] {} → {}", src.display(), dst.display());
 
@@ -188,15 +191,13 @@ async fn run_backup(ctx: &HookContext<'_>, target: Option<&str>) -> Result<()> {
     Ok(())
 }
 
-async fn run_export(
-    ctx: &HookContext<'_>,
-    target: Option<&str>,
-    format: Option<&str>,
-) -> Result<()> {
+fn run_export(ctx: &HookContext<'_>, target: Option<&str>, format: Option<&str>) {
     let fmt = format.unwrap_or("json");
-    let out_path = target.map(std::path::PathBuf::from).unwrap_or_else(|| {
-        std::path::PathBuf::from(format!("/tmp/fs-export-{}.{}", ctx.instance.name, fmt))
-    });
+    let inst_name = &ctx.instance.name;
+    let out_path = target.map_or_else(
+        || std::path::PathBuf::from(format!("/tmp/fs-export-{inst_name}.{fmt}")),
+        std::path::PathBuf::from,
+    );
 
     info!(
         "[lifecycle:export] {} format={} → {}",
@@ -206,6 +207,5 @@ async fn run_export(
     );
     // Actual export implementation is service-specific and provided via
     // the `command` field in the hook (run_shell handles the exec).
-    // This stub logs intent and returns OK for Bus-signalling purposes.
-    Ok(())
+    // This stub logs intent for Bus-signalling purposes.
 }

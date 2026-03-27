@@ -24,7 +24,7 @@ use toml::Value;
 // ── Schema helpers ─────────────────────────────────────────────────────────────
 
 /// JSON-Schema helper for `IndexMap<String, toml::Value>` fields.
-/// `toml::Value` has no JsonSchema impl — we accept any JSON object here.
+/// `toml::Value` has no `JsonSchema` impl — we accept any JSON object here.
 fn schema_any_object(_gen: &mut schemars::SchemaGenerator) -> schemars::Schema {
     schemars::json_schema!(true)
 }
@@ -142,7 +142,7 @@ pub struct RouteSpec {
 pub struct HeaderSpec {
     /// Header name (e.g. "X-Forwarded-Proto").
     pub name: String,
-    /// Header value — Jinja2 templates allowed (e.g. "{{ service_domain }}").
+    /// Header value — Jinja2 templates allowed (e.g. "{{ `service_domain` }}").
     pub value: String,
 }
 
@@ -205,7 +205,7 @@ pub struct SetupField {
     /// Pre-filled default value shown in the prompt.
     pub default: Option<String>,
 
-    /// For FieldType::Select – the available choices.
+    /// For `FieldType::Select` – the available choices.
     #[serde(default)]
     pub options: Vec<String>,
 
@@ -329,28 +329,36 @@ impl ServiceMeta {
     /// Returns `true` if this service is purely internal infrastructure
     /// (no subdomain, no proxy route, no user-facing UI).
     /// Requires ALL declared types to be internal.
+    #[must_use]
     pub fn is_internal_only(&self) -> bool {
-        !self.service_types.is_empty() && self.service_types.iter().all(|t| t.is_internal())
+        !self.service_types.is_empty()
+            && self
+                .service_types
+                .iter()
+                .all(types::ServiceType::is_internal)
     }
 
     /// Returns `true` if any of the declared types matches `t`.
+    #[must_use]
     pub fn has_type(&self, t: &ServiceType) -> bool {
         self.service_types.contains(t)
     }
 
     /// The primary type (first in the list), or `Custom` if the list is empty.
+    #[must_use]
     pub fn primary_type(&self) -> &ServiceType {
         self.service_types.first().unwrap_or(&ServiceType::Custom)
     }
 
     /// Comma-separated label list for TUI display (e.g. "Reverse Proxy, Webhoster (Simple)").
+    #[must_use]
     pub fn types_label(&self) -> String {
         if self.service_types.is_empty() {
             return ServiceType::Custom.label().to_string();
         }
         self.service_types
             .iter()
-            .map(|t| t.label())
+            .map(types::ServiceType::label)
             .collect::<Vec<_>>()
             .join(", ")
     }
@@ -421,6 +429,7 @@ pub enum DeploymentKind {
 
 impl ServiceClass {
     /// Deployment kind — derived from which deployment block is present.
+    #[must_use]
     pub fn deployment_kind(&self) -> DeploymentKind {
         if self.service.is_some() {
             DeploymentKind::NativeApp
@@ -546,6 +555,7 @@ pub enum ServicePhase {
 
 impl ServicePhase {
     /// Short display label shown in TUI and CLI output.
+    #[must_use]
     pub fn label(self) -> &'static str {
         match self {
             Self::Init => "Init",
@@ -564,6 +574,7 @@ impl ServicePhase {
     }
 
     /// One-sentence description of what happens during this phase.
+    #[must_use]
     pub fn description(self) -> &'static str {
         match self {
             Self::Init => "Service record created; no containers deployed yet.",
@@ -686,7 +697,7 @@ pub enum LifecycleHook {
 /// container when another service of the matching type is installed alongside it.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct PeerHook {
-    /// Glob-style trigger pattern matching the peer's primary ServiceType label.
+    /// Glob-style trigger pattern matching the peer's primary `ServiceType` label.
     /// Examples: `"wiki.*"`, `"git/forgejo"`, `"iam.*"`.
     pub trigger: String,
 
@@ -700,6 +711,7 @@ pub struct PeerHook {
 
 impl ServiceLifecycle {
     /// Returns `true` if no hooks are defined (all fields empty).
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.on_install.is_empty()
             && self.on_configure.is_empty()
@@ -712,6 +724,7 @@ impl ServiceLifecycle {
 
     /// Returns the peer hooks whose trigger matches the given service type label.
     /// `peer_type_label` is the primary type label of the newly installed peer.
+    #[must_use]
     pub fn matching_peer_hooks(&self, peer_type_label: &str) -> Vec<&PeerHook> {
         self.on_peer_install
             .iter()

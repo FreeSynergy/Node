@@ -15,6 +15,10 @@ pub struct HookHelpers;
 
 impl HookHelpers {
     /// Ensure the instance data directory exists.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the directory cannot be created.
     pub fn ensure_data_dir(&self, ctx: &HookContext<'_>) -> Result<()> {
         let dir = ctx.instance_data_dir();
         std::fs::create_dir_all(&dir)
@@ -22,6 +26,10 @@ impl HookHelpers {
     }
 
     /// Create a directory, optionally setting permissions.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the directory cannot be created or permissions cannot be set.
     pub fn create_dir(&self, path: &Path, mode: u32) -> Result<()> {
         std::fs::create_dir_all(path).with_context(|| format!("creating {}", path.display()))?;
         std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode))
@@ -30,6 +38,10 @@ impl HookHelpers {
 
     /// Render a Jinja2 template from the module's templates/ directory.
     /// `template_name` is the filename (e.g. "kanidm.toml.j2").
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the template file cannot be read or rendered.
     pub fn render_template(&self, ctx: &HookContext<'_>, template_name: &str) -> Result<String> {
         let tpl_path = ctx.templates_dir().join(template_name);
         let source = std::fs::read_to_string(&tpl_path)
@@ -55,10 +67,14 @@ impl HookHelpers {
         };
 
         crate::template::render(&source, &tctx)
-            .with_context(|| format!("rendering template {}", template_name))
+            .with_context(|| format!("rendering template {template_name}"))
     }
 
     /// Write a rendered template to disk (only if content changed).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the template cannot be rendered or the file cannot be written.
     pub fn write_template(
         &self,
         ctx: &HookContext<'_>,
@@ -80,6 +96,10 @@ impl HookHelpers {
     }
 
     /// Run `podman exec {container} {cmd...}` and return stdout.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the podman command fails.
     pub async fn podman_exec(&self, container: &str, args: &[&str]) -> Result<String> {
         let mut cmd_args = vec!["exec", container];
         cmd_args.extend_from_slice(args);
@@ -90,7 +110,7 @@ impl HookHelpers {
             .args(&cmd_args)
             .output()
             .await
-            .with_context(|| format!("podman exec {} {:?}", container, args))?;
+            .with_context(|| format!("podman exec {container} {args:?}"))?;
 
         if out.status.success() {
             Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
@@ -112,6 +132,10 @@ impl HookHelpers {
     }
 
     /// Read the last N lines from a container's logs.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the podman command fails.
     pub async fn podman_logs_tail(&self, container: &str, lines: usize) -> Result<String> {
         let out = tokio::process::Command::new("podman")
             .args(["logs", "--tail", &lines.to_string(), container])
@@ -129,26 +153,38 @@ impl HookHelpers {
 
 // ── Public shims ──────────────────────────────────────────────────────────────
 
+/// # Errors
+/// Returns an error if the data directory cannot be created.
 pub fn ensure_data_dir(ctx: &HookContext<'_>) -> Result<()> {
     HookHelpers.ensure_data_dir(ctx)
 }
 
+/// # Errors
+/// Returns an error if the directory cannot be created or permissions cannot be set.
 pub fn create_dir(path: &Path, mode: u32) -> Result<()> {
     HookHelpers.create_dir(path, mode)
 }
 
+/// # Errors
+/// Returns an error if the template cannot be read or rendered.
 pub fn render_template(ctx: &HookContext<'_>, template_name: &str) -> Result<String> {
     HookHelpers.render_template(ctx, template_name)
 }
 
+/// # Errors
+/// Returns an error if the template cannot be rendered or the file cannot be written.
 pub fn write_template(ctx: &HookContext<'_>, template_name: &str, dest: &Path) -> Result<()> {
     HookHelpers.write_template(ctx, template_name, dest)
 }
 
+/// # Errors
+/// Returns an error if the podman command fails.
 pub async fn podman_exec(container: &str, args: &[&str]) -> Result<String> {
     HookHelpers.podman_exec(container, args).await
 }
 
+/// # Errors
+/// Returns an error if the podman command fails.
 pub async fn podman_logs_tail(container: &str, lines: usize) -> Result<String> {
     HookHelpers.podman_logs_tail(container, lines).await
 }

@@ -67,6 +67,7 @@ pub enum BotType {
 
 impl BotType {
     /// Returns the machine-readable string representation.
+    #[must_use]
     pub fn as_str(&self) -> &'static str {
         match self {
             BotType::Matrix => "matrix",

@@ -81,7 +81,7 @@ impl ContainerCmd {
             .service_status(&Self::unit(service))
             .await
             .map_err(|e| anyhow::anyhow!("{e}"))?;
-        println!("{:?}", status);
+        println!("{status:?}");
         Ok(())
     }
 
@@ -115,7 +115,7 @@ impl ContainerCmd {
                 let name = parts[0].trim_end_matches(".service");
                 let active = parts.get(2).copied().unwrap_or("-");
                 let sub = parts.get(3).copied().unwrap_or("-");
-                println!("{:<32} {:<12} {}", name, active, sub);
+                println!("{name:<32} {active:<12} {sub}");
             }
         }
         Ok(())

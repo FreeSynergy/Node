@@ -22,7 +22,7 @@ pub struct SetupRequirement {
 /// Gather all `[[setup.fields]]` from all active modules + sub-modules.
 /// Deduplicates by `key` — the first occurrence wins (preserves module order).
 pub fn collect_requirements(desired: &DesiredState) -> Vec<SetupRequirement> {
-    let mut seen_keys: std::collections::HashSet<String> = Default::default();
+    let mut seen_keys: std::collections::HashSet<String> = std::collections::HashSet::default();
     let mut out = Vec::new();
 
     for instance in &desired.services {

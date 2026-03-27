@@ -25,6 +25,7 @@ pub enum VarType {
 
 impl VarType {
     /// Infer the variable type from an uppercase variable name.
+    #[must_use]
     pub fn infer_from(upper: &str) -> (VarType, u8) {
         // Connection strings — check before URL to avoid false URL matches
         if has_any(upper, &["_DB", "_DATABASE", "_DSN", "_JDBC"]) {
@@ -104,6 +105,7 @@ pub enum VarRole {
 
 impl VarRole {
     /// Infer the semantic role from an uppercase variable name.
+    #[must_use]
     pub fn infer_from(upper: &str) -> (VarRole, u8) {
         if has_any(upper, &["POSTGRES", "PGSQL", "PG_"]) {
             return (
@@ -344,6 +346,7 @@ pub struct AnalyzedVar {
 
 impl AnalyzedVar {
     /// Display string for reporting.
+    #[must_use]
     pub fn summary(&self) -> String {
         format!(
             "{:<40} → type: {:<18} role: {:<22} ({}%)",
@@ -360,13 +363,16 @@ pub fn analyze_vars(vars: &[EnvVar]) -> Vec<AnalyzedVar> {
 }
 
 /// Infer type, role and confidence for a single env var.
+#[must_use]
 pub fn analyze_var(var: &EnvVar) -> AnalyzedVar {
     let upper = var.name.to_uppercase();
     let (var_type, type_confidence) = VarType::infer_from(&upper);
     let (role, role_confidence) = VarRole::infer_from(&upper);
 
     // Blend confidences: both must be high for overall high confidence.
-    let confidence = ((type_confidence as u16 + role_confidence as u16) / 2) as u8;
+    // Both inputs are u8 values so their u16 midpoint always fits in u8.
+    #[allow(clippy::cast_possible_truncation)]
+    let confidence = u16::midpoint(u16::from(type_confidence), u16::from(role_confidence)) as u8;
 
     AnalyzedVar {
         name: var.name.clone(),

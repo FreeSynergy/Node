@@ -25,7 +25,7 @@ pub async fn run(_root: &Path, _project: Option<&Path>) -> Result<()> {
             Ok(s) => s.active_state.to_string(),
             Err(_) => "error".to_string(),
         };
-        println!("{:<30} {}", name, state);
+        println!("{name:<30} {state}");
     }
 
     Ok(())

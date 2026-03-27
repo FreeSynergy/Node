@@ -6,7 +6,7 @@ use tera::{Filter, Value};
 
 // ── ToEnvKey ──────────────────────────────────────────────────────────────────
 
-/// Convert a string to UPPER_SNAKE_CASE for use as an env var key.
+/// Convert a string to `UPPER_SNAKE_CASE` for use as an env var key.
 ///
 /// Non-alphanumeric characters are replaced with `_` and the result is uppercased.
 ///
@@ -103,7 +103,8 @@ impl Filter for Indent {
             .as_str()
             .ok_or_else(|| tera::Error::msg("indent: expected a string value"))?;
 
-        let width = args.get("width").and_then(|v| v.as_u64()).unwrap_or(2) as usize;
+        let width = usize::try_from(args.get("width").and_then(tera::Value::as_u64).unwrap_or(2))
+            .unwrap_or(2);
 
         let pad = " ".repeat(width);
         let result = s

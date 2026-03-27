@@ -101,11 +101,11 @@ impl<'a> Publisher<'a> {
         let store_dir = Self::home_dir().join(".local/share/fsn/store-clone");
 
         // Clone if not present.
-        if !store_dir.join(".git").exists() {
+        if store_dir.join(".git").exists() {
+            Self::git_run(&store_dir, &["pull", "--rebase"])?;
+        } else {
             std::fs::create_dir_all(&store_dir).context("Cannot create store clone dir")?;
             Self::git_run(&store_dir, &["clone", self.store_remote, "."])?;
-        } else {
-            Self::git_run(&store_dir, &["pull", "--rebase"])?;
         }
 
         // Copy package into clone.
@@ -152,8 +152,7 @@ impl<'a> Publisher<'a> {
 
     fn home_dir() -> std::path::PathBuf {
         std::env::var("HOME")
-            .map(std::path::PathBuf::from)
-            .unwrap_or_else(|_| std::path::PathBuf::from("."))
+            .map_or_else(|_| std::path::PathBuf::from("."), std::path::PathBuf::from)
     }
 }
 

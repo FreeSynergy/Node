@@ -62,9 +62,8 @@ async fn cmd_remove_package(name: &str, keep_data: bool, confirm: bool) -> Resul
         .context("looking up installed package")?
         .ok_or_else(|| {
             anyhow::anyhow!(
-                "Package '{}' is not installed.\n\
-             Run `fsn install --list` to see installed packages.",
-                name
+                "Package '{name}' is not installed.\n\
+             Run `fsn install --list` to see installed packages."
             )
         })?;
 
@@ -104,9 +103,9 @@ async fn cmd_remove_package(name: &str, keep_data: bool, confirm: bool) -> Resul
         .context("updating install record")?;
 
     if keep_data {
-        println!("Removed '{}' (data preserved).", name);
+        println!("Removed '{name}' (data preserved).");
     } else {
-        println!("Removed '{}'.", name);
+        println!("Removed '{name}'.");
     }
     Ok(())
 }
@@ -116,25 +115,21 @@ async fn cmd_remove_package(name: &str, keep_data: bool, confirm: bool) -> Resul
 /// Undeploy a container service instance (stops units, deletes Quadlet files).
 async fn cmd_undeploy_service(service: &str, confirm: bool) -> Result<()> {
     if !confirm {
-        bail!(
-            "This will undeploy service '{}'. Re-run with --confirm to proceed.",
-            service
-        );
+        bail!("This will undeploy service '{service}'. Re-run with --confirm to proceed.");
     }
     let opts = DeployOpts::default_for_user();
     undeploy_instance(service, &opts).await?;
-    println!("Undeployed service '{}'.", service);
+    println!("Undeployed service '{service}'.");
     Ok(())
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/// Parse a ResourceType from the stored `package_type` string label.
+/// Parse a `ResourceType` from the stored `package_type` string label.
 /// Falls back to `Container` for unknown values.
 fn parse_resource_type(label: &str) -> ResourceType {
     match label {
         "App" => ResourceType::App,
-        "Container" => ResourceType::Container,
         "Bundle" => ResourceType::Bundle,
         "Widget" => ResourceType::Widget,
         "Bot" => ResourceType::Bot,

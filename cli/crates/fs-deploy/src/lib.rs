@@ -1,3 +1,7 @@
+#![deny(clippy::all, clippy::pedantic, warnings)]
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::must_use_candidate)]
+#![allow(clippy::return_self_not_must_use)]
 // fs-engine – State reconciliation and code generation.
 //
 // The engine is the heart of FSN: it reads config, computes state,

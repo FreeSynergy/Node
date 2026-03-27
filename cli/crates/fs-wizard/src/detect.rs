@@ -35,6 +35,7 @@ impl ServiceTypeHint {
 // ── Detection rules ───────────────────────────────────────────────────────────
 
 /// Detect the service type from a compose service definition.
+#[must_use]
 pub fn detect(svc: &ComposeService) -> ServiceTypeHint {
     let image = svc.image.to_lowercase();
     let image_name = image.split('/').next_back().unwrap_or(&image);

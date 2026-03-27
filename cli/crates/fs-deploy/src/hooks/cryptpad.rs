@@ -18,8 +18,8 @@ use tracing::info;
 
 use super::{common, HookContext};
 
-#[allow(clippy::cognitive_complexity)]
-pub async fn run(ctx: &HookContext<'_>) -> Result<()> {
+#[allow(clippy::cognitive_complexity, clippy::unused_async)]
+pub fn run(ctx: &HookContext<'_>) -> Result<()> {
     let data_dir = ctx.instance_data_dir();
     let name = &ctx.instance.name;
 

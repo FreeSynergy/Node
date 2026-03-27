@@ -5,7 +5,10 @@ use anyhow::{bail, Result};
 use fs_node_core::state::DesiredState;
 
 /// Check all deployment constraints for the resolved desired state.
-/// Returns Err if any constraint is violated.
+///
+/// # Errors
+///
+/// Returns an error if any constraint is violated (e.g. `per_host` limit exceeded).
 pub fn check(desired: &DesiredState) -> Result<()> {
     check_per_host(desired)?;
     // per_ip requires multi-host context (Phase 4)
@@ -13,13 +16,17 @@ pub fn check(desired: &DesiredState) -> Result<()> {
     Ok(())
 }
 
-/// per_host: at most N instances of the same module class per host.
+/// `per_host`: at most N instances of the same module class per host.
+///
+/// Collects all instances (including sub-modules) with their class key,
+/// groups by class key, and fails if any group exceeds its `per_host` limit.
 fn check_per_host(desired: &DesiredState) -> Result<()> {
     // Collect all instances (including sub-modules) with their class key
     let all = collect_all_instances(desired);
 
     // Group by class key
-    let mut counts: std::collections::HashMap<String, Vec<String>> = Default::default();
+    let mut counts: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::default();
     for (class_key, name, limit) in &all {
         if let Some(limit) = limit {
             let group = counts.entry(class_key.clone()).or_default();
@@ -39,7 +46,7 @@ fn check_per_host(desired: &DesiredState) -> Result<()> {
     Ok(())
 }
 
-/// Returns (class_key, instance_name, per_host_limit) for every instance.
+/// Returns `(class_key, instance_name, per_host_limit)` for every instance.
 fn collect_all_instances(desired: &DesiredState) -> Vec<(String, String, Option<u32>)> {
     let mut out = Vec::new();
     for m in &desired.services {

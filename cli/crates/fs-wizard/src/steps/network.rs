@@ -18,16 +18,19 @@ pub struct NetworkStep;
 
 impl NetworkStep {
     /// Create a new `NetworkStep`.
+    #[must_use]
     pub fn new() -> Self {
         Self
     }
 
     /// Static title (useful when you don't have a step instance).
+    #[must_use]
     pub fn title() -> &'static str {
         "Network Setup"
     }
 
     /// Validate a `NetworkInput` without a step instance.
+    #[must_use]
     pub fn validate(input: &NetworkInput) -> Vec<String> {
         let mut errors = Vec::new();
 
@@ -66,7 +69,7 @@ impl WizardStep for NetworkStep {
     type Input = NetworkInput;
     type Output = NetworkInput;
 
-    fn title(&self) -> &str {
+    fn title(&self) -> &'static str {
         "Network Setup"
     }
 

@@ -36,6 +36,10 @@ impl TokenFile {
     ///
     /// Returns an empty `TokenFile` with the default cluster ID when the file
     /// does not exist yet.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be read or parsed.
     pub fn load(path: &Path) -> Result<Self> {
         if !path.exists() {
             return Ok(Self::default());
@@ -46,6 +50,10 @@ impl TokenFile {
     }
 
     /// Serialize and write this `TokenFile` to `path` (creates or overwrites).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be written or serialized.
     pub fn save(&self, path: &Path) -> Result<()> {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)
@@ -104,19 +112,16 @@ fn utc_now_rfc3339() -> String {
     // Approximate date from epoch days (good enough for a timestamp label).
     let (year, month, day) = days_to_ymd(days);
 
-    format!(
-        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
-        year, month, day, hour, min, sec
-    )
+    format!("{year:04}-{month:02}-{day:02}T{hour:02}:{min:02}:{sec:02}Z")
 }
 
 /// Convert days since Unix epoch to (year, month, day).
 fn days_to_ymd(mut days: u64) -> (u64, u64, u64) {
     // Algorithm: http://howardhinnant.github.io/date_algorithms.html
-    days += 719468;
-    let era = days / 146097;
-    let doe = days % 146097;
-    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    days += 719_468;
+    let era = days / 146_097;
+    let doe = days % 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146_096) / 365;
     let y = yoe + era * 400;
     let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
     let mp = (5 * doy + 2) / 153;

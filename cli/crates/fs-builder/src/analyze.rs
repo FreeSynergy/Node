@@ -1,4 +1,4 @@
-//! `fs-builder analyze` — Docker Compose → ContainerResource.
+//! `fs-builder analyze` — Docker Compose → `ContainerResource`.
 //!
 //! # What it does
 //!
@@ -107,7 +107,7 @@ impl ComposeAnalyzer {
             .collect();
         if networks.is_empty() {
             networks.push(NetworkDef {
-                name: format!("{}-backend", primary_name),
+                name: format!("{primary_name}-backend"),
                 external: false,
             });
         }
@@ -117,7 +117,7 @@ impl ComposeAnalyzer {
             .keys()
             .map(|v| VolumeDef {
                 name: v.clone(),
-                s3_path: Some(format!("backups/{}/{}", primary_name, v)),
+                s3_path: Some(format!("backups/{primary_name}/{v}")),
             })
             .collect();
 
@@ -334,7 +334,7 @@ impl ComposeAnalyzer {
             if upper.contains(&svc_upper) || upper.starts_with(&format!("{}_", &svc_upper)) {
                 return Some(AutoSource::InternalService {
                     service_name: svc.clone(),
-                    url_template: format!("http://{}:{{{{ port }}}}", svc),
+                    url_template: format!("http://{svc}:{{{{ port }}}}"),
                 });
             }
         }

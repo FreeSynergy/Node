@@ -167,8 +167,7 @@ async fn run_remote_plugin_configs(
             .class
             .manifest
             .as_ref()
-            .map(|m| m.commands.iter().any(|c| c == "generate-config"))
-            .unwrap_or(false);
+            .is_some_and(|m| m.commands.iter().any(|c| c == "generate-config"));
 
         if !has_generate_config {
             continue;

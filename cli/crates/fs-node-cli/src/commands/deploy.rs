@@ -37,8 +37,7 @@ pub async fn run(
     // ── Resolve desired state ─────────────────────────────────────────────────
     let data_root = project_path
         .parent()
-        .map(|p| p.join("data"))
-        .unwrap_or_else(|| root.join("data"));
+        .map_or_else(|| root.join("data"), |p| p.join("data"));
     let desired = resolve_desired(&proj, &host, &registry, &vault, Some(&data_root))
         .context("Resolving desired state")?;
 
@@ -102,7 +101,7 @@ pub async fn run(
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/// Build a RemoteHost from a host config file matched by name.
+/// Build a `RemoteHost` from a host config file matched by name.
 fn build_remote_host(root: &Path, host_name: &str) -> Option<fs_host::RemoteHost> {
     let host_path = find_host_by_name(root, host_name)?;
     let cfg = HostConfig::load(&host_path).ok()?;

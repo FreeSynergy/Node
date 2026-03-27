@@ -19,11 +19,13 @@ pub struct WizardResult {
 
 impl WizardResult {
     /// Render the generated module TOML as a string.
+    #[must_use]
     pub fn to_toml(&self) -> String {
         self.module.to_toml()
     }
 
     /// Return the required setup fields for this service's detected class.
+    #[must_use]
     pub fn setup_fields(&self) -> Vec<SetupField> {
         setup_fields::setup_fields_for(&self.hint.class)
     }
@@ -45,12 +47,17 @@ impl WizardResult {
 pub struct Wizard;
 
 impl Wizard {
+    #[must_use]
     pub fn new() -> Self {
         Self
     }
 
     /// Convert all services in the compose input.
-    pub fn convert_all(&self, input: ComposeInput) -> Result<Vec<WizardResult>, FsyError> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the compose input cannot be resolved or parsed.
+    pub fn convert_all(&self, input: &ComposeInput) -> Result<Vec<WizardResult>, FsyError> {
         let yaml = input.resolve()?;
         let services = ComposeService::parse_all(&yaml)?;
 
@@ -71,9 +78,14 @@ impl Wizard {
     }
 
     /// Convert a single named service from the compose input.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the compose input cannot be resolved, parsed, or the
+    /// named service is not found.
     pub fn convert_service(
         &self,
-        input: ComposeInput,
+        input: &ComposeInput,
         service_name: &str,
     ) -> Result<WizardResult, FsyError> {
         let results = self.convert_all(input)?;
@@ -91,6 +103,7 @@ impl Wizard {
     ///
     /// These mirror the `[[setup.fields]]` entries in the module TOML and tell
     /// the operator what secrets and configuration values they need to supply.
+    #[must_use]
     pub fn setup_fields(&self, class: &str) -> Vec<SetupField> {
         setup_fields::setup_fields_for(class)
     }

@@ -52,11 +52,13 @@ pub struct ManualDiscovery {
 
 impl ManualDiscovery {
     /// Create a new `ManualDiscovery` with the given nodes.
+    #[must_use]
     pub fn new(nodes: Vec<DiscoveredNode>) -> Self {
         Self { nodes }
     }
 
     /// Create an empty `ManualDiscovery`.
+    #[must_use]
     pub fn empty() -> Self {
         Self { nodes: vec![] }
     }
@@ -83,6 +85,7 @@ pub struct MdnsDiscovery;
 
 impl MdnsDiscovery {
     /// Create a new `MdnsDiscovery` instance.
+    #[must_use]
     pub fn new() -> Self {
         Self
     }

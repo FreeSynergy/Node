@@ -7,10 +7,10 @@ pub async fn run(_root: &Path, _project: Option<&Path>, service: Option<&str>) -
     let opts = DeployOpts::default_for_user();
     if let Some(name) = service {
         undeploy_instance(name, &opts).await?;
-        println!("Undeployed {}", name);
+        println!("Undeployed {name}");
     } else {
         let n = undeploy_all(&opts).await?;
-        println!("Undeployed {} service(s).", n);
+        println!("Undeployed {n} service(s).");
     }
     Ok(())
 }

@@ -15,6 +15,7 @@ pub struct ConfigDiscovery<'a> {
 }
 
 impl<'a> ConfigDiscovery<'a> {
+    #[must_use]
     pub fn new(root: &'a Path) -> Self {
         Self { root }
     }
@@ -23,6 +24,7 @@ impl<'a> ConfigDiscovery<'a> {
     ///
     /// If `explicit` is provided it is returned as-is.
     /// Otherwise scans `{root}/projects/**/*.project.toml` and returns the first match.
+    #[must_use]
     pub fn find_project(&self, explicit: Option<&Path>) -> Option<PathBuf> {
         if let Some(p) = explicit {
             return Some(p.to_path_buf());
@@ -44,6 +46,7 @@ impl<'a> ConfigDiscovery<'a> {
 
     /// Find a host config file whose `[host].name` field (or filename prefix)
     /// matches `host_name`.
+    #[must_use]
     pub fn find_host_by_name(&self, host_name: &str) -> Option<PathBuf> {
         // 1. Projects tree
         let projects_dir = self.root.join("projects");
@@ -125,14 +128,17 @@ impl<'a> ConfigDiscovery<'a> {
 
 // ── Public shims (used by config/mod.rs re-exports and existing callers) ─────
 
+#[must_use]
 pub fn find_project(root: &Path, explicit: Option<&Path>) -> Option<PathBuf> {
     ConfigDiscovery::new(root).find_project(explicit)
 }
 
+#[must_use]
 pub fn find_host(root: &Path) -> Option<PathBuf> {
     ConfigDiscovery::new(root).find_host()
 }
 
+#[must_use]
 pub fn find_host_by_name(root: &Path, host_name: &str) -> Option<PathBuf> {
     ConfigDiscovery::new(root).find_host_by_name(host_name)
 }

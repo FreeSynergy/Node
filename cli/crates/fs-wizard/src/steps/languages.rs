@@ -22,11 +22,13 @@ pub struct LanguagesStep;
 
 impl LanguagesStep {
     /// Create a new `LanguagesStep`.
+    #[must_use]
     pub fn new() -> Self {
         Self
     }
 
     /// Well-known supported locales.
+    #[must_use]
     pub fn supported_locales() -> &'static [&'static str] {
         &["en", "de", "fr", "es", "pt", "nl", "it", "ru", "zh", "ja"]
     }
@@ -42,7 +44,7 @@ impl WizardStep for LanguagesStep {
     type Input = LanguagesInput;
     type Output = LanguagesInput;
 
-    fn title(&self) -> &str {
+    fn title(&self) -> &'static str {
         "Language"
     }
 

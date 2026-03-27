@@ -1,3 +1,4 @@
+#![deny(clippy::all, clippy::pedantic, warnings)]
 // fs-store-validator
 //
 // Standalone store catalog validator.

@@ -34,12 +34,7 @@ fn project_has_type(project: &ProjectConfig, type_prefix: &str) -> bool {
 
 impl HealthCheck for HostConfig {
     fn health(&self) -> HealthStatus {
-        let has_project = self
-            .host
-            .project
-            .as_deref()
-            .map(|p| !p.is_empty())
-            .unwrap_or(false);
+        let has_project = self.host.project.as_deref().is_some_and(|p| !p.is_empty());
 
         HealthRules::new()
             .require(!self.proxy.is_empty(), "health.host.no_proxy")
@@ -50,12 +45,7 @@ impl HealthCheck for HostConfig {
 
 impl HealthCheck for ServiceInstanceConfig {
     fn health(&self) -> HealthStatus {
-        let has_host = self
-            .service
-            .host
-            .as_deref()
-            .map(|h| !h.is_empty())
-            .unwrap_or(false);
+        let has_host = self.service.host.as_deref().is_some_and(|h| !h.is_empty());
 
         HealthRules::new()
             .require(
@@ -93,6 +83,7 @@ impl HealthCheck for ProjectConfig {
 /// # Arguments
 /// * `project`       — the project config to check
 /// * `host_projects` — project slugs referenced by all known hosts
+#[must_use]
 pub fn check_project_with_hosts(project: &ProjectConfig, host_projects: &[&str]) -> HealthStatus {
     let has_host = host_projects.contains(&project.project.meta.name.as_str());
     let self_status = project.health();

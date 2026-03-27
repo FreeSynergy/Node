@@ -54,19 +54,25 @@ pub async fn run(ctx: &HookContext<'_>) -> Result<()> {
             .vault
             .expose("vault_forgejo_oidc_client_secret")
             .unwrap_or("");
-        if !client_secret.is_empty() {
+        if client_secret.is_empty() {
+            tracing::warn!(
+                "{}: vault_forgejo_oidc_client_secret not set – OIDC not configured",
+                name
+            );
+        } else {
             // Try to find the kanidm service domain
             let kanidm_domain = ctx
                 .desired
                 .services
                 .iter()
                 .find(|m| m.class_key == "auth/kanidm")
-                .map(|m| m.service_domain.clone())
-                .unwrap_or_else(|| format!("kanidm.{}", ctx.project.project.domain));
+                .map_or_else(
+                    || format!("kanidm.{}", ctx.project.project.domain),
+                    |m| m.service_domain.clone(),
+                );
 
             let discover_url = format!(
-                "https://{}/oauth2/openid/forgejo/.well-known/openid-configuration",
-                kanidm_domain
+                "https://{kanidm_domain}/oauth2/openid/forgejo/.well-known/openid-configuration",
             );
 
             let _ = common::podman_exec(
@@ -94,11 +100,6 @@ pub async fn run(ctx: &HookContext<'_>) -> Result<()> {
             .await;
 
             info!("{}: OIDC source 'kanidm' configured", name);
-        } else {
-            tracing::warn!(
-                "{}: vault_forgejo_oidc_client_secret not set – OIDC not configured",
-                name
-            );
         }
     }
 

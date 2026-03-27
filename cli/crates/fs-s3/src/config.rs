@@ -37,10 +37,12 @@ pub struct StorageConfig {
 }
 
 impl StorageConfig {
+    #[must_use]
     pub fn s3_endpoint(&self) -> String {
         format!("http://{}:{}", self.bind, self.port)
     }
 
+    #[must_use]
     pub fn buckets_root(&self) -> PathBuf {
         self.data_root.clone()
     }

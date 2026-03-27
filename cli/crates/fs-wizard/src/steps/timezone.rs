@@ -5,7 +5,7 @@ use super::WizardStep;
 /// Input data for the timezone selection step.
 #[derive(Debug, Clone)]
 pub struct TimezoneInput {
-    /// IANA timezone identifier (e.g. "Europe/Berlin", "America/New_York").
+    /// IANA timezone identifier (e.g. "Europe/Berlin", "`America/New_York`").
     pub tz: String,
 }
 
@@ -22,11 +22,13 @@ pub struct TimezoneStep;
 
 impl TimezoneStep {
     /// Create a new `TimezoneStep`.
+    #[must_use]
     pub fn new() -> Self {
         Self
     }
 
     /// A selection of common timezone identifiers.
+    #[must_use]
     pub fn common_timezones() -> &'static [&'static str] {
         &[
             "UTC",
@@ -61,7 +63,7 @@ impl WizardStep for TimezoneStep {
     type Input = TimezoneInput;
     type Output = TimezoneInput;
 
-    fn title(&self) -> &str {
+    fn title(&self) -> &'static str {
         "Timezone"
     }
 

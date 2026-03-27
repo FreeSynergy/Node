@@ -5,9 +5,9 @@ use super::WizardStep;
 /// Input data for the store configuration step.
 #[derive(Debug, Clone)]
 pub struct StoreInput {
-    /// Base URL of the FreeSynergy store (e.g. "https://raw.githubusercontent.com/FreeSynergy/Store/main").
+    /// Base URL of the `FreeSynergy` store (e.g. "<https://raw.githubusercontent.com/FreeSynergy/Store/main>").
     pub url: String,
-    /// Store namespaces to activate (e.g. ["Node", "Community"]).
+    /// Store namespaces to activate (e.g. `["Node", "Community"]`).
     pub namespaces: Vec<String>,
 }
 
@@ -25,6 +25,7 @@ pub struct StoreStep;
 
 impl StoreStep {
     /// Create a new `StoreStep`.
+    #[must_use]
     pub fn new() -> Self {
         Self
     }
@@ -40,7 +41,7 @@ impl WizardStep for StoreStep {
     type Input = StoreInput;
     type Output = StoreInput;
 
-    fn title(&self) -> &str {
+    fn title(&self) -> &'static str {
         "Store Configuration"
     }
 

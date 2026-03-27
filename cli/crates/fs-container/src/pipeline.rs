@@ -22,7 +22,7 @@ pub struct AnalyzeResult {
     pub compose: ComposeFile,
     pub instance: InstanceName,
     pub validation: ValidationReport,
-    /// Per-service variable analysis: service_name → analyzed vars
+    /// Per-service variable analysis: `service_name` → analyzed vars
     pub vars_by_service: indexmap::IndexMap<String, Vec<AnalyzedVar>>,
 }
 
@@ -68,6 +68,10 @@ impl AnalyzeResult {
 // ── Pipeline ──────────────────────────────────────────────────────────────────
 
 /// Analyze a compose file without writing any files.
+///
+/// # Errors
+///
+/// Returns an error if the compose file cannot be parsed or the instance name is invalid.
 pub fn analyze(path: &Path, instance_name: Option<&str>) -> Result<AnalyzeResult> {
     let compose = parse_file(path)?;
 
@@ -94,6 +98,10 @@ pub fn analyze(path: &Path, instance_name: Option<&str>) -> Result<AnalyzeResult
 /// Full install pipeline: parse → validate → convert → write quadlet files → daemon-reload.
 ///
 /// `dry_run = true` skips writing files and starting services.
+///
+/// # Errors
+///
+/// Returns an error if the compose file is invalid, conversion fails, or any file write fails.
 pub async fn install(
     path: &Path,
     instance_name: Option<&str>,

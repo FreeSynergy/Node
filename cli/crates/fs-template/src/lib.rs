@@ -1,4 +1,5 @@
-//! Tera template rendering for FreeSynergy.
+#![deny(clippy::all, clippy::pedantic, warnings)]
+//! Tera template rendering for `FreeSynergy`.
 //!
 //! Generates Quadlet files, config files, and other text artifacts from templates.
 //!

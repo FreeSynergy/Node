@@ -94,7 +94,7 @@ impl<'a> StateResolver<'a> {
                     &cross_vars,
                     project_root,
                 )
-                .with_context(|| format!("Resolving module '{}'", instance_name))?;
+                .with_context(|| format!("Resolving module '{instance_name}'"))?;
 
             instances.push(instance);
         }
@@ -119,15 +119,15 @@ impl<'a> StateResolver<'a> {
         let class = self
             .registry
             .get(class_key)
-            .with_context(|| format!("Module class '{}' not found in registry", class_key))?
+            .with_context(|| format!("Module class '{class_key}' not found in registry"))?
             .clone();
 
-        let service_domain = format!("{}.{}", name, self.project.project.domain);
+        let service_domain = format!("{name}.{}", self.project.project.domain);
         let alias_domains: Vec<String> = class
             .meta
             .alias
             .iter()
-            .map(|a| format!("{}.{}", a, self.project.project.domain))
+            .map(|a| format!("{a}.{}", self.project.project.domain))
             .collect();
 
         // Pre-compute [vars] block: render each var template with just the basic vars
@@ -182,27 +182,25 @@ impl<'a> StateResolver<'a> {
         let container_volumes = class
             .container
             .as_ref()
-            .map(|c| c.volumes.as_slice())
-            .unwrap_or(&[]);
+            .map_or(&[] as &[String], |c| c.volumes.as_slice());
         let resolved_volumes = Self::resolve_volumes(container_volumes, &ctx)?;
 
         // Expand native app args ({{ module_vars.config_dir }}/... → real path)
         let raw_args = class
             .service
             .as_ref()
-            .map(|s| s.args.as_slice())
-            .unwrap_or(&[]);
+            .map_or(&[] as &[String], |s| s.args.as_slice());
         let resolved_args = raw_args
             .iter()
             .map(|a| {
-                crate::template::render(a, &ctx).with_context(|| format!("Expanding arg '{}'", a))
+                crate::template::render(a, &ctx).with_context(|| format!("Expanding arg '{a}'"))
             })
             .collect::<Result<Vec<String>>>()?;
 
         // Resolve sub-modules recursively (same cross_vars for the whole project)
         let mut sub_services = Vec::new();
         for (sub_name_tpl, sub_ref) in &class.load.sub_services {
-            let sub_name = format!("{}-{}", name, sub_name_tpl);
+            let sub_name = format!("{name}-{sub_name_tpl}");
             let sub = self
                 .resolve_instance(
                     &sub_name,
@@ -212,7 +210,7 @@ impl<'a> StateResolver<'a> {
                     cross_vars,
                     project_root,
                 )
-                .with_context(|| format!("Resolving sub-module '{}'", sub_name))?;
+                .with_context(|| format!("Resolving sub-module '{sub_name}'"))?;
             sub_services.push(sub);
         }
 
@@ -221,7 +219,7 @@ impl<'a> StateResolver<'a> {
             .meta
             .service_types
             .iter()
-            .flat_map(|t| t.capabilities())
+            .flat_map(fs_node_core::config::ServiceType::capabilities)
             .collect();
         for cap in &class.meta.capabilities {
             if !capabilities.contains(cap) {
@@ -253,7 +251,7 @@ impl<'a> StateResolver<'a> {
         let mut out = HashMap::new();
         for (key, template) in raw_env {
             let value = crate::template::render(template, ctx)
-                .with_context(|| format!("Expanding env var '{}'", key))?;
+                .with_context(|| format!("Expanding env var '{key}'"))?;
             out.insert(key.clone(), value);
         }
         Ok(out)
@@ -265,7 +263,7 @@ impl<'a> StateResolver<'a> {
             .iter()
             .map(|tpl| {
                 crate::template::render(tpl, ctx)
-                    .with_context(|| format!("Expanding volume '{}'", tpl))
+                    .with_context(|| format!("Expanding volume '{tpl}'"))
             })
             .collect()
     }
@@ -300,18 +298,17 @@ impl<'a> StateResolver<'a> {
             }
 
             let subdomain = entry.subdomain.as_deref().unwrap_or(instance_name.as_str());
-            let domain = format!("{}.{}", subdomain, self.project.project.domain);
+            let domain = format!("{subdomain}.{}", self.project.project.domain);
 
             // Resolve container name (or use instance_name for native apps).
-            let container = class
-                .container
-                .as_ref()
-                .map(|c| {
+            let container = class.container.as_ref().map_or_else(
+                || instance_name.clone(),
+                |c| {
                     c.name
                         .replace("{{ instance_name }}", instance_name)
                         .replace("{{ parent_instance_name }}", instance_name)
-                })
-                .unwrap_or_else(|| instance_name.to_string());
+                },
+            );
 
             let health_path = class
                 .contract
@@ -337,7 +334,7 @@ impl<'a> StateResolver<'a> {
     ///
     /// Each var value is itself a Tera template (may reference `project_root`,
     /// `instance_name`, `project_name`, `project_domain`). We render them with a
-    /// minimal context (no module_vars self-reference) to get concrete paths/strings.
+    /// minimal context (no `module_vars` self-reference) to get concrete paths/strings.
     fn precompute_module_vars(
         vars: &indexmap::IndexMap<String, toml::Value>,
         project_root: &str,
@@ -373,6 +370,12 @@ impl<'a> StateResolver<'a> {
 
 // ── Public shims ──────────────────────────────────────────────────────────────
 
+/// Build the desired state from the config layers.
+///
+/// # Errors
+///
+/// Returns an error if a service class is not found in the registry, instance names are
+/// duplicated, or any template expansion fails.
 pub fn resolve_desired(
     project: &ProjectConfig,
     host: &HostConfig,

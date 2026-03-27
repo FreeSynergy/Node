@@ -57,7 +57,7 @@ pub struct HostMeta {
     #[serde(default = "default_ssh_port")]
     pub ssh_port: u16,
 
-    /// Path to the SSH private key for deploy access (optional, falls back to ~/.ssh/id_ed25519).
+    /// Path to the SSH private key for deploy access (optional, falls back to ~/.`ssh/id_ed25519`).
     pub ssh_key_path: Option<String>,
 
     // ── Legacy fields (kept for backward compat) ──────────────────────────────
@@ -83,15 +83,17 @@ fn default_ssh_port() -> u16 {
 
 impl HostMeta {
     /// Returns the canonical address: `address` if set, falls back to legacy `ip`.
+    #[must_use]
     pub fn addr(&self) -> &str {
-        if !self.address.is_empty() {
-            &self.address
-        } else {
+        if self.address.is_empty() {
             &self.ip
+        } else {
+            &self.address
         }
     }
 
-    /// Convenience: returns name from embedded ResourceMeta.
+    /// Convenience: returns name from embedded `ResourceMeta`.
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.meta.name
     }
@@ -164,6 +166,10 @@ fn default_acme() -> String {
 
 impl HostConfig {
     /// Load a host config from a TOML file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be read, is invalid TOML, or fails schema validation.
     pub fn load(path: &Path) -> Result<Self, FsyError> {
         crate::config::load_toml_validated(path, crate::config::validate::TomlKind::Host)
     }
@@ -175,6 +181,7 @@ impl HostConfig {
     /// The ACME email is resolved from proxy override → host default → empty string.
     ///
     /// Returns an empty map when no proxy is configured on this host.
+    #[must_use]
     pub fn plugin_vars(&self, registry: &ServiceRegistry) -> HashMap<String, String> {
         let mut vars: HashMap<String, String> = HashMap::new();
 

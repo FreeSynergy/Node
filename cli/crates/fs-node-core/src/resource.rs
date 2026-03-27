@@ -86,6 +86,10 @@ pub trait Resource: fmt::Debug {
     ///
     /// Returns `Ok(())` when the resource is self-consistent.
     /// Returns `Err(FsyError::ConstraintViolation)` on the first violation found.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any required field is missing or invalid.
     fn validate(&self) -> Result<(), FsyError>;
 
     /// Current lifecycle phase.
@@ -164,7 +168,7 @@ pub trait ServiceResource: Resource {
 /// deploy context. The engine collects all providers and merges their maps before
 /// Jinja2 rendering, enabling automatic cross-service injection without hardcoded lookups.
 ///
-/// # Naming convention (SCREAMING_SNAKE_CASE with type prefix)
+/// # Naming convention (`SCREAMING_SNAKE_CASE` with type prefix)
 /// - Project:    `PROJECT_NAME`, `PROJECT_DOMAIN`, `PROJECT_EMAIL`
 /// - Host:       `HOST_ADDR`, `HOST_INSTALL_DIR`
 /// - Mail:       `MAIL_HOST`, `MAIL_DOMAIN`, `MAIL_URL`, `MAIL_PORT`

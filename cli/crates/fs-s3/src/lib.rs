@@ -1,3 +1,4 @@
+#![deny(clippy::all, clippy::pedantic, warnings)]
 // fs-s3 – FreeSynergy.Node embedded S3 storage server.
 //
 // Modules:

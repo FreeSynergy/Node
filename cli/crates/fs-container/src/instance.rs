@@ -20,6 +20,10 @@ pub struct InstanceName(String);
 
 impl InstanceName {
     /// Create from user-supplied string, validating format.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the name is empty or contains invalid characters.
     pub fn parse(s: &str) -> Result<Self> {
         let s = s.trim().to_lowercase();
         validate_name(&s)?;
@@ -29,6 +33,10 @@ impl InstanceName {
     /// Derive the default instance name from a compose file.
     ///
     /// Uses the first service name (= "main service") as the instance name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the compose file has no services or the name is invalid.
     pub fn from_compose(compose: &ComposeFile) -> Result<Self> {
         let name = compose
             .services
@@ -41,6 +49,7 @@ impl InstanceName {
     }
 
     /// The instance name string.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -49,6 +58,7 @@ impl InstanceName {
     ///
     /// If `svc_name` equals the instance name itself (single-service compose),
     /// no prefix is added. Otherwise returns `"{instance}-{svc_name}"`.
+    #[must_use]
     pub fn service_name(&self, svc_name: &str) -> String {
         let svc = normalise(svc_name);
         if svc == self.0 {
@@ -125,13 +135,13 @@ mod tests {
 
     #[test]
     fn from_compose_uses_first_service() {
-        let yaml = r#"
+        let yaml = r"
 services:
   kanidm:
     image: kanidm/server:latest
   db:
     image: postgres:16
-"#;
+";
         let f = parse_str(yaml).unwrap();
         let name = InstanceName::from_compose(&f).unwrap();
         assert_eq!(name.as_str(), "kanidm");

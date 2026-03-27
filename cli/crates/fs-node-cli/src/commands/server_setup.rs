@@ -53,10 +53,7 @@ impl ServerSetup {
     fn check_root() -> Result<()> {
         let uid = unsafe { libc::getuid() };
         if uid != 0 {
-            bail!(
-                "fsn server setup must be run as root (current uid: {})",
-                uid
-            );
+            bail!("fsn server setup must be run as root (current uid: {uid})");
         }
         Ok(())
     }

@@ -56,6 +56,7 @@ impl AuditEntry {
     }
 
     /// Attach an optional detail string and return `self` (builder style).
+    #[must_use]
     pub fn with_detail(mut self, detail: impl Into<String>) -> Self {
         self.detail = Some(detail.into());
         self
@@ -75,6 +76,7 @@ pub struct AuditLog {
 
 impl AuditLog {
     /// Create an empty audit log.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -96,21 +98,25 @@ impl AuditLog {
     }
 
     /// All entries in insertion order.
+    #[must_use]
     pub fn entries(&self) -> &[AuditEntry] {
         &self.entries
     }
 
     /// Entries where `actor` matches.
+    #[must_use]
     pub fn by_actor<'a>(&'a self, actor: &str) -> Vec<&'a AuditEntry> {
         self.entries.iter().filter(|e| e.actor == actor).collect()
     }
 
     /// Entries where `action` matches.
+    #[must_use]
     pub fn by_action<'a>(&'a self, action: &str) -> Vec<&'a AuditEntry> {
         self.entries.iter().filter(|e| e.action == action).collect()
     }
 
     /// Entries for a specific resource (kind + name pair).
+    #[must_use]
     pub fn by_resource<'a>(&'a self, kind: &str, name: &str) -> Vec<&'a AuditEntry> {
         self.entries
             .iter()

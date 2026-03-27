@@ -96,7 +96,7 @@ impl StoreClient {
                     Ok(catalog) => {
                         for mut entry in catalog.packages {
                             if seen.insert(entry.id.clone()) {
-                                entry.store_source = store.name.clone();
+                                entry.store_source.clone_from(&store.name);
                                 result.push(entry);
                             }
                         }
@@ -118,7 +118,7 @@ impl StoreClient {
                 Ok(catalog) => {
                     for mut entry in catalog.packages {
                         if seen.insert(entry.id.clone()) {
-                            entry.store_source = store.name.clone();
+                            entry.store_source.clone_from(&store.name);
                             result.push(entry);
                         }
                     }
@@ -227,11 +227,10 @@ impl StoreClient {
                 continue;
             }
 
-            let git_url = store
-                .git_url
-                .as_deref()
-                .map(|s| s.to_string())
-                .unwrap_or_else(|| raw_url_to_git(&store.url));
+            let git_url = store.git_url.as_deref().map_or_else(
+                || raw_url_to_git(&store.url),
+                std::string::ToString::to_string,
+            );
 
             let local_dir = cache_dir.join(name_to_slug(&store.name));
             sync_git_repo(&git_url, &local_dir)

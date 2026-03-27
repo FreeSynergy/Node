@@ -22,7 +22,7 @@ use crate::config::service::ServiceClass;
 /// In-memory index of all available resource classes and plugins.
 ///
 /// Class key  = "{kind}/{name}"              (e.g. "apps/zentinel", "containers/forgejo")
-/// Plugin key = "plugins/{plugin_type}/{name}" (e.g. "plugins/dns/hetzner")
+/// Plugin key = "`plugins/{plugin_type}/{name`}" (e.g. "plugins/dns/hetzner")
 #[derive(Debug, Default)]
 pub struct ServiceRegistry {
     classes: HashMap<String, ServiceClass>,
@@ -42,6 +42,10 @@ impl ServiceRegistry {
     ///
     /// Plugin layout:
     ///   Depth 4: `resources/plugins/{plugin_type}/{name}.toml`    → key = `plugins/{plugin_type}/{name}`
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any resource TOML cannot be read or deserialized.
     pub fn load(resources_dir: &Path) -> Result<Self, FsyError> {
         let mut registry = Self {
             classes: HashMap::new(),
@@ -54,7 +58,7 @@ impl ServiceRegistry {
             .min_depth(3)
             .max_depth(4)
             .into_iter()
-            .filter_map(|e| e.ok())
+            .filter_map(std::result::Result::ok)
         {
             let path = entry.path();
             if path.extension().and_then(|e| e.to_str()) != Some("toml") {
@@ -131,7 +135,7 @@ impl ServiceRegistry {
                 .min_depth(2)
                 .max_depth(2)
                 .into_iter()
-                .filter_map(|e| e.ok())
+                .filter_map(std::result::Result::ok)
             {
                 let path = entry.path();
                 if path.extension().and_then(|e| e.to_str()) != Some("toml") {
@@ -177,6 +181,7 @@ impl ServiceRegistry {
     }
 
     /// Look up a module class by its "{type}/{name}" key.
+    #[must_use]
     pub fn get(&self, class_key: &str) -> Option<&ServiceClass> {
         self.classes.get(class_key)
     }
@@ -184,6 +189,7 @@ impl ServiceRegistry {
     /// Look up a plugin by plugin type and name.
     ///
     /// Example: `get_plugin("dns", "hetzner")`
+    #[must_use]
     pub fn get_plugin(&self, plugin_type: &str, name: &str) -> Option<&PluginConfig> {
         let key = format!("plugins/{plugin_type}/{name}");
         self.plugins.get(&key)
@@ -199,6 +205,7 @@ impl ServiceRegistry {
         self.plugins.iter().map(|(k, v)| (k.as_str(), v))
     }
 
+    #[must_use]
     pub fn resources_dir(&self) -> &Path {
         &self.resources_dir
     }

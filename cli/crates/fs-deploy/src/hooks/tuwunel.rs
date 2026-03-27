@@ -15,7 +15,8 @@ use tracing::info;
 
 use super::{common, HookContext};
 
-pub async fn run(ctx: &HookContext<'_>) -> Result<()> {
+#[allow(clippy::unused_async)]
+pub fn run(ctx: &HookContext<'_>) -> Result<()> {
     let data_dir = ctx.instance_data_dir();
     let name = &ctx.instance.name;
     let domain = &ctx.project.project.domain;

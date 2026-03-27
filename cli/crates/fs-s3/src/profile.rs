@@ -54,6 +54,7 @@ pub struct ProfileStore {
 }
 
 impl ProfileStore {
+    #[must_use]
     pub fn new(config: &StorageConfig) -> Self {
         let profiles_root = BucketKind::Profiles.path(&config.buckets_root());
         Self { profiles_root }
@@ -61,6 +62,11 @@ impl ProfileStore {
 
     // ── writes ────────────────────────────────────────────────────────────────
 
+    /// Store a node profile, creating the profile directory if necessary.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the directory cannot be created or the file cannot be written.
     pub async fn put_profile(&self, profile: &NodeProfile) -> Result<()> {
         let dir = self.profile_dir(&profile.node_id);
         tokio::fs::create_dir_all(&dir)
@@ -78,6 +84,10 @@ impl ProfileStore {
     }
 
     /// Store an avatar image; returns the SHA-256 hex of the data.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the directory cannot be created or the file cannot be written.
     pub async fn put_avatar(&self, node_id: &str, data: &[u8], extension: &str) -> Result<String> {
         let dir = self.profile_dir(node_id);
         tokio::fs::create_dir_all(&dir).await?;
@@ -101,6 +111,11 @@ impl ProfileStore {
 
     // ── reads ─────────────────────────────────────────────────────────────────
 
+    /// Read a node profile from disk.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be read or deserialized.
     pub async fn get_profile(&self, node_id: &str) -> Result<NodeProfile> {
         let path = self.profile_dir(node_id).join("profile.json");
         let data = tokio::fs::read(&path)
@@ -114,7 +129,8 @@ impl ProfileStore {
     }
 
     /// Path to the avatar file (any known extension), or `None` if absent.
-    pub async fn avatar_path(&self, node_id: &str) -> Option<PathBuf> {
+    #[must_use]
+    pub fn avatar_path(&self, node_id: &str) -> Option<PathBuf> {
         let dir = self.profile_dir(node_id);
         for ext in ["png", "jpg", "jpeg", "webp"] {
             let p = dir.join(format!("avatar.{ext}"));
@@ -127,6 +143,11 @@ impl ProfileStore {
 
     // ── list ──────────────────────────────────────────────────────────────────
 
+    /// List all node profiles stored locally.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the profiles directory cannot be read.
     pub async fn list_profiles(&self) -> Result<Vec<NodeProfile>> {
         let mut out = Vec::new();
         let mut rd = tokio::fs::read_dir(&self.profiles_root).await?;
@@ -143,6 +164,11 @@ impl ProfileStore {
 
     // ── delete ────────────────────────────────────────────────────────────────
 
+    /// Delete a node profile and all its associated files.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the profile directory cannot be removed.
     pub async fn delete_profile(&self, node_id: &str) -> Result<()> {
         let dir = self.profile_dir(node_id);
         if dir.exists() {
@@ -186,7 +212,7 @@ fn sha256_hex(data: &[u8]) -> String {
     // For a real checksum, the caller can use sha2 or blake3 from the CLI crate.
     let mut h: u64 = 5381;
     for &b in data {
-        h = h.wrapping_mul(33).wrapping_add(b as u64);
+        h = h.wrapping_mul(33).wrapping_add(u64::from(b));
     }
     let mut s = String::with_capacity(16);
     let _ = write!(s, "{h:016x}");

@@ -21,7 +21,7 @@ static WRITE_BUF: OnceLock<Arc<WriteBuffer>> = OnceLock::new();
 pub struct NodeDb;
 
 impl NodeDb {
-    /// Path to an FSN SQLite database under `~/.local/share/fsn/`.
+    /// Path to an FSN `SQLite` database under `~/.local/share/fsn/`.
     pub fn path(filename: &str) -> PathBuf {
         let home = std::env::var("HOME").unwrap_or_else(|_| "/root".to_string());
         PathBuf::from(home).join(".local/share/fsn").join(filename)
@@ -30,7 +30,7 @@ impl NodeDb {
     /// Initialize all Node databases: connect, run migrations, set up write buffer.
     ///
     /// Call once at startup. Non-fatal — the CLI continues without persistence
-    /// if DB init fails (e.g. permission error, missing SQLite).
+    /// if DB init fails (e.g. permission error, missing `SQLite`).
     #[allow(clippy::cognitive_complexity)]
     pub async fn init() -> Result<()> {
         let path = Self::path("fsn.db");
@@ -147,21 +147,21 @@ pub async fn init() -> Result<()> {
     NodeDb::init().await
 }
 pub fn spawn_flush_loop() {
-    NodeDb::spawn_flush_loop()
+    NodeDb::spawn_flush_loop();
 }
 pub async fn write_audit_entry(entry: &AuditEntry) {
-    NodeDb::write_audit(entry).await
+    NodeDb::write_audit(entry).await;
 }
 pub fn get_conn() -> Option<Arc<DbConnection>> {
     NodeDb::conn()
 }
 pub async fn flush() {
-    NodeDb::flush().await
+    NodeDb::flush().await;
 }
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
 
-const CORE_SCHEMA: &str = r#"
+const CORE_SCHEMA: &str = r"
 CREATE TABLE IF NOT EXISTS hosts (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     name        TEXT    NOT NULL UNIQUE,
@@ -208,9 +208,9 @@ CREATE TABLE IF NOT EXISTS federation_rights (
     right     TEXT    NOT NULL,
     scope     TEXT    NOT NULL DEFAULT '*'
 )
-"#;
+";
 
-const BUS_SCHEMA: &str = r#"
+const BUS_SCHEMA: &str = r"
 CREATE TABLE IF NOT EXISTS event_log (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     event_id     TEXT    NOT NULL UNIQUE,
@@ -253,4 +253,4 @@ CREATE TABLE IF NOT EXISTS standing_orders (
     enabled       INTEGER NOT NULL DEFAULT 1,
     created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
 )
-"#;
+";

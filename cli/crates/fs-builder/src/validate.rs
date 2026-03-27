@@ -74,19 +74,15 @@ pub fn run(path: &Path) -> Result<()> {
                 .map(|(t, _)| *t)
                 .collect::<Vec<_>>()
                 .join(", ");
-            anyhow::anyhow!(
-                "Unsupported resource type '{}'. Supported: {}",
-                resource_type,
-                supported
-            )
+            anyhow::anyhow!("Unsupported resource type '{resource_type}'. Supported: {supported}")
         })?;
 
     let (id, status) = validator(&raw)?;
-    print_status(&id, &status);
+    print_status(&id, status);
     Ok(())
 }
 
-fn print_status(id: &str, status: &ValidationStatus) {
+fn print_status(id: &str, status: ValidationStatus) {
     let (badge, message) = match status {
         ValidationStatus::Ok => ("✅", "Resource is valid."),
         ValidationStatus::Incomplete => (

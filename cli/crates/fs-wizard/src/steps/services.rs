@@ -35,6 +35,7 @@ pub enum InstanceMode {
 
 impl InstanceMode {
     /// Short display label.
+    #[must_use]
     pub fn label(&self) -> &str {
         match self {
             Self::Standalone => "Standalone",
@@ -79,11 +80,13 @@ pub struct ServicesStep {
 
 impl ServicesStep {
     /// Create a new `ServicesStep` with the given list of available service classes.
+    #[must_use]
     pub fn new(available: Vec<String>) -> Self {
         Self { available }
     }
 
     /// Default set of well-known service classes shown in the wizard.
+    #[must_use]
     pub fn default_available() -> Vec<String> {
         vec![
             "proxy/zentinel".into(),
@@ -107,7 +110,7 @@ impl WizardStep for ServicesStep {
     type Input = ServicesInput;
     type Output = ServicesInput;
 
-    fn title(&self) -> &str {
+    fn title(&self) -> &'static str {
         "Service Selection"
     }
 

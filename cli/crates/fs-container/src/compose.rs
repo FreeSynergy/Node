@@ -94,6 +94,7 @@ impl EnvVar {
     }
 
     /// Parse from `"KEY=VALUE"` or `"KEY"` string.
+    #[must_use]
     pub fn parse_entry(s: &str) -> Self {
         match s.split_once('=') {
             Some((k, v)) => Self::new(k.trim(), Some(v.to_string())),
@@ -126,6 +127,10 @@ pub struct ComposeHealthcheck {
 // ── Parsing entry point ───────────────────────────────────────────────────────
 
 /// Parse a compose YAML file from disk.
+///
+/// # Errors
+///
+/// Returns an error if the file cannot be read or the YAML is invalid.
 pub fn parse_file(path: &Path) -> Result<ComposeFile> {
     let content = std::fs::read_to_string(path)
         .with_context(|| format!("reading compose file: {}", path.display()))?;
@@ -133,6 +138,10 @@ pub fn parse_file(path: &Path) -> Result<ComposeFile> {
 }
 
 /// Parse a compose YAML string.
+///
+/// # Errors
+///
+/// Returns an error if the YAML is invalid or missing required fields.
 pub fn parse_str(content: &str) -> Result<ComposeFile> {
     serde_yml::from_str(content).context("parsing compose YAML")
 }
@@ -203,7 +212,7 @@ where
                 let source = map.get("source").and_then(|v| v.as_str()).unwrap_or("");
                 let ro = map
                     .get("read_only")
-                    .and_then(|v| v.as_bool())
+                    .and_then(serde_yml::Value::as_bool)
                     .unwrap_or(false);
                 let line = if source.is_empty() {
                     target.to_string()
@@ -237,7 +246,10 @@ where
             serde_yml::Value::Number(n) => out.push(n.to_string()),
             serde_yml::Value::Mapping(map) => {
                 // Longform: { target, published, protocol }
-                let target = map.get("target").and_then(|v| v.as_u64()).unwrap_or(0);
+                let target = map
+                    .get("target")
+                    .and_then(serde_yml::Value::as_u64)
+                    .unwrap_or(0);
                 let published = map
                     .get("published")
                     .map(|v| match v {
@@ -317,7 +329,7 @@ fn yaml_to_string(v: &serde_yml::Value) -> Result<String, String> {
         serde_yml::Value::Number(n) => Ok(n.to_string()),
         serde_yml::Value::Bool(b) => Ok(b.to_string()),
         serde_yml::Value::Null => Ok(String::new()),
-        other => Err(format!("unexpected YAML value: {:?}", other)),
+        other => Err(format!("unexpected YAML value: {other:?}")),
     }
 }
 

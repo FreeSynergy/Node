@@ -43,7 +43,7 @@ struct ConfigBundle {
 /// and writes them as raw TOML strings into `output`.
 pub async fn export(root: &Path, project: Option<&Path>, output: &Path) -> Result<()> {
     let proj_path = project
-        .map(|p| p.to_path_buf())
+        .map(std::path::Path::to_path_buf)
         .or_else(|| find_project(root, None))
         .ok_or_else(|| {
             anyhow::anyhow!(
@@ -75,7 +75,7 @@ pub async fn export(root: &Path, project: Option<&Path>, output: &Path) -> Resul
         .to_string();
 
     // Host config (optional).
-    let host_path = root.join("hosts").join(format!("{}.host.toml", slug));
+    let host_path = root.join("hosts").join(format!("{slug}.host.toml"));
     if host_path.exists() {
         let host_content = std::fs::read_to_string(&host_path)
             .with_context(|| format!("reading host config: {}", host_path.display()))?;
@@ -176,7 +176,7 @@ pub async fn import(root: &Path, input: &Path) -> Result<()> {
         println!("Bundle contained no config files to import.");
     } else {
         for path in &written {
-            println!("  Wrote: {}", path);
+            println!("  Wrote: {path}");
         }
         println!("Import complete ({} file(s)).", written.len());
     }

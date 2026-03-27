@@ -12,8 +12,8 @@ use serde::{Deserialize, Serialize};
 
 /// Common metadata shared by ALL FSN resources.
 ///
-/// Embedded via `#[serde(flatten)]` into ProjectMeta, HostMeta,
-/// ServiceInstanceMeta, BotMeta.  Provides the base fields that every
+/// Embedded via `#[serde(flatten)]` into `ProjectMeta`, `HostMeta`,
+/// `ServiceInstanceMeta`, `BotMeta`.  Provides the base fields that every
 /// managed object needs for identification, display and filtering.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceMeta {
@@ -43,6 +43,7 @@ fn default_version() -> String {
 
 impl ResourceMeta {
     /// Returns the display name: alias if set, otherwise name.
+    #[must_use]
     pub fn display_name(&self) -> &str {
         self.alias.as_deref().unwrap_or(&self.name)
     }

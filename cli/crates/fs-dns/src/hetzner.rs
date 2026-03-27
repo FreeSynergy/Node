@@ -14,6 +14,7 @@ pub struct HetznerDns {
 }
 
 impl HetznerDns {
+    #[must_use]
     pub fn new(token: &str) -> Self {
         Self {
             client: Client::new(),
@@ -36,7 +37,7 @@ impl HetznerDns {
             .into_iter()
             .find(|z| z.name == domain || domain.ends_with(&format!(".{}", z.name)))
             .map(|z| z.id)
-            .ok_or_else(|| anyhow::anyhow!("Zone not found for domain: {}", domain))
+            .ok_or_else(|| anyhow::anyhow!("Zone not found for domain: {domain}"))
     }
 }
 
@@ -70,7 +71,7 @@ impl DnsProvider for HetznerDns {
 
         if !resp.status().is_success() {
             let text = resp.text().await.unwrap_or_default();
-            bail!("Hetzner DNS create_record failed: {}", text);
+            bail!("Hetzner DNS create_record failed: {text}");
         }
 
         Ok(())
@@ -78,7 +79,7 @@ impl DnsProvider for HetznerDns {
 
     async fn remove_record(&self, record: &DnsRecord) -> Result<()> {
         let existing = self
-            .list_records(record.name.split_once('.').map(|x| x.1).unwrap_or(""))
+            .list_records(record.name.split_once('.').map_or("", |x| x.1))
             .await?;
 
         let target = existing

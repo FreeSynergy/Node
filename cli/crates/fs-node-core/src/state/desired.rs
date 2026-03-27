@@ -26,7 +26,7 @@ pub struct ServiceInstance {
     /// The class template this instance was resolved from.
     pub class: ServiceClass,
 
-    /// Functional types (convenience copy from class.meta.service_types).
+    /// Functional types (convenience copy from `class.meta.service_types`).
     pub service_types: Vec<ServiceType>,
 
     /// Jinja2-expanded environment variables (ready for Quadlet .env file).
@@ -45,7 +45,7 @@ pub struct ServiceInstance {
     pub version: String,
 
     /// Jinja2-expanded volume mount strings (ready for Quadlet Volume= lines).
-    /// Empty when resolved without a data_root (non-deploy contexts).
+    /// Empty when resolved without a `data_root` (non-deploy contexts).
     pub resolved_volumes: Vec<String>,
 
     /// Jinja2-expanded command-line arguments for native app services.

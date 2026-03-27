@@ -5,15 +5,15 @@ use super::WizardStep;
 /// Which identity / access management provider to deploy.
 #[derive(Debug, Clone, PartialEq)]
 pub enum IamChoice {
-    /// Kanidm — recommended, modern Rust-native IdP.
+    /// Kanidm — recommended, modern Rust-native `IdP`.
     Kanidm,
-    /// Keycloak — Java-based, feature-rich enterprise IdP.
+    /// Keycloak — Java-based, feature-rich enterprise `IdP`.
     Keycloak,
-    /// Authentik — Python-based, flexible IdP.
+    /// Authentik — Python-based, flexible `IdP`.
     Authentik,
     /// LLDAP — lightweight LDAP server.
     Lldap,
-    /// External — use an existing IdP at the given URL.
+    /// External — use an existing `IdP` at the given URL.
     External { url: String },
     /// No IAM — skip identity provider setup.
     None,
@@ -21,6 +21,7 @@ pub enum IamChoice {
 
 impl IamChoice {
     /// Short display label used in menus and summaries.
+    #[must_use]
     pub fn label(&self) -> &str {
         match self {
             Self::Kanidm => "Kanidm ⭐ (recommended)",
@@ -33,11 +34,13 @@ impl IamChoice {
     }
 
     /// Returns `true` if this choice is the recommended default.
+    #[must_use]
     pub fn is_recommended(&self) -> bool {
         *self == Self::Kanidm
     }
 
     /// Returns the service class ID used in the store (if any).
+    #[must_use]
     pub fn service_class(&self) -> Option<&'static str> {
         match self {
             Self::Kanidm => Some("iam/kanidm"),
@@ -69,12 +72,14 @@ pub struct IamStep;
 
 impl IamStep {
     /// Create a new `IamStep`.
+    #[must_use]
     pub fn new() -> Self {
         Self
     }
 
     /// Returns all available `IamChoice` variants (excluding the `External` variant).
     /// The External variant must be constructed with a URL by the UI.
+    #[must_use]
     pub fn choices() -> Vec<IamChoice> {
         vec![
             IamChoice::Kanidm,
@@ -97,7 +102,7 @@ impl WizardStep for IamStep {
     type Input = IamInput;
     type Output = IamInput;
 
-    fn title(&self) -> &str {
+    fn title(&self) -> &'static str {
         "Identity & Access Management"
     }
 

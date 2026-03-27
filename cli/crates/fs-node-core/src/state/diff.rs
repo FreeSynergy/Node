@@ -19,10 +19,12 @@ pub struct StateDiff {
 }
 
 impl StateDiff {
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.to_deploy.is_empty() && self.to_update.is_empty() && self.to_remove.is_empty()
     }
 
+    #[must_use]
     pub fn summary(&self) -> String {
         format!(
             "deploy={}, update={}, remove={}, ok={}",

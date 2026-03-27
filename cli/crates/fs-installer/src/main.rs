@@ -1,3 +1,4 @@
+#![deny(clippy::all, clippy::pedantic, warnings)]
 // FreeSynergy.Node – Bootstrap Installer
 //
 // Replaces fs-install.sh.  Distributed as a pre-built binary; bootstrapped via:
@@ -83,7 +84,7 @@ impl Installer {
         }
     }
 
-    async fn run(&self) -> Result<()> {
+    fn run(&self) -> Result<()> {
         let os = Self::detect_os();
         Log::info(&format!("Detected OS: {os}"));
 
@@ -313,9 +314,7 @@ impl Installer {
     }
 
     fn home() -> PathBuf {
-        env::var_os("HOME")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| PathBuf::from("."))
+        env::var_os("HOME").map_or_else(|| PathBuf::from("."), PathBuf::from)
     }
 }
 
@@ -327,5 +326,5 @@ async fn main() -> Result<()> {
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
 
-    Installer::new(Args::parse()).run().await
+    Installer::new(Args::parse()).run()
 }

@@ -17,7 +17,7 @@ use fs_node_core::config::{find_project, ProjectConfig, ServiceType};
 /// as an ASCII tree to stdout.
 pub async fn run(root: &Path, project: Option<&Path>, service: &str) -> Result<()> {
     let proj_path = project
-        .map(|p| p.to_path_buf())
+        .map(std::path::Path::to_path_buf)
         .or_else(|| find_project(root, None))
         .ok_or_else(|| {
             anyhow::anyhow!(
@@ -34,21 +34,19 @@ pub async fn run(root: &Path, project: Option<&Path>, service: &str) -> Result<(
         let available: Vec<&str> = proj.load.services.keys().map(String::as_str).collect();
         if available.is_empty() {
             anyhow::bail!(
-                "Service '{}' not found. No services are declared in the project.",
-                service
-            );
-        } else {
-            anyhow::bail!(
-                "Service '{}' not found. Available services: {}",
-                service,
-                available.join(", ")
+                "Service '{service}' not found. No services are declared in the project."
             );
         }
+        anyhow::bail!(
+            "Service '{}' not found. Available services: {}",
+            service,
+            available.join(", ")
+        );
     }
 
     let entry = &proj.load.services[service];
 
-    println!("Dependency graph for: {}", service);
+    println!("Dependency graph for: {service}");
     println!("  Service class: {}", entry.service_class);
     println!();
 
@@ -58,9 +56,9 @@ pub async fn run(root: &Path, project: Option<&Path>, service: &str) -> Result<(
     let deps = collect_slot_deps(entry.service_class.as_str(), slots);
 
     if deps.is_empty() {
-        println!("{} (no declared slot dependencies)", service);
+        println!("{service} (no declared slot dependencies)");
     } else {
-        println!("{}", service);
+        println!("{service}");
         let last = deps.len().saturating_sub(1);
         for (i, (slot, instance)) in deps.iter().enumerate() {
             let prefix = if i == last {
@@ -68,7 +66,7 @@ pub async fn run(root: &Path, project: Option<&Path>, service: &str) -> Result<(
             } else {
                 "├── "
             };
-            println!("{}{}  [{}]", prefix, instance, slot);
+            println!("{prefix}{instance}  [{slot}]");
 
             // Second-level: if that dependency itself has further slot deps,
             // show them (one level deep is enough for a useful display).
@@ -82,7 +80,7 @@ pub async fn run(root: &Path, project: Option<&Path>, service: &str) -> Result<(
                     } else {
                         "├── "
                     };
-                    println!("{}{}{}  [{}]", indent, sub_prefix, sub_inst, sub_slot);
+                    println!("{indent}{sub_prefix}{sub_inst}  [{sub_slot}]");
                 }
             }
         }
@@ -96,7 +94,7 @@ pub async fn run(root: &Path, project: Option<&Path>, service: &str) -> Result<(
 /// Return a list of `(slot_name, instance_name)` pairs that the given service
 /// class depends on, using `ServiceType::consumed_slots` and `ServiceSlots::find`.
 ///
-/// OOP: ServiceType knows what it needs; ServiceSlots knows what is assigned.
+/// OOP: `ServiceType` knows what it needs; `ServiceSlots` knows what is assigned.
 /// No heuristics here — both objects carry their own knowledge.
 fn collect_slot_deps<'a>(
     class: &str,

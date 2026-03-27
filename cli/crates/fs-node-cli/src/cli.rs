@@ -283,7 +283,7 @@ pub enum ProfileCommand {
 pub enum StorageSyncCommand {
     /// Pull a bucket from a remote node
     Pull {
-        /// S3 endpoint of the remote node (e.g. http://peer.example:9000)
+        /// S3 endpoint of the remote node (e.g. <http://peer.example:9000>)
         #[arg(long)]
         remote_url: String,
 
@@ -368,7 +368,7 @@ pub enum ContainerCommand {
         #[arg(long)]
         dry_run: bool,
 
-        /// Store API base URL for enrichment (e.g. http://localhost:8080)
+        /// Store API base URL for enrichment (e.g. <http://localhost:8080>)
         #[arg(long)]
         store_url: Option<String>,
     },

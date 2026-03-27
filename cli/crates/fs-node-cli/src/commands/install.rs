@@ -121,9 +121,8 @@ async fn cmd_install_from_store(name: &str, check_only: bool, dry_run: bool) -> 
         .find(|e| e.id == name)
         .ok_or_else(|| {
             anyhow::anyhow!(
-                "Package '{}' not found in store catalog.\n\
-             Run `fsn store search` to browse available packages.",
-                name
+                "Package '{name}' not found in store catalog.\n\
+             Run `fsn store search` to browse available packages."
             )
         })?;
 
@@ -139,15 +138,13 @@ async fn cmd_install_from_store(name: &str, check_only: bool, dry_run: bool) -> 
 
     if let Err(e) = registry.check_prerequisites(meta.resource_type, &meta) {
         anyhow::bail!(
-            "Prerequisites not met for '{}':\n  {}\n\
-             Fix the issue above and try again.",
-            name,
-            e
+            "Prerequisites not met for '{name}':\n  {e}\n\
+             Fix the issue above and try again."
         );
     }
 
     if check_only {
-        println!("Prerequisites satisfied for '{}'.", name);
+        println!("Prerequisites satisfied for '{name}'.");
         println!("  Version:  {}", entry.version);
         println!("  Type:     {}", meta.resource_type.label());
         let install_path = paths.install_path_for(meta.resource_type, &meta.id);
@@ -208,10 +205,7 @@ async fn cmd_install_from_store(name: &str, check_only: bool, dry_run: bool) -> 
 
     // 9. For Container resources: also add to project config for `fsn deploy`.
     if meta.resource_type == ResourceType::Container && !dry_run {
-        println!(
-            "\nContainer '{}' registered. Run `fsn deploy` to start it.",
-            name
-        );
+        println!("\nContainer '{name}' registered. Run `fsn deploy` to start it.");
     }
 
     Ok(())
@@ -333,7 +327,7 @@ fn build_local_meta(name: &str, resource_type: ResourceType, _src: &Path) -> Res
     }
 }
 
-/// Detect ResourceType from a local package path.
+/// Detect `ResourceType` from a local package path.
 ///
 /// Reads `resource-type.txt` in the directory if present, otherwise defaults to `App`.
 fn detect_resource_type(src: &Path) -> ResourceType {
@@ -345,7 +339,6 @@ fn detect_resource_type(src: &Path) -> ResourceType {
 
     if let Ok(content) = std::fs::read_to_string(&type_file) {
         match content.trim() {
-            "app" => ResourceType::App,
             "container" => ResourceType::Container,
             "widget" => ResourceType::Widget,
             "bot" => ResourceType::Bot,

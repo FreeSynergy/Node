@@ -28,6 +28,7 @@ pub struct ProxyStep;
 
 impl ProxyStep {
     /// Create a new `ProxyStep`.
+    #[must_use]
     pub fn new() -> Self {
         Self
     }
@@ -43,7 +44,7 @@ impl WizardStep for ProxyStep {
     type Input = ProxyInput;
     type Output = ProxyInput;
 
-    fn title(&self) -> &str {
+    fn title(&self) -> &'static str {
         "Proxy Setup (Zentinel)"
     }
 

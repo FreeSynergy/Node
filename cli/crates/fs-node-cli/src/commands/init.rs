@@ -28,8 +28,8 @@ struct Prompt;
 impl Prompt {
     fn ask(label: &str, default: Option<&str>) -> Result<String> {
         match default {
-            Some(d) => print!("  {} [{}]: ", label, d),
-            None => print!("  {}: ", label),
+            Some(d) => print!("  {label} [{d}]: "),
+            None => print!("  {label}: "),
         }
         io::stdout().flush()?;
         let mut buf = String::new();
@@ -43,7 +43,7 @@ impl Prompt {
     }
 
     fn optional(label: &str) -> Result<Option<String>> {
-        print!("  {} (Enter to skip): ", label);
+        print!("  {label} (Enter to skip): ");
         io::stdout().flush()?;
         let mut buf = String::new();
         io::stdin().read_line(&mut buf)?;
@@ -52,7 +52,7 @@ impl Prompt {
     }
 
     fn secret(label: &str) -> Result<String> {
-        print!("  {}: ", label);
+        print!("  {label}: ");
         io::stdout().flush()?;
         let mut buf = String::new();
         io::stdin().read_line(&mut buf)?;
@@ -60,7 +60,7 @@ impl Prompt {
     }
 
     fn confirm(label: &str) -> Result<bool> {
-        print!("  {} [Y/n]: ", label);
+        print!("  {label} [Y/n]: ");
         io::stdout().flush()?;
         let mut buf = String::new();
         io::stdin().read_line(&mut buf)?;
@@ -68,7 +68,7 @@ impl Prompt {
     }
 
     fn confirm_no(label: &str) -> Result<bool> {
-        print!("{} [y/N]: ", label);
+        print!("{label} [y/N]: ");
         io::stdout().flush()?;
         let mut buf = String::new();
         io::stdin().read_line(&mut buf)?;
@@ -146,24 +146,21 @@ impl<'a> InitWizard<'a> {
         std::fs::create_dir_all(&proj_dir)?;
 
         std::fs::write(
-            proj_dir.join(format!("{}.project.toml", slug)),
+            proj_dir.join(format!("{slug}.project.toml")),
             format!(
-                "[project]\nname        = \"{name}\"\ndomain      = \"{domain}\"\ndescription = \"\"\n\n[project.contact]\nemail       = \"{contact}\"\nacme_email  = \"{contact}\"\n\n[load.services]\n# Added by wizard\n",
-                name = project_name, domain = domain, contact = contact,
+                "[project]\nname        = \"{project_name}\"\ndomain      = \"{domain}\"\ndescription = \"\"\n\n[project.contact]\nemail       = \"{contact}\"\nacme_email  = \"{contact}\"\n\n[load.services]\n# Added by wizard\n",
             ),
         )?;
 
         let hosts_dir = self.root.join("hosts");
         std::fs::create_dir_all(&hosts_dir)?;
         let ipv6_line = host_ipv6
-            .map(|v| format!("\nipv6   = \"{}\"", v))
+            .map(|v| format!("\nipv6   = \"{v}\""))
             .unwrap_or_default();
         std::fs::write(
-            hosts_dir.join(format!("{}.host.toml", slug)),
+            hosts_dir.join(format!("{slug}.host.toml")),
             format!(
-                "[host]\nname = \"{slug}\"\nip   = \"{ip}\"{ipv6}\n\n[proxy.zentinel]\nservice_class = \"proxy/zentinel\"\n\n[proxy.zentinel.load.plugins]\ndns        = \"{dns}\"\nacme       = \"{acme}\"\nacme_email = \"{contact}\"\n",
-                slug = slug, ip = host_ip, ipv6 = ipv6_line,
-                dns = dns_provider, acme = acme, contact = contact,
+                "[host]\nname = \"{slug}\"\nip   = \"{host_ip}\"{ipv6_line}\n\n[proxy.zentinel]\nservice_class = \"proxy/zentinel\"\n\n[proxy.zentinel.load.plugins]\ndns        = \"{dns_provider}\"\nacme       = \"{acme}\"\nacme_email = \"{contact}\"\n",
             ),
         )?;
 
@@ -198,10 +195,10 @@ impl<'a> InitWizard<'a> {
 
         for (class_key, class) in &all_classes {
             let desc = class.meta.description.as_deref().unwrap_or("");
-            let label = format!("  [{:<22}]  {}", class_key, desc);
+            let label = format!("  [{class_key:<22}]  {desc}");
             if Prompt::confirm_no(&label)? {
                 let instance_name = Prompt::ask(
-                    &format!("    Instance name for {}", class_key),
+                    &format!("    Instance name for {class_key}"),
                     Some(&class.meta.name),
                 )?;
                 selected.push((instance_name, class_key.to_string()));
@@ -213,15 +210,16 @@ impl<'a> InitWizard<'a> {
             return Ok(());
         }
 
-        let proj_toml = proj_dir.join(format!("{}.project.toml", slug));
+        let proj_toml = proj_dir.join(format!("{slug}.project.toml"));
         let mut existing = std::fs::read_to_string(&proj_toml)?;
 
         let mut additions = String::new();
         for (instance_name, class_key) in &selected {
-            additions.push_str(&format!(
-                "\n[load.services.{}]\nservice_class = \"{}\"\n",
-                instance_name, class_key
-            ));
+            use std::fmt::Write as _;
+            let _ = write!(
+                additions,
+                "\n[load.services.{instance_name}]\nservice_class = \"{class_key}\"\n"
+            );
         }
 
         existing = existing.replace("# Added by wizard\n", &additions);
@@ -243,7 +241,7 @@ impl<'a> InitWizard<'a> {
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("project");
-        let proj_toml = proj_dir.join(format!("{}.project.toml", slug));
+        let proj_toml = proj_dir.join(format!("{slug}.project.toml"));
         if !proj_toml.exists() {
             return Ok(());
         }
@@ -258,7 +256,7 @@ impl<'a> InitWizard<'a> {
         let registry = ServiceRegistry::load(modules_dir)?;
         let vault = VaultConfig::load(proj_dir, None).unwrap_or_default();
 
-        let host_path = self.root.join("hosts").join(format!("{}.host.toml", slug));
+        let host_path = self.root.join("hosts").join(format!("{slug}.host.toml"));
         let host = fs_node_core::config::HostConfig::load(&host_path)
             .with_context(|| format!("Loading {}", host_path.display()))?;
 
@@ -289,7 +287,7 @@ impl<'a> InitWizard<'a> {
 
             println!("  [{}] {}", req.class_key, field.label);
             if let Some(desc) = &field.description {
-                println!("      {}", desc);
+                println!("      {desc}");
             }
 
             let value = match &field.field_type {
@@ -297,7 +295,7 @@ impl<'a> InitWizard<'a> {
                     if field.auto_generate {
                         let gen = generate_secret(32);
                         let show = format!("{}...{}", &gen[..4], &gen[gen.len() - 4..]);
-                        let input = Prompt::secret(&format!("    auto [{}] (Enter=accept)", show))?;
+                        let input = Prompt::secret(&format!("    auto [{show}] (Enter=accept)"))?;
                         if input.is_empty() {
                             gen
                         } else {
@@ -320,8 +318,10 @@ impl<'a> InitWizard<'a> {
                     sel.parse::<usize>()
                         .ok()
                         .filter(|&n| n >= 1 && n <= field.options.len())
-                        .map(|n| field.options[n - 1].clone())
-                        .unwrap_or_else(|| field.options[def_idx].clone())
+                        .map_or_else(
+                            || field.options[def_idx].clone(),
+                            |n| field.options[n - 1].clone(),
+                        )
                 }
                 FieldType::Bool => {
                     if Prompt::confirm_no("    yes/no")? {
@@ -349,7 +349,8 @@ impl<'a> InitWizard<'a> {
         if added > 0 {
             let mut content = "# Secrets – generated by fsn init. NEVER commit!\n".to_string();
             for (k, v) in &vault_values {
-                content.push_str(&format!("{} = {:?}\n", k, v));
+                use std::fmt::Write as _;
+                let _ = writeln!(content, "{k} = {v:?}");
             }
             std::fs::write(&vault_path, content)?;
             println!(

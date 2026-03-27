@@ -5,7 +5,7 @@ use anyhow::Result;
 use fs_container::{SystemctlManager, UnitActiveState};
 use fs_node_core::state::{ActualState, HealthStatus, RunState, ServiceStatus};
 
-fn run_state_from(active: UnitActiveState) -> RunState {
+fn run_state_from(active: &UnitActiveState) -> RunState {
     match active {
         UnitActiveState::Active => RunState::Running,
         UnitActiveState::Inactive | UnitActiveState::Deactivating => RunState::Stopped,
@@ -25,7 +25,7 @@ pub async fn observe() -> Result<ActualState> {
         let name = unit.trim_end_matches(".service").to_string();
 
         let run_state = match systemd.service_status(unit).await {
-            Ok(s) => run_state_from(s.active_state),
+            Ok(s) => run_state_from(&s.active_state),
             Err(_) => RunState::Missing,
         };
 
@@ -79,7 +79,7 @@ fn read_deployed_version(unit_name: &str) -> Option<String> {
     let home = std::env::var("HOME").ok()?;
     let path = std::path::PathBuf::from(home)
         .join(".local/share/fsn/deployed")
-        .join(format!("{}.version", name));
+        .join(format!("{name}.version"));
     std::fs::read_to_string(path)
         .ok()?
         .lines()

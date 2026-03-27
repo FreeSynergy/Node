@@ -45,6 +45,10 @@ impl FederatedS3Client {
     }
 
     /// Build an `opendal::Operator` targeting `bucket` on the remote node.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operator cannot be constructed.
     pub fn operator(&self, bucket: BucketKind) -> Result<Operator> {
         self.build_operator(bucket.name())
     }
@@ -52,6 +56,10 @@ impl FederatedS3Client {
     // ── profile pull ──────────────────────────────────────────────────────────
 
     /// Fetch a remote node's public profile JSON.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the profile cannot be fetched or deserialized.
     pub async fn fetch_profile(&self, remote_node_id: &str) -> Result<crate::profile::NodeProfile> {
         let op = self.operator(BucketKind::Profiles)?;
         let key = format!("{remote_node_id}/profile.json");
@@ -64,20 +72,21 @@ impl FederatedS3Client {
     }
 
     /// Download the avatar for a remote node into `dest_path`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no avatar is found or the download fails.
     pub async fn fetch_avatar(&self, remote_node_id: &str, dest_path: &Path) -> Result<()> {
         let op = self.operator(BucketKind::Profiles)?;
         for ext in ["png", "jpg", "jpeg", "webp"] {
             let key = format!("{remote_node_id}/avatar.{ext}");
-            match op.read(&key).await {
-                Ok(buf) => {
-                    let dest = dest_path.join(format!("avatar.{ext}"));
-                    tokio::fs::write(&dest, buf.to_bytes())
-                        .await
-                        .with_context(|| format!("write {}", dest.display()))?;
-                    tracing::debug!("fetched avatar {key} → {}", dest.display());
-                    return Ok(());
-                }
-                Err(_) => continue,
+            if let Ok(buf) = op.read(&key).await {
+                let dest = dest_path.join(format!("avatar.{ext}"));
+                tokio::fs::write(&dest, buf.to_bytes())
+                    .await
+                    .with_context(|| format!("write {}", dest.display()))?;
+                tracing::debug!("fetched avatar {key} → {}", dest.display());
+                return Ok(());
             }
         }
         anyhow::bail!(
@@ -89,12 +98,20 @@ impl FederatedS3Client {
     // ── bucket sync ───────────────────────────────────────────────────────────
 
     /// Pull all objects from a remote bucket into a local directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operator cannot be built or the sync fails.
     pub async fn pull_bucket(&self, bucket: BucketKind, local_dest: &Path) -> Result<SyncStats> {
         let op = self.operator(bucket)?;
         sync_remote_to_local(&op, "/", local_dest).await
     }
 
     /// Push all local files into a remote bucket.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operator cannot be built or the sync fails.
     pub async fn push_bucket(&self, bucket: BucketKind, local_src: &Path) -> Result<SyncStats> {
         let op = self.operator(bucket)?;
         sync_local_to_remote(local_src, "/", &op).await

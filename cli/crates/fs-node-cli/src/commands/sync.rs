@@ -59,7 +59,7 @@ pub async fn run(root: &Path, project: Option<&Path>) -> Result<()> {
             )
         );
         for n in &diff.to_remove {
-            println!("  - {}", n);
+            println!("  - {n}");
         }
     }
     Ok(())

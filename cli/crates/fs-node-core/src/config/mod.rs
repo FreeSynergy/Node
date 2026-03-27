@@ -50,6 +50,10 @@ pub use vault::VaultConfig;
 /// Single source of truth for the read-and-parse pattern used by all config
 /// types (`ProjectConfig`, `HostConfig`, `ServiceInstanceConfig`, …).
 /// Returns typed `FsyError` variants so callers do not need to map manually.
+///
+/// # Errors
+///
+/// Returns an error if the file cannot be read, is invalid TOML, or cannot be deserialized.
 pub fn load_toml<T>(path: &std::path::Path) -> Result<T, fs_error::FsyError>
 where
     T: serde::de::DeserializeOwned,
@@ -61,8 +65,12 @@ where
 ///
 /// Chain of Responsibility:
 ///   1. Read file
-///   2. validate::validate_toml_content (size → syntax → safety → schema)
+///   2. `validate::validate_toml_content` (size → syntax → safety → schema)
 ///   3. Deserialize into `T`
+///
+/// # Errors
+///
+/// Returns an error if the file cannot be read, fails validation, or cannot be deserialized.
 pub fn load_toml_validated<T>(
     path: &std::path::Path,
     kind: validate::TomlKind,

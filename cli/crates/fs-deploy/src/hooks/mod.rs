@@ -34,7 +34,7 @@ pub struct HookContext<'a> {
     /// The module instance that was just deployed.
     pub instance: &'a ServiceInstance,
 
-    /// All modules in the project (needed by Kanidm to register OAuth2 clients).
+    /// All modules in the project (needed by `Kanidm` to register `OAuth2` clients).
     pub desired: &'a DesiredState,
 
     pub project: &'a ProjectConfig,
@@ -47,7 +47,7 @@ pub struct HookContext<'a> {
     pub fs_root: &'a Path,
 }
 
-impl<'a> HookContext<'a> {
+impl HookContext<'_> {
     /// Data directory for this specific instance.
     /// Mirrors `module_vars.config_dir` in Ansible.
     pub fn instance_data_dir(&self) -> PathBuf {
@@ -100,12 +100,18 @@ type HookFn =
 static HOOK_REGISTRY: &[(&str, HookFn)] = &[
     ("apps/kanidm", |ctx| Box::pin(kanidm::run(ctx))),
     ("apps/stalwart", |ctx| Box::pin(stalwart::run(ctx))),
-    ("apps/tuwunel", |ctx| Box::pin(tuwunel::run(ctx))),
+    ("apps/tuwunel", |ctx| {
+        Box::pin(async move { tuwunel::run(ctx) })
+    }),
     ("containers/forgejo", |ctx| Box::pin(forgejo::run(ctx))),
-    ("containers/cryptpad", |ctx| Box::pin(cryptpad::run(ctx))),
-    ("containers/vikunja", |ctx| Box::pin(vikunja::run(ctx))),
+    ("containers/cryptpad", |ctx| {
+        Box::pin(async move { cryptpad::run(ctx) })
+    }),
+    ("containers/vikunja", |ctx| {
+        Box::pin(async move { vikunja::run(ctx) })
+    }),
     ("containers/openobserver", |ctx| {
-        Box::pin(openobserver::run(ctx))
+        Box::pin(async move { openobserver::run(ctx) })
     }),
 ];
 

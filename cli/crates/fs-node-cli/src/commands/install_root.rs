@@ -114,10 +114,7 @@ pub async fn migrate(base: &str, new_path: PathBuf) -> Result<()> {
         "config" => InstallPaths::config_types(),
         "font" => InstallPaths::font_types(),
         "icon" | "cursor" => InstallPaths::icon_types(),
-        _ => bail!(
-            "Unknown base '{}'. Valid: system, config, font, icon, cursor",
-            base
-        ),
+        _ => bail!("Unknown base '{base}'. Valid: system, config, font, icon, cursor"),
     };
 
     // Read installed packages to know what to move.
@@ -175,15 +172,12 @@ fn apply_base(paths: &mut InstallPaths, base: &str, new_path: PathBuf) -> Result
         "font" => paths.font_base = new_path,
         "icon" => paths.icon_base = new_path,
         "cursor" => paths.cursor_base = new_path,
-        _ => bail!(
-            "Unknown base '{}'. Valid values: system, config, font, icon, cursor",
-            base
-        ),
+        _ => bail!("Unknown base '{base}'. Valid values: system, config, font, icon, cursor"),
     }
     Ok(())
 }
 
-/// Read all installed packages and their ResourceType from the DB.
+/// Read all installed packages and their `ResourceType` from the DB.
 async fn get_installed_names() -> Vec<(String, ResourceType)> {
     let Some(conn) = crate::db::get_conn() else {
         return Vec::new();
@@ -198,11 +192,10 @@ async fn get_installed_names() -> Vec<(String, ResourceType)> {
         .collect()
 }
 
-/// Parse ResourceType from the stored label string.
+/// Parse `ResourceType` from the stored label string.
 fn parse_resource_type(label: &str) -> ResourceType {
     match label {
         "App" => ResourceType::App,
-        "Container" => ResourceType::Container,
         "Bundle" => ResourceType::Bundle,
         "Widget" => ResourceType::Widget,
         "Bot" => ResourceType::Bot,

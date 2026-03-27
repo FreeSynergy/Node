@@ -17,6 +17,7 @@ pub struct TemplateContext {
 
 impl TemplateContext {
     /// Create an empty context.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             vars: IndexMap::new(),
@@ -55,6 +56,10 @@ impl TemplateContext {
     }
 
     /// Insert any serializable value (structs, vecs, maps).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `val` cannot be serialized to JSON.
     pub fn set<T: Serialize>(
         &mut self,
         key: impl Into<String>,
@@ -78,6 +83,7 @@ impl TemplateContext {
     }
 
     /// Return `true` when `key` is set in this context.
+    #[must_use]
     pub fn contains_key(&self, key: &str) -> bool {
         self.vars.contains_key(key)
     }

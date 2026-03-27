@@ -20,6 +20,7 @@ impl JoinToken {
     /// Generate a new `JoinToken` for the given cluster.
     ///
     /// The token is a randomly generated UUID v4 formatted as a plain string.
+    #[must_use]
     pub fn generate(cluster_id: &str) -> Self {
         // Use a simple UUID-v4-style generation via rand (no extra uuid crate required).
         let token = generate_uuid_v4();
@@ -31,11 +32,13 @@ impl JoinToken {
     }
 
     /// Returns `true` if `token` matches this join token.
+    #[must_use]
     pub fn verify(&self, token: &str) -> bool {
         self.token == token
     }
 
     /// Returns `true` if this token is older than `ttl_hours`.
+    #[must_use]
     pub fn is_expired(&self, ttl_hours: u64) -> bool {
         let ttl = std::time::Duration::from_secs(ttl_hours * 3600);
         match self.issued_at.elapsed() {
@@ -45,6 +48,7 @@ impl JoinToken {
     }
 
     /// Returns the token string.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.token
     }
@@ -70,29 +74,29 @@ fn generate_uuid_v4() -> String {
         .unwrap_or_default()
         .as_nanos();
 
-    let mut h = DefaultHasher::new();
-    now.hash(&mut h);
-    std::thread::current().id().hash(&mut h);
-    let a = h.finish();
+    let mut hasher = DefaultHasher::new();
+    now.hash(&mut hasher);
+    std::thread::current().id().hash(&mut hasher);
+    let hash0 = hasher.finish();
 
-    now.hash(&mut h);
-    a.hash(&mut h);
-    let b = h.finish();
+    now.hash(&mut hasher);
+    hash0.hash(&mut hasher);
+    let hash1 = hasher.finish();
 
-    now.hash(&mut h);
-    b.hash(&mut h);
-    let c = h.finish();
+    now.hash(&mut hasher);
+    hash1.hash(&mut hasher);
+    let hash2 = hasher.finish();
 
-    now.hash(&mut h);
-    c.hash(&mut h);
-    let d = h.finish();
+    now.hash(&mut hasher);
+    hash2.hash(&mut hasher);
+    let hash3 = hasher.finish();
 
     // Format as UUID v4 (version bits set to 4, variant bits to 10xx).
-    let b0 = ((a >> 32) & 0xffff_ffff) as u32;
-    let b1 = (a & 0xffff) as u16; // time_mid
-    let b2 = (((b >> 48) & 0x0fff) as u16) | 0x4000; // version 4
-    let b3 = (((b >> 32) & 0x3fff) as u16) | 0x8000; // variant 10xx
-    let b4 = c ^ d;
+    let b0 = ((hash0 >> 32) & 0xffff_ffff) as u32;
+    let b1 = (hash0 & 0xffff) as u16; // time_mid
+    let b2 = (((hash1 >> 48) & 0x0fff) as u16) | 0x4000; // version 4
+    let b3 = (((hash1 >> 32) & 0x3fff) as u16) | 0x8000; // variant 10xx
+    let b4 = hash2 ^ hash3;
 
     format!(
         "{:08x}-{:04x}-{:04x}-{:04x}-{:012x}",

@@ -129,9 +129,10 @@ impl StoreCmd {
         let cache_dir = {
             let xdg = std::env::var("XDG_CACHE_HOME").ok();
             let home = std::env::var("HOME").unwrap_or_else(|_| "/root".to_string());
-            let base = xdg
-                .map(std::path::PathBuf::from)
-                .unwrap_or_else(|| std::path::PathBuf::from(&home).join(".cache"));
+            let base = xdg.map_or_else(
+                || std::path::PathBuf::from(&home).join(".cache"),
+                std::path::PathBuf::from,
+            );
             base.join("fsn").join("store")
         };
 
@@ -139,9 +140,9 @@ impl StoreCmd {
             let removed = std::fs::read_dir(&cache_dir)
                 .map(|entries| {
                     entries
-                        .filter_map(|e| e.ok())
+                        .filter_map(std::result::Result::ok)
                         .filter(|e| e.path().extension().is_some_and(|x| x == "toml"))
-                        .filter_map(|e| std::fs::remove_file(e.path()).ok().map(|_| ()))
+                        .filter_map(|e| std::fs::remove_file(e.path()).ok())
                         .count()
                 })
                 .unwrap_or(0);
@@ -384,17 +385,16 @@ impl PackageCmd {
 
         let mut vm = VersionManager::from_records(vm_records);
 
-        let target_version = match version {
-            Some(v) => v.to_string(),
-            None => {
-                let mut versions: Vec<_> = pkg_records.iter().collect();
-                versions.sort_by(|a, b| b.installed_at.cmp(&a.installed_at));
-                if versions.len() < 2 {
-                    println!("No previous version for '{id}' to roll back to.");
-                    return Ok(());
-                }
-                versions[1].version.clone()
+        let target_version = if let Some(v) = version {
+            v.to_string()
+        } else {
+            let mut versions: Vec<_> = pkg_records.iter().collect();
+            versions.sort_by(|a, b| b.installed_at.cmp(&a.installed_at));
+            if versions.len() < 2 {
+                println!("No previous version for '{id}' to roll back to.");
+                return Ok(());
             }
+            versions[1].version.clone()
         };
 
         vm.rollback(id, &target_version)

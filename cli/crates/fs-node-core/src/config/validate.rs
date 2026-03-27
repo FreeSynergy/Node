@@ -38,6 +38,11 @@ pub struct TomlValidator;
 impl TomlValidator {
     /// Validate TOML `content` before deserialization.
     /// Chain: size → syntax → safety → schema.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the content exceeds size limits, contains invalid TOML, unsafe
+    /// patterns, or fails schema validation for the given `kind`.
     pub fn validate(&self, content: &str, kind: TomlKind, path: &str) -> Result<(), FsyError> {
         Self::check_size(content, path)?;
         let doc = Self::check_syntax(content, path)?;
@@ -153,6 +158,11 @@ impl TomlValidator {
 
 // ── Public shim ───────────────────────────────────────────────────────────────
 
+/// Validate TOML `content` using the default [`TomlValidator`].
+///
+/// # Errors
+///
+/// Returns an error if the content fails any validation step.
 pub fn validate_toml_content(content: &str, kind: TomlKind, path: &str) -> Result<(), FsyError> {
     TomlValidator.validate(content, kind, path)
 }

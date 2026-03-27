@@ -25,6 +25,10 @@ impl ComposeInput {
     }
 
     /// Resolve to raw YAML text.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying file cannot be read.
     pub fn resolve(&self) -> Result<String, fs_error::FsyError> {
         match self {
             Self::Text(s) => Ok(s.clone()),
@@ -77,6 +81,10 @@ pub struct ComposeService {
 
 impl ComposeService {
     /// Parse a `ComposeFile` from raw YAML and return all services.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the YAML is invalid.
     pub fn parse_all(yaml: &str) -> Result<Vec<Self>, fs_error::FsyError> {
         let compose: ComposeFile = serde_yml::from_str(yaml)
             .map_err(|e| fs_error::FsyError::parse(format!("wizard: invalid compose YAML: {e}")))?;

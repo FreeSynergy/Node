@@ -1,3 +1,7 @@
+#![deny(clippy::all, clippy::pedantic, warnings)]
+// Many command functions are declared `async` for future extensibility
+// (callers await them) but don't currently use any async I/O.
+#![allow(clippy::unused_async)]
 mod cli;
 mod commands;
 mod db;
@@ -15,10 +19,10 @@ async fn main() -> Result<()> {
         .init();
 
     std::panic::set_hook(Box::new(|info| {
-        let location = info
-            .location()
-            .map(|l| format!("{}:{}", l.file(), l.line()))
-            .unwrap_or_else(|| "<unknown>".to_string());
+        let location = info.location().map_or_else(
+            || "<unknown>".to_string(),
+            |l| format!("{}:{}", l.file(), l.line()),
+        );
         let message = info
             .payload()
             .downcast_ref::<&str>()

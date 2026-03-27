@@ -72,10 +72,8 @@ async fn cmd_update_one(name: &str, dry_run: bool) -> Result<()> {
         .context("looking up installed package")?
         .ok_or_else(|| {
             anyhow::anyhow!(
-                "Package '{}' is not installed.\n\
-             Run `fsn install {}` to install it first.",
-                name,
-                name
+                "Package '{name}' is not installed.\n\
+             Run `fsn install {name}` to install it first."
             )
         })?;
 
@@ -87,8 +85,7 @@ async fn cmd_update_one(name: &str, dry_run: bool) -> Result<()> {
         .find(|e| e.id == name)
         .ok_or_else(|| {
             anyhow::anyhow!(
-                "Package '{}' not found in store catalog — cannot check for updates.",
-                name
+                "Package '{name}' not found in store catalog — cannot check for updates."
             )
         })?;
 

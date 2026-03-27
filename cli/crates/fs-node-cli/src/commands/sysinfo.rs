@@ -62,6 +62,7 @@ pub async fn info() -> Result<()> {
 // ── fsn sysinfo --live ────────────────────────────────────────────────────────
 
 /// Show live (on-demand) system metrics: memory, disk, CPU temperature.
+#[allow(clippy::cast_precision_loss)]
 pub async fn live() -> Result<()> {
     // Re-read OS info (not cached, to show current hostname etc.)
     let (os, _) = SysInfoCache::default_path().get_or_detect();

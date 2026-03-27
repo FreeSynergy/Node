@@ -1,3 +1,4 @@
+#![deny(clippy::all, clippy::pedantic, warnings)]
 // fs-dns – DNS record management.
 // Replaces playbooks/tasks/dns-create-record.yml and dns-remove-record.yml.
 
@@ -7,12 +8,16 @@ pub mod provider;
 pub use provider::{DnsProvider, DnsRecord, RecordType};
 
 /// Create the right provider from a name string and API token.
+///
+/// # Errors
+///
+/// Returns an error if the provider name is unknown or not yet implemented.
 pub fn make_provider(name: &str, token: &str) -> anyhow::Result<Box<dyn DnsProvider>> {
     match name {
         "hetzner" => Ok(Box::new(hetzner::HetznerDns::new(token))),
         "cloudflare" => anyhow::bail!("Cloudflare DNS not yet implemented"),
         "none" => Ok(Box::new(NoopDns)),
-        other => anyhow::bail!("Unknown DNS provider: {}", other),
+        other => anyhow::bail!("Unknown DNS provider: {other}"),
     }
 }
 

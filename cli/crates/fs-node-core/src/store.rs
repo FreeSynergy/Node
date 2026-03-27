@@ -161,7 +161,7 @@ pub struct StoreEntry {
     pub min_fs_version: Option<String>,
 
     /// Name of the store this entry was fetched from.
-    /// Set by StoreClient when merging results from multiple stores.
+    /// Set by `StoreClient` when merging results from multiple stores.
     #[serde(default)]
     pub store_source: String,
 }
@@ -192,19 +192,20 @@ impl Manifest for StoreEntry {
 impl StoreEntry {
     /// Returns the category-derived display label shown in the TUI service class dropdown.
     /// Format: "Kanidm (IAM)" or "Kanidm (IAM) ↓" when not installed locally.
+    #[must_use]
     pub fn select_label(&self, is_local: bool) -> String {
-        let type_label = if !self.category.is_empty() {
+        let type_label = if self.category.is_empty() {
+            self.service_types
+                .iter()
+                .map(super::config::service::types::ServiceType::label)
+                .collect::<Vec<_>>()
+                .join("/")
+        } else {
             self.category
                 .split('.')
                 .next_back()
                 .unwrap_or(&self.category)
                 .to_uppercase()
-        } else {
-            self.service_types
-                .iter()
-                .map(|t| t.label())
-                .collect::<Vec<_>>()
-                .join("/")
         };
         if is_local {
             format!("{} ({})", self.name, type_label)
@@ -214,25 +215,28 @@ impl StoreEntry {
     }
 
     /// Returns the primary (first) service type of this entry.
+    #[must_use]
     pub fn primary_type(&self) -> &ServiceType {
         self.service_types.first().unwrap_or(&ServiceType::Custom)
     }
 
     /// Returns the primary service type as a lowercase string.
+    #[must_use]
     pub fn primary_type_str(&self) -> String {
         self.primary_type().to_string()
     }
 
     /// Returns the category suffix (e.g. "proxy" from "deploy.proxy").
-    /// Falls back to primary_type_str for backward compat.
+    /// Falls back to `primary_type_str` for backward compat.
+    #[must_use]
     pub fn category_type(&self) -> &str {
-        if !self.category.is_empty() {
+        if self.category.is_empty() {
+            &self.category
+        } else {
             self.category
                 .split('.')
                 .next_back()
                 .unwrap_or(&self.category)
-        } else {
-            &self.category
         }
     }
 }
@@ -257,7 +261,7 @@ pub struct I18nBundle {
     pub ui: toml::Table,
 }
 
-/// HTTP client for the FreeSynergy Store.
+/// HTTP client for the `FreeSynergy` Store.
 ///
 /// Fetches catalog and i18n bundles from a raw-file store URL.
 /// Use [`NodeStoreClient::node_store`] for the FSN production store.
@@ -276,6 +280,7 @@ impl NodeStoreClient {
     }
 
     /// Pre-configured client for the FSN production store.
+    #[must_use]
     pub fn node_store() -> Self {
         Self::new("https://raw.githubusercontent.com/FreeSynergy/fs-store/main")
     }
@@ -284,6 +289,11 @@ impl NodeStoreClient {
     ///
     /// `force_refresh` is accepted for API compatibility but has no effect
     /// (caching is handled by the caller via `fs-deploy`'s `StoreClient`).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the HTTP request fails, the response is not successful,
+    /// or the catalog TOML cannot be deserialized.
     pub async fn fetch_catalog<T>(
         &mut self,
         section: &str,
@@ -309,6 +319,10 @@ impl NodeStoreClient {
     }
 
     /// Fetch `{base_url}/{section}/{lang}.toml` and return an [`I18nBundle`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the HTTP request fails or the response cannot be parsed.
     pub async fn fetch_i18n(&self, section: &str, lang: &str) -> anyhow::Result<I18nBundle> {
         let url = format!("{}/{}/{lang}.toml", self.base_url, section);
         let text = self

@@ -80,6 +80,7 @@ impl SetupField {
 /// Matches on the primary type prefix (before `/`).
 ///
 /// Returns an empty slice when no fields are known (e.g. database, cache).
+#[must_use]
 pub fn setup_fields_for(class: &str) -> Vec<SetupField> {
     let primary = class.split('/').next().unwrap_or(class);
     match primary {

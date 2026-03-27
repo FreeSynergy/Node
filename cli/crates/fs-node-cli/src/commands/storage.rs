@@ -229,6 +229,7 @@ fn parse_bucket(name: &str) -> Result<BucketKind> {
     }
 }
 
+#[allow(clippy::cast_precision_loss)]
 fn human_bytes(b: u64) -> String {
     const K: u64 = 1024;
     const M: u64 = K * 1024;

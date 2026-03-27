@@ -12,6 +12,10 @@ const POLL_INTERVAL: Duration = Duration::from_secs(3);
 
 /// Wait until the service is reachable and returns a successful HTTP response,
 /// or until `timeout` is exceeded.
+///
+/// # Errors
+///
+/// Returns an error if the service does not become healthy within `timeout`.
 #[allow(clippy::cognitive_complexity)]
 pub async fn wait_for_ready(instance: &ServiceInstance, timeout: Duration) -> Result<()> {
     let Some(path) = &instance.class.meta.health_path else {
@@ -33,7 +37,7 @@ pub async fn wait_for_ready(instance: &ServiceInstance, timeout: Duration) -> Re
         .health_scheme
         .as_deref()
         .unwrap_or("http");
-    let url = format!("{}://localhost:{}{}", scheme, port, path);
+    let url = format!("{scheme}://localhost:{port}{path}");
 
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(5))
@@ -90,20 +94,18 @@ pub async fn check_once(instance: &ServiceInstance) -> HealthStatus {
         .health_scheme
         .as_deref()
         .unwrap_or("http");
-    let url = format!("{}://localhost:{}{}", scheme, port, path);
+    let url = format!("{scheme}://localhost:{port}{path}");
 
-    let client = match reqwest::Client::builder()
+    let Ok(client) = reqwest::Client::builder()
         .timeout(Duration::from_secs(5))
         .danger_accept_invalid_certs(true)
         .build()
-    {
-        Ok(c) => c,
-        Err(_) => return HealthStatus::Unknown,
+    else {
+        return HealthStatus::Unknown;
     };
 
     match client.get(&url).send().await {
         Ok(r) if r.status().is_success() || r.status().as_u16() == 401 => HealthStatus::Healthy,
-        Ok(_) => HealthStatus::Unhealthy,
-        Err(_) => HealthStatus::Unhealthy,
+        Ok(_) | Err(_) => HealthStatus::Unhealthy,
     }
 }

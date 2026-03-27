@@ -1,4 +1,5 @@
-//! FreeSynergy Resource Builder CLI.
+#![deny(clippy::all, clippy::pedantic, warnings)]
+//! `FreeSynergy` Resource Builder CLI.
 //!
 //! # Commands
 //!
@@ -31,7 +32,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Analyze a Docker Compose file and output a ContainerResource.
+    /// Analyze a Docker Compose file and output a `ContainerResource`.
     Analyze {
         /// Path to the Docker Compose YAML file.
         #[arg(value_name = "COMPOSE_FILE")]

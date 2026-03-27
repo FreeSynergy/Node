@@ -1,4 +1,5 @@
-//! fs-wizard — Import tool for FreeSynergy.
+#![deny(clippy::all, clippy::pedantic, warnings)]
+//! fs-wizard — Import tool for `FreeSynergy`.
 //!
 //! Import tool: converts Docker Compose / YAML container definitions into FSN module TOML.
 //! This is an import-only tool — Docker Compose is not used at runtime. FSN uses Quadlets.

@@ -44,6 +44,7 @@ impl ServiceRoleMap {
     }
 
     /// Returns `true` if no roles are assigned.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
@@ -65,7 +66,7 @@ pub struct AppSettings {
     pub preferred_lang: Option<String>,
 
     /// Module IDs that have been installed (local copy synced from store).
-    /// Example: ["zentinel", "kanidm"]
+    /// Example: `["zentinel", "kanidm"]`
     #[serde(default)]
     pub installed_modules: Vec<String>,
 
@@ -88,6 +89,7 @@ impl Default for AppSettings {
 
 impl AppSettings {
     /// Returns `true` if the module with the given ID is marked as installed.
+    #[must_use]
     pub fn is_installed(&self, id: &str) -> bool {
         self.installed_modules.iter().any(|m| m == id)
     }
@@ -130,7 +132,7 @@ pub struct StoreConfig {
 
     /// Git clone URL for syncing the full module tree locally.
     /// When absent, derived from `url` by stripping the raw.githubusercontent.com prefix.
-    /// Example: "https://github.com/FreeSynergy/Store.git"
+    /// Example: "<https://github.com/FreeSynergy/Store.git>"
     #[serde(default)]
     pub git_url: Option<String>,
 
@@ -161,6 +163,10 @@ fn default_true() -> bool {
 impl AppSettings {
     /// Load settings from `~/.config/fsn/settings.toml`.
     /// Returns `Default` when the file does not exist.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be read or parsed.
     pub fn load() -> Result<Self, FsyError> {
         let path = settings_path();
         if !path.exists() {
@@ -171,6 +177,10 @@ impl AppSettings {
     }
 
     /// Persist settings to `~/.config/fsn/settings.toml`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be written or serialized.
     pub fn save(&self) -> Result<(), FsyError> {
         let path = settings_path();
         if let Some(parent) = path.parent() {
@@ -204,6 +214,7 @@ fn settings_path() -> PathBuf {
 ///
 /// Callers pass the FSN workspace root so the fallback path always resolves
 /// even when no settings file or env var is present.
+#[must_use]
 pub fn resolve_plugins_dir(node_root: &std::path::Path) -> PathBuf {
     if let Some(dir) = resolve_plugins_dir_no_fallback() {
         return dir;
@@ -219,6 +230,12 @@ pub fn resolve_plugins_dir(node_root: &std::path::Path) -> PathBuf {
 /// Priority:
 ///   1. `FS_PLUGINS_DIR` environment variable.
 ///   2. First enabled store with a `local_path` → `{local_path}/Node/`.
+///
+/// # Panics
+///
+/// Panics if a store has `enabled = true` and `local_path = Some(...)` but the
+/// inner value is `None` (which cannot happen given the `is_some()` guard).
+#[must_use]
 pub fn resolve_plugins_dir_no_fallback() -> Option<PathBuf> {
     if let Ok(dir) = std::env::var("FS_PLUGINS_DIR") {
         return Some(PathBuf::from(dir));
@@ -273,6 +290,7 @@ impl ServiceRoleRegistry {
     ///
     /// Errors in individual files are silently skipped — partial results are
     /// always better than a startup crash.
+    #[must_use]
     pub fn build_from_dir(modules_dir: &std::path::Path) -> Self {
         let mut providers: HashMap<String, Vec<String>> = HashMap::new();
 
@@ -300,10 +318,7 @@ impl ServiceRoleRegistry {
 
     /// Returns all module names that claim to provide `role_id`.
     pub fn providers_for(&self, role_id: &str) -> &[String] {
-        self.providers
-            .get(role_id)
-            .map(Vec::as_slice)
-            .unwrap_or(&[])
+        self.providers.get(role_id).map_or(&[], Vec::as_slice)
     }
 
     /// Returns all role IDs seen across all modules.

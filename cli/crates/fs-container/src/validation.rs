@@ -60,10 +60,12 @@ pub struct ValidationReport {
 }
 
 impl ValidationReport {
+    #[must_use]
     pub fn is_valid(&self) -> bool {
         !self.issues.iter().any(|i| i.level == IssueLevel::Error)
     }
 
+    #[must_use]
     pub fn error_count(&self) -> usize {
         self.issues
             .iter()
@@ -71,6 +73,7 @@ impl ValidationReport {
             .count()
     }
 
+    #[must_use]
     pub fn warning_count(&self) -> usize {
         self.issues
             .iter()
@@ -105,6 +108,7 @@ impl ValidationReport {
 // ── Validator ─────────────────────────────────────────────────────────────────
 
 /// Run all checks against `compose` and return a validation report.
+#[must_use]
 pub fn validate(compose: &ComposeFile) -> ValidationReport {
     let mut issues = Vec::new();
 
@@ -269,12 +273,12 @@ services:
 
     #[test]
     fn missing_image_is_error() {
-        let yaml = r#"
+        let yaml = r"
 services:
   app:
     environment:
       - KEY=value
-"#;
+";
         let f = parse_str(yaml).unwrap();
         let r = validate(&f);
         assert!(r
@@ -285,11 +289,11 @@ services:
 
     #[test]
     fn no_healthcheck_is_warning() {
-        let yaml = r#"
+        let yaml = r"
 services:
   app:
     image: myapp:latest
-"#;
+";
         let f = parse_str(yaml).unwrap();
         let r = validate(&f);
         assert!(r.issues.iter().any(|i| i.level == IssueLevel::Warning));

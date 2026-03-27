@@ -26,6 +26,7 @@ pub struct S3Server {
 }
 
 impl S3Server {
+    #[must_use]
     pub fn new(config: StorageConfig) -> Self {
         Self {
             config: Arc::new(config),
@@ -33,6 +34,10 @@ impl S3Server {
     }
 
     /// Ensure bucket directories exist and start the S3 server in a background task.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if bucket initialization fails.
     pub async fn start(&self) -> Result<JoinHandle<()>> {
         buckets::ensure_buckets(&self.config.buckets_root())
             .await

@@ -103,8 +103,8 @@ fn apply_enrichment(vars: Vec<AnalyzedVar>, meta: &StorePackageMeta) -> Vec<Enri
             let mut enriched = EnrichedVar::from_analyzed(v);
             if let Some(sv) = store_var {
                 // Only fill gaps — never overwrite container app manager's own analysis
-                enriched.description = sv.description.clone();
-                enriched.example = sv.example.clone();
+                enriched.description.clone_from(&sv.description);
+                enriched.example.clone_from(&sv.example);
                 enriched.required = sv.required;
             }
             enriched

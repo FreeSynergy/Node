@@ -37,6 +37,11 @@ pub struct PluginMeta {
 }
 
 impl PluginConfig {
+    /// Load a plugin config from a TOML file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be read, is invalid TOML, or fails schema validation.
     pub fn load(path: &std::path::Path) -> Result<Self, fs_error::FsyError> {
         crate::config::load_toml(path)
     }

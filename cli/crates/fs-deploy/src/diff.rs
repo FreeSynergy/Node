@@ -3,6 +3,7 @@
 use fs_node_core::state::{ActualState, DesiredState, RunState, StateDiff};
 
 /// Compare desired state with actual state and return what needs to change.
+#[must_use]
 pub fn compute_diff(desired: &DesiredState, actual: &ActualState) -> StateDiff {
     let mut diff = StateDiff::default();
 
@@ -56,8 +57,8 @@ mod tests {
     use super::*;
     use fs_node_core::{
         config::service::{
-            Constraints, ContainerDef, ServiceClass, ServiceContract, ServiceLoad, ServiceMeta,
-            ServiceSetup, ServiceType,
+            Constraints, ContainerDef, ModuleRoles, ModuleUi, ServiceClass, ServiceContract,
+            ServiceLifecycle, ServiceLoad, ServiceMeta, ServiceSetup, ServiceType,
         },
         state::{
             actual::{ActualState, HealthStatus as ContainerHealth, RunState, ServiceStatus},
@@ -86,8 +87,8 @@ mod tests {
                 health_port: None,
                 health_scheme: None,
                 capabilities: vec![],
-                roles: Default::default(),
-                ui: Default::default(),
+                roles: ModuleRoles::default(),
+                ui: ModuleUi::default(),
             },
             vars: IndexMap::default(),
             load: ServiceLoad::default(),
@@ -107,7 +108,7 @@ mod tests {
             }),
             service: None,
             variables: vec![],
-            lifecycle: Default::default(),
+            lifecycle: ServiceLifecycle::default(),
             environment: IndexMap::default(),
             setup: ServiceSetup::default(),
             contract: ServiceContract::default(),

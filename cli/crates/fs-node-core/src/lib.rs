@@ -1,3 +1,4 @@
+#![deny(clippy::all, clippy::pedantic, warnings)]
 // fs-core – FreeSynergy.Node core data types and config parsing.
 //
 // This crate has NO async dependencies and NO binary I/O.

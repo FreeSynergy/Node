@@ -102,7 +102,11 @@ impl ContextBuilder {
                 PeerService {
                     name: p.name.clone(),
                     class_key: p.class_key.clone(),
-                    types: p.service_types.iter().map(|t| t.to_string()).collect(),
+                    types: p
+                        .service_types
+                        .iter()
+                        .map(std::string::ToString::to_string)
+                        .collect(),
                     domain: p.service_domain.clone(),
                     port: p.class.meta.port,
                     upstream_tls: p.class.contract.upstream_tls,

@@ -68,12 +68,13 @@ pub struct DeployOpts {
     /// When set, deploy to this remote host via SSH instead of running locally.
     pub remote_host: Option<fs_host::RemoteHost>,
 
-    /// Path to the local inventory SQLite database.
+    /// Path to the local inventory `SQLite` database.
     /// When set, deploy/undeploy operations are recorded in the Inventory.
     pub inventory_path: Option<PathBuf>,
 }
 
 impl DeployOpts {
+    #[must_use]
     pub fn default_for_user() -> Self {
         let home = std::env::var("HOME").unwrap_or_else(|_| "/root".to_string());
         Self {
@@ -91,6 +92,11 @@ impl DeployOpts {
 /// Deploy (or reconcile) the full desired state.
 /// Sub-modules are always started before their parents.
 /// When `opts.remote_host` is set, deploys via SSH instead of running locally.
+///
+/// # Errors
+///
+/// Returns an error if writing Quadlet files, reloading systemd, starting services,
+/// or health checks fail for any instance.
 #[allow(clippy::cognitive_complexity)]
 pub async fn deploy_all(
     desired: &DesiredState,
@@ -116,7 +122,7 @@ pub async fn deploy_all(
 
     // ── Phase 1: Write the project .network Quadlet ───────────────────────────
     let net_content = gen_quadlet::generate_network(&network_name, &desired.project_name);
-    let net_path = opts.quadlet_dir.join(format!("{}.network", &network_name));
+    let net_path = opts.quadlet_dir.join(format!("{network_name}.network"));
     write_if_changed(&net_path, &net_content)?;
 
     // ── Phase 2: Write all .container + .env files ────────────────────────────
@@ -252,7 +258,7 @@ pub async fn deploy_all(
     }
 
     // ── Phase 5: Run plugin generate-config for all applicable services ───────
-    run_all_plugin_configs(desired, data_root, opts)?;
+    run_all_plugin_configs(desired, data_root, opts);
 
     Ok(())
 }
@@ -260,6 +266,10 @@ pub async fn deploy_all(
 /// Stop and remove all FSN-managed services.
 ///
 /// Returns the number of services that were undeployed.
+///
+/// # Errors
+///
+/// Returns an error if listing units or undeploying any individual instance fails.
 pub async fn undeploy_all(opts: &DeployOpts) -> Result<usize> {
     let systemd = SystemctlManager::user();
     let units = crate::observe::list_fs_units(&systemd).await?;
@@ -271,9 +281,13 @@ pub async fn undeploy_all(opts: &DeployOpts) -> Result<usize> {
 }
 
 /// Stop and remove a single service (keep data directories).
+///
+/// # Errors
+///
+/// Returns an error if removing Quadlet files or reloading systemd fails.
 #[allow(clippy::cognitive_complexity)]
 pub async fn undeploy_instance(name: &str, opts: &DeployOpts) -> Result<()> {
-    let unit = format!("{}.service", name);
+    let unit = format!("{name}.service");
     let systemd = SystemctlManager::user();
 
     // Best-effort stop/disable (may already be stopped)
@@ -281,8 +295,8 @@ pub async fn undeploy_instance(name: &str, opts: &DeployOpts) -> Result<()> {
     let _ = systemd.disable(&unit).await;
 
     // Remove Quadlet files
-    let container_file = opts.quadlet_dir.join(format!("{}.container", name));
-    let env_file = opts.quadlet_dir.join(format!("{}.env", name));
+    let container_file = opts.quadlet_dir.join(format!("{name}.container"));
+    let env_file = opts.quadlet_dir.join(format!("{name}.env"));
     for f in [&container_file, &env_file] {
         if f.exists() {
             std::fs::remove_file(f)?;
@@ -290,7 +304,7 @@ pub async fn undeploy_instance(name: &str, opts: &DeployOpts) -> Result<()> {
     }
 
     // Remove version marker
-    let marker = opts.state_dir.join(format!("{}.version", name));
+    let marker = opts.state_dir.join(format!("{name}.version"));
     if marker.exists() {
         std::fs::remove_file(marker)?;
     }
@@ -429,6 +443,7 @@ async fn record_service_error(
 // ── Internal helpers ──────────────────────────────────────────────────────────
 
 /// Flatten instances into a list where sub-modules come before their parents.
+#[must_use]
 pub fn flatten_instances(modules: &[ServiceInstance]) -> Vec<&ServiceInstance> {
     let mut out = Vec::new();
     for m in modules {
@@ -452,14 +467,13 @@ fn write_quadlet_files(
 ) -> Result<()> {
     // .container
     let quadlet = gen_quadlet::generate(instance, Some(network_name))?;
-    let qpath = opts
-        .quadlet_dir
-        .join(format!("{}.container", instance.name));
+    let inst_name = &instance.name;
+    let qpath = opts.quadlet_dir.join(format!("{inst_name}.container"));
     write_if_changed(&qpath, &quadlet)?;
 
     // .env
     let env_content = gen_env::generate(instance)?;
-    let epath = opts.quadlet_dir.join(format!("{}.env", instance.name));
+    let epath = opts.quadlet_dir.join(format!("{inst_name}.env"));
     write_if_changed(&epath, &env_content)?;
 
     Ok(())
@@ -479,12 +493,14 @@ fn write_if_changed(path: &Path, content: &str) -> Result<()> {
 }
 
 fn write_version_marker(instance: &ServiceInstance, opts: &DeployOpts) -> Result<()> {
-    let path = opts.state_dir.join(format!("{}.version", instance.name));
+    let inst_name = &instance.name;
+    let path = opts.state_dir.join(format!("{inst_name}.version"));
     std::fs::write(&path, &instance.version)
         .with_context(|| format!("writing version marker {}", path.display()))
 }
 
-/// project_name → "fs-myproject" (lowercase, hyphens)
+/// `project_name` → "fs-myproject" (lowercase, hyphens)
+#[must_use]
 pub fn project_network_name(project_name: &str) -> String {
     let slug: String = project_name
         .chars()
@@ -496,7 +512,7 @@ pub fn project_network_name(project_name: &str) -> String {
             }
         })
         .collect();
-    format!("fs-{}", slug)
+    format!("fs-{slug}")
 }
 
 // ── Plugin config generation (Phase 5) ───────────────────────────────────────
@@ -512,11 +528,7 @@ pub fn project_network_name(project_name: &str) -> String {
 /// Plugin failures are non-fatal: a warning is emitted and the rest of the
 /// deploy continues.  This implements graceful degradation — a broken or
 /// missing plugin must never block unrelated services from starting.
-fn run_all_plugin_configs(
-    desired: &DesiredState,
-    data_root: &Path,
-    opts: &DeployOpts,
-) -> Result<()> {
+fn run_all_plugin_configs(desired: &DesiredState, data_root: &Path, opts: &DeployOpts) {
     for instance in &desired.services {
         if let Err(e) = run_service_plugin_config(instance, desired, data_root, opts) {
             warn!(
@@ -525,7 +537,6 @@ fn run_all_plugin_configs(
             );
         }
     }
-    Ok(())
 }
 
 fn run_service_plugin_config(
@@ -538,8 +549,7 @@ fn run_service_plugin_config(
         .class
         .manifest
         .as_ref()
-        .map(|m| m.commands.iter().any(|c| c == "generate-config"))
-        .unwrap_or(false);
+        .is_some_and(|m| m.commands.iter().any(|c| c == "generate-config"));
 
     // Plugin path: manifest + store_root available
     if has_generate_config {
@@ -611,7 +621,7 @@ fn run_plugin_generate_config(
     Ok(())
 }
 
-/// Built-in Zentinel KDL generator — fallback when no store_root or no manifest.
+/// Built-in Zentinel KDL generator — fallback when no `store_root` or no manifest.
 ///
 /// - Existing file: only the FSN-managed block is replaced (markers preserved).
 /// - New file: full config is generated (server + listeners + managed section).

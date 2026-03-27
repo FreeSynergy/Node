@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// TOML accepts either a single string (legacy) or an array:
 ///   type   = "proxy"               # legacy / single
-///   types  = ["proxy", "webhoster_simple"]   # multi-type
+///   types  = `["proxy", "webhoster_simple"]`   # multi-type
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq, Hash, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum ServiceType {
@@ -33,7 +33,7 @@ pub enum ServiceType {
     IamProvider,
     /// Identity broker: federates external identity providers (Keycloak, …)
     IamBroker,
-    /// Legacy catch-all for any IAM service (mapped to IamProvider on read)
+    /// Legacy catch-all for any IAM service (mapped to `IamProvider` on read)
     Iam,
 
     // ── Proxy / Webhosting ────────────────────────────────────────────────
@@ -53,9 +53,9 @@ pub enum ServiceType {
     Git,
 
     // ── Knowledge & collaboration ─────────────────────────────────────────
-    /// Wiki / knowledge base (Outline, BookStack, …)
+    /// Wiki / knowledge base (Outline, `BookStack`, …)
     Wiki,
-    /// Collaborative editing (CryptPad, …)
+    /// Collaborative editing (`CryptPad`, …)
     Collab,
 
     // ── Project management ────────────────────────────────────────────────
@@ -69,7 +69,7 @@ pub enum ServiceType {
     Maps,
 
     // ── Observability ─────────────────────────────────────────────────────
-    /// Observability / metrics / logs (OpenObserver, …)
+    /// Observability / metrics / logs (`OpenObserver`, …)
     Monitoring,
 
     // ── Infrastructure (internal) ─────────────────────────────────────────
@@ -118,8 +118,9 @@ impl ServiceType {
     /// Infer the primary `ServiceType` from a service class key prefix.
     ///
     /// Maps the first segment of a class key (e.g. "git" in "git/forgejo")
-    /// to the corresponding ServiceType variant.  Used in pre-registry contexts
+    /// to the corresponding `ServiceType` variant.  Used in pre-registry contexts
     /// (e.g. cross-service var collection) where the full class is not yet loaded.
+    #[must_use]
     pub fn from_class_prefix(prefix: &str) -> Option<Self> {
         match prefix {
             "mail" => Some(Self::Mail),
@@ -138,11 +139,13 @@ impl ServiceType {
 
     /// Returns `true` for types that are internal infrastructure
     /// (no subdomain, no proxy route, no user-facing UI).
+    #[must_use]
     pub fn is_internal(&self) -> bool {
         matches!(self, ServiceType::Database | ServiceType::Cache)
     }
 
     /// Returns `true` if this type can fill the IAM slot of a project.
+    #[must_use]
     pub fn is_iam(&self) -> bool {
         matches!(
             self,
@@ -151,6 +154,7 @@ impl ServiceType {
     }
 
     /// Returns `true` if this type can act as the project's reverse proxy.
+    #[must_use]
     pub fn is_proxy(&self) -> bool {
         matches!(self, ServiceType::Proxy)
     }
@@ -158,7 +162,8 @@ impl ServiceType {
     /// Logical category this type belongs to.
     ///
     /// Used for grouping in the service slot type-filter.
-    /// Multiple types may share the same category (e.g. IamProvider + IamBroker → "iam").
+    /// Multiple types may share the same category (e.g. `IamProvider` + `IamBroker` → "iam").
+    #[must_use]
     pub fn category(&self) -> &'static str {
         match self {
             ServiceType::IamProvider | ServiceType::IamBroker | ServiceType::Iam => "iam",
@@ -176,6 +181,7 @@ impl ServiceType {
     }
 
     /// Human-readable label (English) for TUI display.
+    #[must_use]
     pub fn label(&self) -> &'static str {
         match self {
             ServiceType::IamProvider => "IAM Provider",
@@ -200,6 +206,7 @@ impl ServiceType {
     }
 
     /// One-sentence plain-language explanation of what this service type is.
+    #[must_use]
     pub fn description(&self) -> &'static str {
         match self {
             ServiceType::IamProvider     => "Manages user identities, handles login and authentication (e.g. Kanidm, Keycloak).",
@@ -226,6 +233,7 @@ impl ServiceType {
     /// What contracts/interfaces this type provides to other services.
     ///
     /// Returns a list of human-readable strings explaining cross-service integration.
+    #[must_use]
     pub fn what_it_provides(&self) -> &'static [&'static str] {
         match self {
             ServiceType::IamProvider => &[
@@ -295,6 +303,7 @@ impl ServiceType {
     /// that are not consumed directly by peer services via template variables.
     ///
     /// OOP principle: the type owns this knowledge, not the caller's match block.
+    #[must_use]
     pub fn exported_contract(&self) -> Option<ExportedVarContract> {
         let prefix = match self {
             ServiceType::Mail => "MAIL",
@@ -324,15 +333,13 @@ impl ServiceType {
     /// `ServiceType::Git.consumed_slots()` → `["iam", "mail"]`
     ///
     /// OOP principle: the type knows what it depends on — callers iterate and look up.
+    #[must_use]
     pub fn consumed_slots(&self) -> &'static [&'static str] {
         match self {
-            ServiceType::Git => &["iam", "mail"],
-            ServiceType::Wiki => &["iam"],
-            ServiceType::Chat => &["iam"],
-            ServiceType::Collab => &["iam"],
-            ServiceType::Tasks => &["iam", "mail"],
-            ServiceType::Tickets => &["iam", "mail"],
-            ServiceType::Maps => &["iam"],
+            ServiceType::Git | ServiceType::Tasks | ServiceType::Tickets => &["iam", "mail"],
+            ServiceType::Wiki | ServiceType::Chat | ServiceType::Collab | ServiceType::Maps => {
+                &["iam"]
+            }
             // Infrastructure, proxy, and bots consume no project-level slots.
             _ => &[],
         }
@@ -343,6 +350,7 @@ impl ServiceType {
     /// Fine-grained capabilities (e.g. `IamScim`, `DatabaseMysql`) are declared
     /// at the plugin level in the container plugin TOML — these are the minimums
     /// that any implementation of this type must provide.
+    #[must_use]
     pub fn capabilities(&self) -> Vec<Capability> {
         match self {
             ServiceType::Database | ServiceType::Cache => vec![Capability::InternalOnly],
@@ -361,7 +369,7 @@ impl ServiceType {
 
 /// Fine-grained protocol or feature capability.
 ///
-/// ServiceType::capabilities() returns the guaranteed minimum for ALL plugins of
+/// `ServiceType::capabilities()` returns the guaranteed minimum for ALL plugins of
 /// that type. Individual container plugins declare additional capabilities in their
 /// TOML via `[module] capabilities = ["iam_scim", "database_postgres", …]`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
@@ -372,7 +380,7 @@ pub enum Capability {
     InternalOnly,
 
     // ── IAM ────────────────────────────────────────────────────────────────
-    /// OpenID Connect / OAuth2 login
+    /// `OpenID` Connect / `OAuth2` login
     IamOidc,
     /// LDAP directory access
     IamLdap,
@@ -380,19 +388,19 @@ pub enum Capability {
     IamSaml,
     /// SCIM 2.0 provisioning (Kanidm yes, Keycloak no)
     IamScim,
-    /// Identity federation (brokering external IdPs)
+    /// Identity federation (brokering external `IdPs`)
     IamFederation,
 
     // ── Database ───────────────────────────────────────────────────────────
-    /// PostgreSQL wire protocol
+    /// `PostgreSQL` wire protocol
     DatabasePostgres,
     /// MySQL/MariaDB wire protocol
     DatabaseMysql,
-    /// SQLite file-based storage
+    /// `SQLite` file-based storage
     DatabaseSqlite,
 
     // ── Cache ──────────────────────────────────────────────────────────────
-    /// Redis RESP protocol (Dragonfly, Redis, KeyDB, …)
+    /// Redis RESP protocol (Dragonfly, Redis, `KeyDB`, …)
     CacheRedis,
     /// Memcached protocol
     CacheMemcached,
@@ -423,8 +431,8 @@ pub enum Capability {
 /// All types that export vars use the same 4-variable pattern:
 ///   {PREFIX}_HOST    — container name (for internal DNS)
 ///   {PREFIX}_DOMAIN  — public subdomain (e.g. "mail.example.com")
-///   {PREFIX}_URL     — full HTTPS URL (e.g. "https://mail.example.com")
-///   {PREFIX}_PORT    — service port (from ServiceMeta::port)
+///   {PREFIX}_URL     — full HTTPS URL (e.g. "<https://mail.example.com>")
+///   {PREFIX}_PORT    — service port (from `ServiceMeta::port`)
 ///
 /// This struct is the single source of truth — `desired.rs` calls
 /// `contract.resolve(…)` instead of hard-coding prefix strings.
@@ -436,6 +444,7 @@ pub struct ExportedVarContract {
 
 impl ExportedVarContract {
     /// Resolve the contract into concrete key-value pairs.
+    #[must_use]
     pub fn resolve(&self, name: &str, domain: &str, port: u16) -> HashMap<String, String> {
         let p = self.prefix;
         HashMap::from([
@@ -453,6 +462,10 @@ impl ExportedVarContract {
 ///
 /// This enables backward-compatible reading of legacy TOML files that used
 /// `type = "proxy"` alongside new files that use `types = ["proxy", "webhoster_simple"]`.
+///
+/// # Errors
+///
+/// Returns a deserialization error if the value is neither a string nor an array of strings.
 pub fn de_service_types<'de, D>(d: D) -> Result<Vec<ServiceType>, D::Error>
 where
     D: serde::Deserializer<'de>,

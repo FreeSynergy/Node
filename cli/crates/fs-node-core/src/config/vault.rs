@@ -21,13 +21,13 @@ use anyhow::{Context, Result};
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 
-/// Vault – all values are SecretString (zero-on-drop, never logged).
+/// Vault – all values are `SecretString` (zero-on-drop, never logged).
 #[derive(Debug, Default)]
 pub struct VaultConfig {
     values: HashMap<String, SecretString>,
 }
 
-/// Raw deserialization target – plain strings, converted to SecretString after load.
+/// Raw deserialization target – plain strings, converted to `SecretString` after load.
 #[derive(Deserialize, Serialize, Default)]
 struct RawVault(HashMap<String, String>);
 
@@ -37,6 +37,10 @@ impl VaultConfig {
     /// Load vault from `vault_dir`.
     /// Tries vault.age first (needs passphrase), falls back to vault.toml (dev).
     /// Returns empty vault if neither exists.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a vault file exists but cannot be read or decrypted.
     pub fn load(vault_dir: &Path, passphrase: Option<&str>) -> Result<Self> {
         let age_path = vault_dir.join("vault.age");
         let toml_path = vault_dir.join("vault.toml");
@@ -55,6 +59,10 @@ impl VaultConfig {
     }
 
     /// Load plaintext vault.toml (development only – no passphrase).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be read or parsed.
     pub fn load_plaintext(path: &Path) -> Result<Self> {
         let content =
             std::fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
@@ -63,7 +71,11 @@ impl VaultConfig {
         Ok(Self::from_raw(raw))
     }
 
-    /// Decrypt vault.age and return VaultConfig.
+    /// Decrypt vault.age and return `VaultConfig`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be read, decrypted, or parsed.
     pub fn load_encrypted(path: &Path, passphrase: &str) -> Result<Self> {
         let ciphertext =
             std::fs::read(path).with_context(|| format!("reading {}", path.display()))?;
@@ -77,6 +89,10 @@ impl VaultConfig {
     // ── Persistence ───────────────────────────────────────────────────────────
 
     /// Encrypt vault contents and write vault.age.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if encryption or file write fails.
     pub fn save_encrypted(&self, path: &Path, passphrase: &str) -> Result<()> {
         let toml_str = toml::to_string(&self.to_raw())?;
         let ciphertext = encrypt_age(toml_str.as_bytes(), passphrase)?;
@@ -87,6 +103,10 @@ impl VaultConfig {
     }
 
     /// Write plaintext vault.toml (dev/init use only).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization or file write fails.
     pub fn save_plaintext(&self, path: &Path) -> Result<()> {
         let toml_str = toml::to_string(&self.to_raw())?;
         if let Some(parent) = path.parent() {
@@ -109,15 +129,20 @@ impl VaultConfig {
 
     // ── Read access ───────────────────────────────────────────────────────────
 
+    #[must_use]
     pub fn get(&self, key: &str) -> Option<&SecretString> {
         self.values.get(key)
     }
 
     /// Expose a secret for template rendering. Use sparingly.
+    #[must_use]
     pub fn expose(&self, key: &str) -> Option<&str> {
-        self.values.get(key).map(|s| s.expose_secret())
+        self.values
+            .get(key)
+            .map(secrecy::ExposeSecret::expose_secret)
     }
 
+    #[must_use]
     pub fn contains(&self, key: &str) -> bool {
         self.values.contains_key(key)
     }
@@ -126,6 +151,7 @@ impl VaultConfig {
         self.values.keys().map(String::as_str)
     }
 
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.values.is_empty()
     }
