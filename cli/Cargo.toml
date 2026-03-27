@@ -36,7 +36,7 @@ fs-inventory = { path = "../../fs-inventory" }
 fs-sysinfo   = { path = "../../fs-info", package = "fs-info" }
 fs-i18n      = { path = "../../fs-i18n" }
 fs-theme     = { path = "../../fs-theme" }
-fs-help      = { path = "../../fs-libs/fs-help" }
+fs-help      = { path = "../../fs-help" }
 fs-pkg            = { path = "../../fs-packages/fs-pkg" }
 fs-plugin-sdk     = { path = "../../fs-packages/fs-plugin-sdk" }
 fs-plugin-runtime = { path = "../../fs-packages/fs-plugin-runtime" }
