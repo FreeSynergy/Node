@@ -36,7 +36,11 @@ tower-http     = { workspace = true }
 serde_json     = { workspace = true }
 reqwest        = { workspace = true }
 uuid           = { workspace = true }
-fs-pkg        = { workspace = true }
+fs-pkg         = { workspace = true }
+fs-registry    = { workspace = true }
+fs-node-server = { workspace = true }
+fs-auth        = { workspace = true }
+async-trait    = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

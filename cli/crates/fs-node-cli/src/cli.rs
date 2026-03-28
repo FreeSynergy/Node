@@ -195,6 +195,12 @@ pub enum Command {
         cmd: BusCommand,
     },
 
+    /// Node server management (orchestration layers + invite system)
+    Node {
+        #[command(subcommand)]
+        cmd: NodeCommand,
+    },
+
     /// Show system information (OS, features, disk, memory, CPU temperature)
     Sysinfo {
         /// Show live on-demand data (disk, memory, temperature) instead of cached static info
@@ -569,6 +575,61 @@ pub enum ConfigCommand {
 }
 
 #[derive(Subcommand)]
+pub enum NodeCommand {
+    /// Start the full Node server (Auth, S3, `ServiceProxy`, Federation, API)
+    Serve {
+        /// HTTP bind address
+        #[arg(long, default_value = "127.0.0.1")]
+        bind: String,
+
+        /// HTTP port for the Node API
+        #[arg(long, default_value = "8080")]
+        port: u16,
+
+        /// Public domain name of this node (e.g. "node.example.com")
+        #[arg(long)]
+        domain: Option<String>,
+    },
+
+    /// Node invitation management
+    Invite {
+        #[command(subcommand)]
+        cmd: InviteCommand,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum InviteCommand {
+    /// Generate a new invite token and encrypted bundle
+    Create {
+        /// Token lifetime in hours (default: 24)
+        #[arg(long, default_value = "24")]
+        ttl_hours: u64,
+
+        /// Optional label for this invite (e.g. recipient name)
+        #[arg(long)]
+        label: Option<String>,
+
+        /// First port in the invite port range
+        #[arg(long, default_value = "9100")]
+        port_min: u16,
+
+        /// Last port (exclusive) in the invite port range
+        #[arg(long, default_value = "9200")]
+        port_max: u16,
+    },
+
+    /// Accept an invite from another node (decrypt bundle + connect)
+    Accept {
+        /// The invite token string
+        token: String,
+
+        /// The encrypted bundle string
+        bundle: String,
+    },
+}
+
+#[derive(Subcommand)]
 pub enum InstallRootCommand {
     /// Show all current installation base paths
     Show,
@@ -801,6 +862,7 @@ pub async fn run() -> Result<()> {
                 payload,
             } => commands::bus::publish_event(&topic, &source, payload.as_deref()).await,
         },
+        Command::Node { cmd } => commands::node::run(&root, cmd).await,
         Command::Sysinfo {
             live,
             refresh,

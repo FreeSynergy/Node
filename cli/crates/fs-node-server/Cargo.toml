@@ -1,0 +1,31 @@
+[package]
+name        = "fs-node-server"
+description = "FreeSynergy.Node – orchestration layer: Auth, S3, ServiceProxy, FederationGate, NodeAPI, Invites"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+fs-auth       = { workspace = true }
+fs-registry   = { workspace = true }
+fs-s3         = { workspace = true }
+fs-federation = { workspace = true }
+
+axum          = { workspace = true }
+tower-http    = { workspace = true }
+tokio         = { workspace = true }
+serde         = { workspace = true }
+serde_json    = { workspace = true }
+toml          = { workspace = true }
+uuid          = { workspace = true }
+rand          = { workspace = true }
+age           = { workspace = true }
+chrono        = { workspace = true }
+tracing       = { workspace = true }
+anyhow        = { workspace = true }
+thiserror     = { workspace = true }
+async-trait   = { workspace = true }
+
+[dev-dependencies]
+tokio    = { workspace = true }
+tempfile = { workspace = true }

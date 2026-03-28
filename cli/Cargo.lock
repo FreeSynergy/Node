@@ -1704,6 +1704,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "fs-auth"
+version = "0.2.0"
+dependencies = [
+ "async-trait",
+ "serde",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "fs-builder"
 version = "0.1.0"
 dependencies = [
@@ -1831,6 +1840,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "fs-federation"
+version = "0.1.0"
+dependencies = [
+ "fs-error",
+ "serde",
+ "serde_json",
+ "tracing",
+ "urlencoding",
+]
+
+[[package]]
 name = "fs-health"
 version = "0.1.0"
 dependencies = [
@@ -1904,9 +1924,11 @@ name = "fs-node-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "axum",
  "chrono",
  "clap",
+ "fs-auth",
  "fs-bus",
  "fs-container 0.2.0",
  "fs-db",
@@ -1916,7 +1938,9 @@ dependencies = [
  "fs-i18n",
  "fs-info",
  "fs-node-core",
+ "fs-node-server",
  "fs-pkg",
+ "fs-registry",
  "fs-s3",
  "fs-types",
  "libc",
@@ -1955,6 +1979,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "fs-node-server"
+version = "0.1.0"
+dependencies = [
+ "age",
+ "anyhow",
+ "async-trait",
+ "axum",
+ "chrono",
+ "fs-auth",
+ "fs-federation",
+ "fs-registry",
+ "fs-s3",
+ "rand 0.9.2",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "toml 1.0.6+spec-1.1.0",
+ "tower-http",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "fs-pkg"
 version = "0.1.0"
 dependencies = [
@@ -1984,6 +2033,20 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "fs-registry"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "fs-bus",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tracing",
 ]
 
 [[package]]

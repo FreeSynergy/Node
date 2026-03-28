@@ -9,6 +9,7 @@ pub mod init;
 pub mod install;
 pub mod install_root;
 pub mod logs;
+pub mod node;
 pub mod remove;
 pub mod restart;
 pub mod serve;

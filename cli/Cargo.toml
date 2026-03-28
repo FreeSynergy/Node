@@ -11,6 +11,7 @@ members = [
     "crates/fs-container",
     "crates/fs-builder",
     "crates/fs-template",
+    "crates/fs-node-server",
 ]
 resolver = "2"
 
@@ -40,8 +41,10 @@ fs-help      = { path = "../../fs-help" }
 fs-pkg            = { path = "../../fs-packages/fs-pkg" }
 fs-plugin-sdk     = { path = "../../fs-packages/fs-plugin-sdk" }
 fs-plugin-runtime = { path = "../../fs-packages/fs-plugin-runtime" }
+fs-registry   = { path = "../../fs-registry" }
 # Internal crates
-fs-node-core = { path = "crates/fs-node-core" }
+fs-node-core   = { path = "crates/fs-node-core" }
+fs-node-server = { path = "crates/fs-node-server" }
 fs-deploy    = { path = "crates/fs-deploy" }
 fs-dns       = { path = "crates/fs-dns" }
 fs-host      = { path = "crates/fs-host" }
