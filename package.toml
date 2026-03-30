@@ -1,0 +1,16 @@
+[package]
+name        = "fs-node"
+version     = "0.1.0"
+type        = "program"
+description = "FreeSynergy Node — deployment engine, Auth, S3, Federation, Node API"
+license     = "MIT"
+authors     = ["FreeSynergy.Net"]
+repository  = "https://github.com/FreeSynergy/fs-node"
+
+[capabilities]
+provides = ["node.api", "node.deploy", "node.s3", "node.dns", "node.host", "node.federation"]
+requires = ["auth.oauth", "db.engine"]
+
+[metadata]
+category = "program"
+tags     = ["node", "deploy", "server", "s3", "federation"]

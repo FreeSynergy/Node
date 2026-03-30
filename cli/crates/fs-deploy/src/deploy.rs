@@ -23,6 +23,7 @@ use std::time::Duration;
 use anyhow::{Context, Result};
 use chrono::Utc;
 use fs_container::SystemctlManager;
+use fs_db::DbConfig;
 use fs_inventory::models::ReleaseChannel;
 use fs_inventory::{
     InstalledResource, Inventory, ResourceStatus, ServiceInstance as InvServiceInstance,
@@ -348,7 +349,7 @@ async fn open_inventory(opts: &DeployOpts) -> Option<Inventory> {
             return None;
         }
     }
-    match Inventory::open(&path.to_string_lossy()).await {
+    match Inventory::open(DbConfig::sqlite(path.to_string_lossy().as_ref())).await {
         Ok(inv) => Some(inv),
         Err(e) => {
             warn!("Cannot open inventory {}: {e}", path.display());

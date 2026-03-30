@@ -91,7 +91,7 @@ impl<'a> Publisher<'a> {
             k
         };
 
-        let sig = key.sign(content.as_bytes());
+        let sig = key.sign_package(content.as_bytes());
         Ok(sig.to_hex())
     }
 
